@@ -16,6 +16,14 @@ dependencies = [
     "faster-whisper>=1.2.1",
 ]
 
+[project.optional-dependencies]
+email = [
+    "imapclient>=3.1.0",
+]
+discord = [
+    "discord-py>=2.3",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",
