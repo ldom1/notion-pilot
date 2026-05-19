@@ -1,7 +1,8 @@
-"""Shared enrichment + Notion write pipeline."""
+"""LLM-enriched pipeline → main Notion knowledge database."""
 
 from loguru import logger
-from notion_client import APIResponseError, AsyncClient as NotionClient
+from notion_client import APIResponseError
+from notion_client import AsyncClient as NotionClient
 
 from telegram_to_notion.adapters import MessageHandler
 from telegram_to_notion.config import Settings
@@ -23,9 +24,7 @@ async def process_message(
 def build_pipeline(settings: Settings) -> MessageHandler:
     """Return a ready-to-use async handler: IncomingMessage → page_id | None."""
     notion_client = NotionClient(auth=settings.notion_token.get_secret_value())
-    writer = NotionDatabaseWriter(
-        client=notion_client, database_id=settings.notion_database_id
-    )
+    writer = NotionDatabaseWriter(client=notion_client, database_id=settings.notion_database_id)
 
     async def _handler(incoming: IncomingMessage) -> str | None:
         try:
