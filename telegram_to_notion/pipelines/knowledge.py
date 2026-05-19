@@ -1,14 +1,11 @@
 """LLM-enriched pipeline → main Notion knowledge database."""
 
-from loguru import logger
-from notion_client import APIResponseError
-from notion_client import AsyncClient as NotionClient
-
 from telegram_to_notion.adapters import MessageHandler
 from telegram_to_notion.config import Settings
 from telegram_to_notion.llm.openrouter import interpret_message
 from telegram_to_notion.models import IncomingMessage
 from telegram_to_notion.notion import NotionDatabaseWriter
+from telegram_to_notion.pipelines.pipeline import build_pipeline
 
 
 async def process_message(
@@ -21,21 +18,6 @@ async def process_message(
     return await writer.create_page(notion_properties)
 
 
-def build_pipeline(settings: Settings) -> MessageHandler:
-    """Return a ready-to-use async handler: IncomingMessage → page_id | None."""
-    notion_client = NotionClient(auth=settings.notion_token.get_secret_value())
-    writer = NotionDatabaseWriter(client=notion_client, database_id=settings.notion_database_id)
-
-    async def _handler(incoming: IncomingMessage) -> str | None:
-        try:
-            page_id = await process_message(settings, writer, incoming)
-            logger.info("Wrote notion page {} from {}", page_id, incoming.sender)
-            return page_id
-        except APIResponseError as exc:
-            logger.error("notion API error: {}", exc)
-            return None
-        except Exception:  # pylint: disable=broad-exception-caught  # noqa: BLE001
-            logger.exception("failed to forward message to notion")
-            return None
-
-    return _handler
+def build_knowledge_pipeline(settings: Settings) -> MessageHandler:
+    """Return a handler that enriches via LLM and writes to the main knowledge DB."""
+    return build_pipeline(settings, settings.notion_database_id, process_message, "knowledge")
