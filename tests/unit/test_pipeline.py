@@ -1,4 +1,4 @@
-"""Unit tests for pipeline.py — mocks Notion writer and LLM."""
+"""Unit tests for the knowledge pipeline — mocks Notion writer and LLM."""
 
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -7,7 +7,7 @@ import pytest
 
 from telegram_to_notion.config import Settings
 from telegram_to_notion.models import IncomingMessage, MediaType, NotionDatabaseProperties
-from telegram_to_notion.pipeline import process_message
+from telegram_to_notion.pipelines.knowledge import process_message
 
 
 def _make_incoming() -> IncomingMessage:
@@ -30,7 +30,7 @@ async def test_process_message_returns_page_id():
     mock_writer.create_page.return_value = "page-abc"
 
     with patch(
-        "telegram_to_notion.pipeline.interpret_message", new_callable=AsyncMock, return_value=props
+        "telegram_to_notion.pipelines.knowledge.interpret_message", new_callable=AsyncMock, return_value=props
     ):
         result = await process_message(mock_settings, mock_writer, _make_incoming())
 
