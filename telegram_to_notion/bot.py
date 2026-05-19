@@ -6,7 +6,7 @@ from loguru import logger
 
 from telegram_to_notion.adapters import SourceAdapter
 from telegram_to_notion.config import Settings, load_settings
-from telegram_to_notion.pipelines import build_people_pipeline, build_pipeline
+from telegram_to_notion.pipelines import build_knowledge_pipeline, build_people_pipeline
 
 
 def _build_adapters(settings: Settings) -> list[SourceAdapter]:
@@ -41,7 +41,7 @@ async def _main(settings: Settings) -> None:
         )
     names = [a.name for a in adapters]
     logger.info("starting with adapters: {}", names)
-    pipeline = build_pipeline(settings)
+    pipeline = build_knowledge_pipeline(settings)
     people_pipeline = build_people_pipeline(settings)
 
     async def _run(adapter: SourceAdapter) -> None:
