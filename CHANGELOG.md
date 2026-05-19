@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Source adapter abstraction: `SourceAdapter` and `SinkAdapter` protocols in `telegram_to_notion/adapters/`
 - IMAP email adapter: polls unseen messages, filters by sender allowlist (`IMAP_ALLOWED_SENDERS`), archives processed emails (`uv sync --extra email`)
-- Discord adapter: source (messages → Notion) + sink (pipeline → Discord channel) (`uv sync --extra discord`)
+- Discord adapter: source (messages → Notion) + sink scaffolded for future pipeline notifications (`uv sync --extra discord`)
 - `pipeline.py`: shared enrichment + Notion write logic extracted from `bot.py`
 - Optional dep extras: `uv sync --extra email`, `uv sync --extra discord`
 
