@@ -1,0 +1,36 @@
+"""Unit tests for pipeline.py — mocks Notion writer and LLM."""
+
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
+from telegram_to_notion.models import IncomingMessage, MediaType, NotionDatabaseProperties
+from telegram_to_notion.pipeline import process_message
+
+
+def _make_incoming() -> IncomingMessage:
+    return IncomingMessage(
+        text="Hello pipeline",
+        caption=None,
+        sender="tester",
+        sent_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        media_type=MediaType.TEXT,
+        media=None,
+        source_adapter="telegram",
+    )
+
+
+@pytest.mark.asyncio
+async def test_process_message_returns_page_id():
+    props = NotionDatabaseProperties(name="T", description="D")
+    mock_writer = AsyncMock()
+    mock_writer.create_page.return_value = "page-abc"
+
+    with patch(
+        "telegram_to_notion.pipeline.interpret_message", new_callable=AsyncMock, return_value=props
+    ):
+        result = await process_message(None, mock_writer, _make_incoming())  # type: ignore[arg-type]
+
+    assert result == "page-abc"
+    mock_writer.create_page.assert_awaited_once_with(props)
