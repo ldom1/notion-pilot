@@ -55,7 +55,7 @@ class IncomingMessage(BaseModel):
     sent_at: datetime
     media_type: MediaType
     media: MediaPayload | None
-    source_adapter: str
+    source_adapter: str = Field(..., min_length=1)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
