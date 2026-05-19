@@ -1,5 +1,6 @@
 """Unit tests for email adapter helpers — no network, no IMAP connection."""
 
+import email as email_lib
 from datetime import datetime, timezone
 
 import pytest
@@ -37,11 +38,13 @@ class TestDecodeStr:
     def test_empty_string(self):
         assert _decode_str("") == ""
 
+    def test_rfc2047_base64_encoded_header(self):
+        # "Hello" encoded as =?utf-8?b?SGVsbG8=?=
+        assert _decode_str("=?utf-8?b?SGVsbG8=?=") == "Hello"
+
 
 class TestPlainBody:
     def test_simple_text_message(self):
-        import email as email_lib
-
         raw = (
             "From: sender@example.com\r\n"
             "Subject: Test\r\n"
@@ -52,8 +55,6 @@ class TestPlainBody:
         assert "Hello, world!" in _plain_body(msg)
 
     def test_html_only_returns_empty(self):
-        import email as email_lib
-
         raw = (
             "From: sender@example.com\r\n"
             "Content-Type: text/html; charset=utf-8\r\n\r\n"

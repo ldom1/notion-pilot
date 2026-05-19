@@ -54,6 +54,7 @@ def _sender_allowed(from_addr: str, allowed: list[str]) -> bool:
 
 
 def _parse_date(date_str: str | None) -> datetime:
+    """Parse an RFC 2822 date string; fall back to now(UTC) if missing or malformed."""
     if not date_str:
         return datetime.now(tz=timezone.utc)
     try:
@@ -79,12 +80,16 @@ class EmailAdapter:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._allowed: list[str] = [
-            s.strip() for s in (settings.imap_allowed_senders or "").split(",")
+            s.strip() for s in (settings.imap_allowed_senders or "").split(",") if s.strip()
         ]
+        if not settings.imap_host:
+            raise ValueError("imap_host is required for the email adapter")
+        if not settings.imap_user:
+            raise ValueError("imap_user is required for the email adapter")
+        if not settings.imap_password:
+            raise ValueError("imap_password is required for the email adapter")
 
     def _connect(self) -> IMAPClient:
-        assert self._settings.imap_host
-        assert self._settings.imap_password
         client = IMAPClient(self._settings.imap_host, port=self._settings.imap_port, ssl=True)
         client.login(
             self._settings.imap_user,
@@ -154,6 +159,8 @@ class EmailAdapter:
                     else:
                         to_mark_seen.append(raw.uid)
                         logger.debug("email from {} not in allowlist, skipping", raw.sender)
+                # At-least-once delivery: if _finalize raises after handler already wrote to Notion,
+                # the UID remains UNSEEN and will be reprocessed on the next poll.
                 if to_archive or to_mark_seen:
                     await asyncio.to_thread(self._finalize, to_archive, to_mark_seen)
             except Exception:  # noqa: BLE001  # pylint: disable=broad-exception-caught
