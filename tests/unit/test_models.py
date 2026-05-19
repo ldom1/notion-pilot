@@ -51,6 +51,20 @@ class TestIncomingMessage:
     def test_source_adapter_stored(self):
         assert _msg(source_adapter="email").source_adapter == "email"
 
+    def test_source_adapter_cannot_be_empty(self):
+        import pytest
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError):
+            IncomingMessage(
+                text="hi",
+                caption=None,
+                sender="tester",
+                sent_at=datetime(2026, 4, 18, 12, 0, tzinfo=timezone.utc),
+                media_type=MediaType.TEXT,
+                media=None,
+                source_adapter="",
+            )
+
 
 class TestNotionDatabasePropertiesFromIncoming:
     def test_detects_url_in_body(self):
