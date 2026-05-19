@@ -14,6 +14,7 @@ def _msg(text: str = "Hi", media_type: MediaType = MediaType.TEXT) -> IncomingMe
         sent_at=datetime(2026, 4, 18, 12, 0, tzinfo=timezone.utc),
         media_type=media_type,
         media=None,
+        source_adapter="telegram",
     )
 
 

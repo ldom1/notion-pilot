@@ -55,6 +55,7 @@ class IncomingMessage(BaseModel):
     sent_at: datetime
     media_type: MediaType
     media: MediaPayload | None
+    source_adapter: str
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -132,7 +133,7 @@ class NotionDatabaseProperties(BaseModel):
         src = infer_source_label(body) if body else None
         return cls(
             name=msg.name,
-            label=["telegram"],
+            label=[msg.source_adapter],
             entry_type=msg.media_type.value,
             url=url,
             source=src,
