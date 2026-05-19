@@ -53,6 +53,7 @@ async def handle_telegram_message(settings: Settings, msg: Message) -> IncomingM
             sent_at=sent_at,
             media_type=MediaType.VOICE,
             media=None,
+            source_adapter="telegram",
         )
 
     if msg.photo:
@@ -63,6 +64,7 @@ async def handle_telegram_message(settings: Settings, msg: Message) -> IncomingM
             sent_at=sent_at,
             media_type=MediaType.PHOTO,
             media=await extract_photo(msg),
+            source_adapter="telegram",
         )
 
     return IncomingMessage(
@@ -72,6 +74,7 @@ async def handle_telegram_message(settings: Settings, msg: Message) -> IncomingM
         sent_at=sent_at,
         media_type=MediaType.TEXT,
         media=None,
+        source_adapter="telegram",
     )
 
 

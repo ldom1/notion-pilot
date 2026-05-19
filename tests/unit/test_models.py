@@ -10,7 +10,10 @@ from telegram_to_notion.models import (
 
 
 def _msg(
-    text: str | None = None, caption: str | None = None, media_type: MediaType = MediaType.TEXT
+    text: str | None = None,
+    caption: str | None = None,
+    media_type: MediaType = MediaType.TEXT,
+    source_adapter: str = "telegram",
 ) -> IncomingMessage:
     return IncomingMessage(
         text=text,
@@ -19,6 +22,7 @@ def _msg(
         sent_at=datetime(2026, 4, 18, 12, 0, tzinfo=timezone.utc),
         media_type=media_type,
         media=None,
+        source_adapter=source_adapter,
     )
 
 
@@ -44,6 +48,9 @@ class TestIncomingMessage:
         assert _msg(text=None, caption="cap").body == "cap"
         assert _msg().body == ""
 
+    def test_source_adapter_stored(self):
+        assert _msg(source_adapter="email").source_adapter == "email"
+
 
 class TestNotionDatabasePropertiesFromIncoming:
     def test_detects_url_in_body(self):
@@ -58,9 +65,9 @@ class TestNotionDatabasePropertiesFromIncoming:
         assert props.url is None
         assert props.source is None
 
-    def test_default_label_is_telegram(self):
-        props = NotionDatabaseProperties.from_incoming(_msg(text="anything"))
-        assert props.label == ["telegram"]
+    def test_label_reflects_source_adapter(self):
+        assert NotionDatabaseProperties.from_incoming(_msg(source_adapter="email")).label == ["email"]
+        assert NotionDatabaseProperties.from_incoming(_msg(source_adapter="telegram")).label == ["telegram"]
 
     def test_entry_type_mirrors_media_type(self):
         props = NotionDatabaseProperties.from_incoming(_msg(media_type=MediaType.PHOTO))
