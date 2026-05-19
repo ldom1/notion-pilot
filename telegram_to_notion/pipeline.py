@@ -30,7 +30,7 @@ def build_pipeline(settings: Settings) -> MessageHandler:
         client=notion_client, database_id=settings.notion_database_id
     )
 
-    async def pipeline(incoming: IncomingMessage) -> str | None:
+    async def _handler(incoming: IncomingMessage) -> str | None:
         try:
             page_id = await process_message(settings, writer, incoming)
             logger.info("Wrote notion page {} from {}", page_id, incoming.sender)
@@ -42,4 +42,4 @@ def build_pipeline(settings: Settings) -> MessageHandler:
             logger.exception("failed to forward message to notion")
             return None
 
-    return pipeline
+    return _handler
