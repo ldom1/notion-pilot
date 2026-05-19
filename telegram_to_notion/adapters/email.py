@@ -82,6 +82,10 @@ class EmailAdapter:
         self._allowed: list[str] = [
             s.strip() for s in (settings.imap_allowed_senders or "").split(",") if s.strip()
         ]
+        if not self._allowed:
+            logger.warning(
+                "email adapter: IMAP_ALLOWED_SENDERS is empty — all incoming emails will be skipped"
+            )
         if not settings.imap_host:
             raise ValueError("imap_host is required for the email adapter")
         if not settings.imap_user:

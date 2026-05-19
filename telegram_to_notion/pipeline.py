@@ -1,16 +1,13 @@
 """Shared enrichment + Notion write pipeline."""
 
-from collections.abc import Awaitable, Callable
-
 from loguru import logger
 from notion_client import APIResponseError, AsyncClient as NotionClient
 
+from telegram_to_notion.adapters import MessageHandler
 from telegram_to_notion.config import Settings
 from telegram_to_notion.llm.openrouter import interpret_message
 from telegram_to_notion.models import IncomingMessage
 from telegram_to_notion.notion import NotionDatabaseWriter
-
-MessageHandler = Callable[[IncomingMessage], Awaitable[str | None]]
 
 
 async def process_message(

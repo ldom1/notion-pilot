@@ -52,6 +52,8 @@ class DiscordAdapter:
 
         await self._client.start(self._settings.discord_bot_token.get_secret_value())
 
+    # Sink is scaffolded — not yet wired into the pipeline. Will be connected
+    # when notification support is added (post-v1.1 roadmap item).
     async def send(self, text: str) -> None:
         """Post a notification message to the configured Discord channel."""
         channel = self._client.get_channel(int(self._settings.discord_channel_id))  # type: ignore[arg-type]
