@@ -69,6 +69,19 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
             "Emails from other senders are marked seen but not archived or forwarded."
         ),
     )
+    imap_people_senders: str = Field(
+        default="",
+        description=(
+            "Comma-separated sender suffixes for personal contacts "
+            "(e.g. @gmail.com,@icloud.com). Routed to NOTION_PEOPLE_DATABASE_ID."
+        ),
+    )
+
+    # ── Notion People DB (optional) ──────────────────────────────────────────
+    notion_people_database_id: str | None = Field(
+        default=None,
+        description="Notion database ID for the people / contacts database.",
+    )
 
     # ── Discord (optional) ───────────────────────────────────────────────────
     discord_bot_token: SecretStr | None = Field(

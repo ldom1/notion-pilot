@@ -1,10 +1,15 @@
 """Notion API wrapper for database page creation and file uploads."""
 
+from typing import Any, Protocol, runtime_checkable
+
 from loguru import logger
 from notion_client import AsyncClient
 from notion_client.errors import APIResponseError
 
-from telegram_to_notion.models import NotionDatabaseProperties
+
+@runtime_checkable
+class _HasNotionProperties(Protocol):
+    def to_notion_properties(self) -> dict[str, Any]: ...
 
 
 class NotionDatabaseWriter:
@@ -14,7 +19,7 @@ class NotionDatabaseWriter:
         self.client = client
         self.database_id = database_id
 
-    async def create_page(self, properties: NotionDatabaseProperties) -> str:
+    async def create_page(self, properties: _HasNotionProperties) -> str:
         """Create a new page in the database with the given content following the notion database structure."""
         logger.info(f"Creating page in database {self.database_id} for {properties.name}...")
         try:
@@ -29,7 +34,7 @@ class NotionDatabaseWriter:
             )
             raise e
 
-    async def update_page(self, page_id: str, properties: NotionDatabaseProperties) -> None:
+    async def update_page(self, page_id: str, properties: _HasNotionProperties) -> None:
         """Update an existing page in the database with the given content following the notion database structure."""
         logger.info(
             f"Updating page {page_id} in database {self.database_id} for {properties.name}..."

@@ -85,9 +85,7 @@ class TelegramAdapter:
             raise ValueError("telegram_bot_token is required for the Telegram adapter")
         self._settings = settings
 
-    def _build_app(
-        self, handler: PipelineHandler
-    ) -> Application[Any, Any, Any, Any, Any, Any]:
+    def _build_app(self, handler: PipelineHandler) -> Application[Any, Any, Any, Any, Any, Any]:
         settings = self._settings
 
         async def _handle(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
@@ -115,14 +113,10 @@ class TelegramAdapter:
                 await update.message.reply_text("telegram-to-notion: ok")
 
         app = (
-            ApplicationBuilder()
-            .token(self._settings.telegram_bot_token.get_secret_value())
-            .build()
+            ApplicationBuilder().token(self._settings.telegram_bot_token.get_secret_value()).build()
         )
         app.add_handler(CommandHandler("ping", _ping))
-        app.add_handler(
-            MessageHandler(filters.TEXT | filters.PHOTO | filters.VOICE, _handle)
-        )
+        app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.VOICE, _handle))
         return app
 
     async def run(self, handler: PipelineHandler) -> None:
