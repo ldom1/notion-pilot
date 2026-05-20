@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "code-index": {
+      "command": "uvx",
+      "args": ["code-index-mcp", "--project-path", "/home/lgiron/lab/dom-telegram-to-notion"]
+    },
+    "qmd": {
+      "command": "qmd",
+      "args": ["mcp"],
+      "env": {
+        "INDEX_PATH": "/home/lgiron/vault-qmd/index.sqlite"
+      }
+    }
+  }
+}

@@ -54,6 +54,7 @@ class TestIncomingMessage:
     def test_source_adapter_cannot_be_empty(self):
         import pytest
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             IncomingMessage(
                 text="hi",
@@ -80,8 +81,12 @@ class TestNotionDatabasePropertiesFromIncoming:
         assert props.source is None
 
     def test_label_reflects_source_adapter(self):
-        assert NotionDatabaseProperties.from_incoming(_msg(source_adapter="email")).label == ["email"]
-        assert NotionDatabaseProperties.from_incoming(_msg(source_adapter="telegram")).label == ["telegram"]
+        assert NotionDatabaseProperties.from_incoming(_msg(source_adapter="email")).label == [
+            "email"
+        ]
+        assert NotionDatabaseProperties.from_incoming(_msg(source_adapter="telegram")).label == [
+            "telegram"
+        ]
 
     def test_entry_type_mirrors_media_type(self):
         props = NotionDatabaseProperties.from_incoming(_msg(media_type=MediaType.PHOTO))

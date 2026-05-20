@@ -11,7 +11,7 @@ from imapclient import IMAPClient
 from imapclient.imapclient import SEEN
 from loguru import logger
 
-from telegram_to_notion.adapters import MessageHandler
+from telegram_to_notion.adapters import MessageHandler  # noqa: TCH001
 from telegram_to_notion.config import Settings
 from telegram_to_notion.models import IncomingMessage, MediaType
 
@@ -82,9 +82,13 @@ class EmailAdapter:
         self._allowed: list[str] = [
             s.strip() for s in (settings.imap_allowed_senders or "").split(",") if s.strip()
         ]
-        if not self._allowed:
+        self._people: list[str] = [
+            s.strip() for s in (settings.imap_people_senders or "").split(",") if s.strip()
+        ]
+        if not self._allowed and not self._people:
             logger.warning(
-                "email adapter: IMAP_ALLOWED_SENDERS is empty — all incoming emails will be skipped"
+                "email adapter: IMAP_ALLOWED_SENDERS and IMAP_PEOPLE_SENDERS are both empty — "
+                "all incoming emails will be skipped"
             )
         if not settings.imap_host:
             raise ValueError("imap_host is required for the email adapter")
@@ -94,23 +98,32 @@ class EmailAdapter:
             raise ValueError("imap_password is required for the email adapter")
 
     def _connect(self) -> IMAPClient:
-        client = IMAPClient(self._settings.imap_host, port=self._settings.imap_port, ssl=True)
+        port = self._settings.imap_port
+        # Port 993 → direct TLS; anything else (e.g. 587, 143) → STARTTLS
+        use_ssl = port == 993
+        client = IMAPClient(self._settings.imap_host, port=port, ssl=use_ssl)
+        if not use_ssl:
+            client.starttls()
         client.login(
             self._settings.imap_user,
             self._settings.imap_password.get_secret_value(),
         )
         return client
 
-    def _fetch_unseen(self) -> list[_RawEmail]:
+    def _fetch_unseen(
+        self, search: list[str] | None = None, folder: str | None = None
+    ) -> list[_RawEmail]:
         with self._connect() as client:
-            client.select_folder(self._settings.imap_inbox)
-            uids = client.search(["UNSEEN"])
+            client.select_folder(folder or self._settings.imap_inbox)
+            uids = client.search(search or ["UNSEEN"])
             if not uids:
                 return []
-            raw_messages = client.fetch(uids, ["RFC822"])
+            # BODY.PEEK[] fetches the full message without setting the \Seen flag,
+            # unlike RFC822 which silently marks messages as read on the server.
+            raw_messages = client.fetch(uids, ["BODY.PEEK[]"])
             result: list[_RawEmail] = []
             for uid, data in raw_messages.items():
-                msg = email_lib.message_from_bytes(data[b"RFC822"])
+                msg = email_lib.message_from_bytes(data[b"BODY[]"])
                 _, from_addr = parseaddr(msg.get("From", ""))
                 result.append(
                     _RawEmail(
@@ -144,7 +157,11 @@ class EmailAdapter:
             source_adapter="email",
         )
 
-    async def run(self, handler: MessageHandler) -> None:
+    async def run(
+        self,
+        handler: MessageHandler,
+        people_handler: MessageHandler | None = None,
+    ) -> None:
         logger.info(
             "email adapter: polling {} every {}s",
             self._settings.imap_host,
@@ -159,10 +176,14 @@ class EmailAdapter:
                     if _sender_allowed(raw.sender, self._allowed):
                         await handler(self._to_incoming(raw))
                         to_archive.append(raw.uid)
-                        logger.info("email processed and queued for archive: {}", raw.sender)
+                        logger.info("email processed → content DB: {}", raw.sender)
+                    elif people_handler and _sender_allowed(raw.sender, self._people):
+                        await people_handler(self._to_incoming(raw))
+                        to_archive.append(raw.uid)
+                        logger.info("email processed → people DB: {}", raw.sender)
                     else:
                         to_mark_seen.append(raw.uid)
-                        logger.debug("email from {} not in allowlist, skipping", raw.sender)
+                        logger.debug("email from {} not in any allowlist, skipping", raw.sender)
                 # At-least-once delivery: if _finalize raises after handler already wrote to Notion,
                 # the UID remains UNSEEN and will be reprocessed on the next poll.
                 if to_archive or to_mark_seen:
