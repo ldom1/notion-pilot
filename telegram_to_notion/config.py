@@ -83,6 +83,20 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         description="Notion database ID for the people / contacts database.",
     )
 
+    # ── CRM / People import (optional) ──────────────────────────────────────
+    notion_people_data_source_id: str | None = Field(
+        default=None,
+        description="Notion data source ID for the People database (inline DS API).",
+    )
+    notion_companies_data_source_id: str | None = Field(
+        default=None,
+        description="Notion data source ID for the Companies & departments database.",
+    )
+    brave_api_key: SecretStr | None = Field(
+        default=None,
+        description="Brave Search API key for email enrichment during people import.",
+    )
+
     # ── Discord (optional) ───────────────────────────────────────────────────
     discord_bot_token: SecretStr | None = Field(
         default=None, description="Discord bot token; enables the Discord adapter"
