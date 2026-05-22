@@ -1,6 +1,9 @@
 {
-  "description": "Project brain — persistent knowledge synced with Local Brain vault",
-  "read_on_session_start": ["OBJECTIVES.md", "CONTEXT.md"],
+  "description": "Project brain \u2014 persistent knowledge synced with Local Brain vault",
+  "read_on_session_start": [
+    "OBJECTIVES.md",
+    "CONTEXT.md"
+  ],
   "files": {
     "OBJECTIVES.md": "Project goals, scope, non-goals. Read at session start.",
     "ARCHITECTURE.md": "Stack decisions, key modules. Update when architecture changes.",

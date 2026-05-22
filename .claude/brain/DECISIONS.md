@@ -27,7 +27,27 @@
 **Rejected:** Cloud STT APIs  
 **Rationale:** No data leaves the server; no API key; aligns with self-hosted, privacy-first positioning
 
-### 2026-04-17 — animation checked before video in handlers
+### 2026-05-21 — crm/ and pipelines/ coexist as separate packages
+**Decision:** Keep `crm/` (batch CRM operations) and `pipelines/` (real-time event-driven handlers) as distinct packages  
+**Rejected:** Merging CRM logic into pipelines/  
+**Rationale:** Different execution models (batch scripts vs. async event loop), different lifecycles. Both need the Notion client but serve different concerns.
+
+### 2026-05-22 — Deals DB uses standard databases API, not data_sources
+**Decision:** `NotionDealsSyncer` uses `parent={"database_id": ...}` and raw httpx for create/patch  
+**Rejected:** Inline data_sources API (used by People + Companies)  
+**Rationale:** Deals DB was created via `databases.create()` — standard database, not inline. data_sources API returns 404 for programmatically-created DBs. Additionally, `notion-client 3.x` silently drops the `properties` arg on `databases.create()`; all scripts use raw httpx PATCH to apply the schema after creation.
+
+### 2026-05-22 — Four-tier enrichment pipeline with Perplexity between Brave and LLM
+**Decision:** `utils/enrichment.py` uses four tiers: Apollo.io → Brave Search → Perplexity (`sonar-pro`) → LLM inference  
+**Rejected:** Three-tier (Apollo → Brave → LLM) or replacing Brave with Perplexity  
+**Rationale:** Perplexity is more expensive than Brave but cheaper than pure LLM inference when used for structured lookups. Brave is kept as the cheap fast pass (regex email/linkedin); Perplexity runs only when Brave returns nothing, providing web-grounded synthesis. LLM inference remains last resort for fields that can't be found online (seniority, role_type). Both Perplexity and LLM tiers reuse `OPENROUTER_API_KEY` — no additional config key.
+
+### 2026-05-22 — `utils/` package extracted from `crm/`
+**Decision:** `dedup.py` and `enrichment.py` live in `utils/`, not `crm/`  
+**Rejected:** Keeping them in `crm/`  
+**Rationale:** `crm/` is strictly Notion CRM objects (reads/writes to Notion). `dedup.py` is pure rapidfuzz + normalization. `enrichment.py` calls Apollo/Brave/Perplexity/OpenRouter with zero Notion dependency. The boundary makes both packages independently testable and reusable.
+
+### 2026-05-22 — animation checked before video in handlers
 **Decision:** Always check `message.animation` before `message.video`  
 **Rejected:** Relying on message type alone  
 **Rationale:** Telegram sets both `animation` and `video` flags for GIFs; wrong order causes GIFs to be misclassified as videos

@@ -1,0 +1,152 @@
+"""Notion People and Company syncers with fuzzy dedup."""
+from dataclasses import dataclass, field
+from typing import Literal
+
+from loguru import logger
+from notion_client import AsyncClient
+from rapidfuzz.fuzz import token_sort_ratio
+
+from telegram_to_notion.crm.dedup import CandidateRecord, DedupStatus, find_match, normalize
+
+
+@dataclass
+class PersonRecord:
+    name: str
+    company: str
+    position: str = field(default="")
+    linkedin_url: str = field(default="")
+    email: str = field(default="")
+
+
+@dataclass
+class UpsertResult:
+    status: Literal["created", "skipped", "review"]
+    page_id: str = field(default="")
+    score: float = field(default=0.0)
+    matched_name: str = field(default="")
+    matched_company: str = field(default="")
+
+
+class NotionCompanySyncer:
+    """Load Companies snapshot from Notion; resolve or create on demand."""
+
+    def __init__(self, client: AsyncClient, data_source_id: str) -> None:
+        self._client = client
+        self._ds_id = data_source_id
+        self._name_to_id: dict[str, str] = {}  # normalized name → page_id
+        self._id_to_name: dict[str, str] = {}  # page_id → original name
+
+    def id_to_name(self, page_id: str) -> str:
+        return self._id_to_name.get(page_id, "")
+
+    async def load_snapshot(self) -> None:
+        cursor: str | None = None
+        while True:
+            kw: dict[str, object] = dict(data_source_id=self._ds_id, page_size=100)
+            if cursor:
+                kw["start_cursor"] = cursor
+            result = await self._client.data_sources.query(**kw)
+            for page in result["results"]:
+                name_prop = page["properties"].get("Name", {})
+                if name_prop.get("title"):
+                    name = name_prop["title"][0]["plain_text"]
+                    self._name_to_id[normalize(name)] = page["id"]
+                    self._id_to_name[page["id"]] = name
+            if not result.get("has_more"):
+                break
+            cursor = result["next_cursor"]
+        logger.info("Companies snapshot: {} entries", len(self._name_to_id))
+
+    async def get_or_create(self, name: str) -> str:
+        norm = normalize(name)
+        best_score = 0.0
+        best_id = ""
+        for cached_norm, page_id in self._name_to_id.items():
+            score = float(token_sort_ratio(norm, cached_norm))
+            if score > best_score:
+                best_score = score
+                best_id = page_id
+        if best_score >= 85 and best_id:
+            return best_id
+        page = await self._client.pages.create(
+            parent={"type": "data_source_id", "data_source_id": self._ds_id},
+            properties={"Name": {"title": [{"text": {"content": name}}]}},
+        )
+        page_id: str = page["id"]
+        self._name_to_id[norm] = page_id
+        self._id_to_name[page_id] = name
+        logger.info("Created company: {} ({})", name, page_id)
+        return page_id
+
+
+class NotionPeopleSyncer:
+    """Load People snapshot from Notion; upsert with dedup and company resolution."""
+
+    def __init__(
+        self,
+        client: AsyncClient,
+        data_source_id: str,
+        company_syncer: NotionCompanySyncer,
+    ) -> None:
+        self._client = client
+        self._ds_id = data_source_id
+        self._company_syncer = company_syncer
+        self._existing: list[CandidateRecord] = []
+
+    async def load_snapshot(self) -> None:
+        """Load all existing people into memory. Call after company_syncer.load_snapshot()."""
+        cursor: str | None = None
+        while True:
+            kw: dict[str, object] = dict(data_source_id=self._ds_id, page_size=100)
+            if cursor:
+                kw["start_cursor"] = cursor
+            result = await self._client.data_sources.query(**kw)
+            for page in result["results"]:
+                props = page["properties"]
+                name_prop = props.get("Nom", {})
+                name = name_prop["title"][0]["plain_text"] if name_prop.get("title") else ""
+                if not name:
+                    continue
+                company_ids = [r["id"] for r in props.get("Entreprise", {}).get("relation", [])]
+                company = self._company_syncer.id_to_name(company_ids[0]) if company_ids else ""
+                self._existing.append({"name": name, "company": company, "page_id": page["id"]})
+            if not result.get("has_more"):
+                break
+            cursor = result["next_cursor"]
+        logger.info("People snapshot: {} entries", len(self._existing))
+
+    async def upsert(self, person: PersonRecord) -> UpsertResult:
+        match = find_match(person.name, person.company, self._existing)
+
+        if match.status == DedupStatus.SKIP:
+            return UpsertResult("skipped", score=match.score,
+                                matched_name=match.matched_name, matched_company=match.matched_company)
+        if match.status == DedupStatus.REVIEW:
+            return UpsertResult("review", score=match.score,
+                                matched_name=match.matched_name, matched_company=match.matched_company)
+
+        company_id = ""
+        if person.company:
+            company_id = await self._company_syncer.get_or_create(person.company)
+
+        properties: dict[str, object] = {
+            "Nom": {"title": [{"text": {"content": person.name}}]},
+            "Dans mon réseau ?": {"select": {"name": "Yes"}},
+        }
+        if person.position:
+            properties["Fonction"] = {"rich_text": [{"text": {"content": person.position}}]}
+        if person.linkedin_url:
+            properties["Linkedin"] = {"url": person.linkedin_url}
+        if person.email:
+            properties["E-mail pro"] = {"email": person.email}
+        if company_id:
+            properties["Entreprise"] = {"relation": [{"id": company_id}]}
+
+        page = await self._client.pages.create(
+            parent={"type": "data_source_id", "data_source_id": self._ds_id},
+            properties=properties,
+        )
+        page_id: str = page["id"]
+        self._existing.append({"name": person.name, "company": person.company, "page_id": page_id})
+        logger.info("Created person: {} @ {} ({})", person.name, person.company, page_id)
+        return UpsertResult("created", page_id=page_id)
