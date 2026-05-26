@@ -13,8 +13,10 @@ from loguru import logger
 from notion_client import AsyncClient
 
 from telegram_to_notion.config import load_settings
-from telegram_to_notion.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
+from telegram_to_notion.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer
 from telegram_to_notion.utils.enrichment import enrich_company, enrich_person
+
+_RATE_LIMIT_S = 0.4  # seconds between Notion writes to stay under rate limit
 
 
 async def enrich_people(limit: int, dry_run: bool) -> None:
@@ -29,31 +31,57 @@ async def enrich_people(limit: int, dry_run: bool) -> None:
     await company_syncer.load_snapshot()
     await people_syncer.load_snapshot()
 
-    enriched = 0
-    for candidate in people_syncer._existing[:limit]:
+    enriched = skipped = wrote = 0
+    candidates = [
+        c for c in people_syncer._existing
+        if not (c.get("seniority") and c.get("role_type") and c.get("email"))
+    ]
+    logger.info("{} people need enrichment (out of {})", len(candidates), len(people_syncer._existing))
+
+    for candidate in candidates[:limit]:
         name = candidate["name"]
         company = candidate.get("company", "")
         position = candidate.get("position", "")
-        if candidate.get("seniority") and candidate.get("role_type"):
-            logger.info("Skipping {} @ {} — already enriched", name, company)
-            continue
 
         logger.info("Enriching {} @ {}...", name, company)
         enrichment = await enrich_person(name, company, settings, position=position)
 
+        props: dict[str, object] = {}
+        if enrichment.email and not candidate.get("email"):
+            props["E-mail pro"] = {"email": enrichment.email}
+        if enrichment.phone and not candidate.get("phone"):
+            props["Phone"] = {"phone_number": enrichment.phone}
+        if enrichment.seniority and not candidate.get("seniority"):
+            props["Seniority"] = {"select": {"name": enrichment.seniority}}
+        if enrichment.role_type and not candidate.get("role_type"):
+            props["Role Type"] = {"multi_select": [{"name": rt} for rt in enrichment.role_type]}
+        if enrichment.linkedin_url and not candidate.get("linkedin_url"):
+            props["Linkedin"] = {"url": enrichment.linkedin_url}
+
+        if not props:
+            logger.info("  No data found (source={})", enrichment.source or "none")
+            skipped += 1
+            continue
+
+        logger.info(
+            "  Found: email={} seniority={} role_type={} source={}",
+            enrichment.email or "-", enrichment.seniority or "-",
+            enrichment.role_type or [], enrichment.source,
+        )
+
         if dry_run:
-            logger.info(
-                "  [DRY-RUN] email={} phone={} seniority={} role_type={}",
-                enrichment.email, enrichment.phone, enrichment.seniority, enrichment.role_type,
-            )
+            logger.info("  [DRY-RUN] would write {} props to {}", len(props), candidate["page_id"])
         else:
-            logger.info(
-                "  Enriched: email={} seniority={} source={}",
-                enrichment.email, enrichment.seniority, enrichment.source,
-            )
+            await client.pages.update(candidate["page_id"], properties=props)
+            await asyncio.sleep(_RATE_LIMIT_S)
+            wrote += 1
+
         enriched += 1
 
-    logger.info("Done. Enriched {} / {} people{}", enriched, limit, " (dry-run)" if dry_run else "")
+    logger.info(
+        "Done{}. processed={} wrote={} skipped(no-data)={}",
+        " (dry-run)" if dry_run else "", enriched, wrote, skipped,
+    )
 
 
 async def enrich_companies(limit: int, dry_run: bool) -> None:
@@ -66,23 +94,50 @@ async def enrich_companies(limit: int, dry_run: bool) -> None:
     company_syncer = NotionCompanySyncer(client, settings.notion_companies_data_source_id)
     await company_syncer.load_snapshot()
 
-    enriched = 0
-    for page_id, name in list(company_syncer._id_to_name.items())[:limit]:
+    enriched = skipped = wrote = 0
+    items = list(company_syncer._id_to_name.items())
+    logger.info("{} companies to process", len(items))
+
+    for page_id, name in items[:limit]:
         logger.info("Enriching company {}...", name)
         enrichment = await enrich_company(name, settings)
+
+        props: dict[str, object] = {}
+        if enrichment.linkedin_url:
+            props["Linkedin"] = {"url": enrichment.linkedin_url}
+        if enrichment.website:
+            props["Website"] = {"url": enrichment.website}
+        if enrichment.size:
+            props["Size"] = {"select": {"name": enrichment.size}}
+        if enrichment.country:
+            props["Country"] = {"select": {"name": enrichment.country}}
+        if enrichment.tech_stack:
+            props["Tech Stack"] = {"multi_select": [{"name": t} for t in enrichment.tech_stack]}
+
+        if not props:
+            logger.info("  No data found (source={})", enrichment.source or "none")
+            skipped += 1
+            continue
+
+        logger.info(
+            "  Found: linkedin={} size={} country={} source={}",
+            enrichment.linkedin_url or "-", enrichment.size or "-",
+            enrichment.country or "-", enrichment.source,
+        )
+
         if dry_run:
-            logger.info(
-                "  [DRY-RUN] linkedin={} size={} country={} source={}",
-                enrichment.linkedin_url, enrichment.size, enrichment.country, enrichment.source,
-            )
+            logger.info("  [DRY-RUN] would write {} props to {}", len(props), page_id)
         else:
-            logger.info(
-                "  Enriched: linkedin={} size={} source={}",
-                enrichment.linkedin_url, enrichment.size, enrichment.source,
-            )
+            await client.pages.update(page_id, properties=props)
+            await asyncio.sleep(_RATE_LIMIT_S)
+            wrote += 1
+
         enriched += 1
 
-    logger.info("Done. Enriched {} / {} companies{}", enriched, limit, " (dry-run)" if dry_run else "")
+    logger.info(
+        "Done{}. processed={} wrote={} skipped(no-data)={}",
+        " (dry-run)" if dry_run else "", enriched, wrote, skipped,
+    )
 
 
 def main() -> None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from typing import Any
 
 import httpx
 
@@ -12,7 +13,15 @@ from telegram_to_notion.config import Settings
 _EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
 _LINKEDIN_IN_RE = re.compile(r"https?://(?:www\.)?linkedin\.com/in/[a-zA-Z0-9\-_%]+/?")
 _LINKEDIN_CO_RE = re.compile(r"https?://(?:www\.)?linkedin\.com/company/[a-zA-Z0-9\-_%]+/?")
-_TIMEOUT = httpx.Timeout(10.0)
+_JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
+_TIMEOUT = httpx.Timeout(20.0)
+
+
+def _openrouter_headers(settings: Settings) -> dict[str, str]:
+    headers = {"Content-Type": "application/json", "X-Title": settings.openrouter_app_title}
+    if settings.openrouter_http_referer:
+        headers["HTTP-Referer"] = settings.openrouter_http_referer
+    return headers
 
 
 @dataclass
@@ -158,9 +167,21 @@ async def _brave_company(name: str, api_key: str) -> CompanyEnrichment | None:
 # ── Tier 3: Perplexity via OpenRouter ─────────────────────────────────────────
 
 
+def _parse_llm_json(content: str) -> Any:
+    """Parse JSON from LLM response, handling markdown code blocks."""
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        m = _JSON_BLOCK_RE.search(content)
+        if m:
+            return json.loads(m.group(1))
+        raise
+
+
 async def _perplexity_person(
-    name: str, company: str, api_key: str, model: str
+    name: str, company: str, settings: Settings, model: str
 ) -> PersonEnrichment | None:
+    api_key = settings.openrouter_api_key.get_secret_value()  # type: ignore[union-attr]
     prompt = (
         f"Find professional contact details for {name} at {company}. "
         "Return JSON with keys: email, phone, linkedin_url, seniority, role_type (list), country. "
@@ -169,17 +190,13 @@ async def _perplexity_person(
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             resp = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={
-                    "model": model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "response_format": {"type": "json_object"},
-                },
+                f"{settings.openrouter_url}/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", **_openrouter_headers(settings)},
+                json={"model": model, "messages": [{"role": "user", "content": prompt}]},
             )
         if resp.status_code != 200:
             return None
-        data = json.loads(resp.json()["choices"][0]["message"]["content"])
+        data = _parse_llm_json(resp.json()["choices"][0]["message"]["content"])
         if not any([data.get("email"), data.get("phone"), data.get("linkedin_url")]):
             return None
         return PersonEnrichment(
@@ -196,8 +213,9 @@ async def _perplexity_person(
 
 
 async def _perplexity_company(
-    name: str, api_key: str, model: str
+    name: str, settings: Settings, model: str
 ) -> CompanyEnrichment | None:
+    api_key = settings.openrouter_api_key.get_secret_value()  # type: ignore[union-attr]
     prompt = (
         f"Find details for the company {name}. "
         "Return JSON with keys: website, linkedin_url, size (e.g. '11-50'), "
@@ -207,17 +225,13 @@ async def _perplexity_company(
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             resp = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={
-                    "model": model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "response_format": {"type": "json_object"},
-                },
+                f"{settings.openrouter_url}/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", **_openrouter_headers(settings)},
+                json={"model": model, "messages": [{"role": "user", "content": prompt}]},
             )
         if resp.status_code != 200:
             return None
-        data = json.loads(resp.json()["choices"][0]["message"]["content"])
+        data = _parse_llm_json(resp.json()["choices"][0]["message"]["content"])
         if not any([data.get("website"), data.get("linkedin_url")]):
             return None
         return CompanyEnrichment(
@@ -236,8 +250,9 @@ async def _perplexity_company(
 
 
 async def _llm_person_infer(
-    name: str, company: str, position: str, api_key: str, model: str
+    name: str, company: str, position: str, settings: Settings
 ) -> PersonEnrichment | None:
+    api_key = settings.openrouter_api_key.get_secret_value()  # type: ignore[union-attr]
     prompt = (
         f"Infer professional attributes for {name}, {position or 'unknown role'} at {company}. "
         "Return JSON: {\"seniority\": one of [founder, c_suite, vp, director, manager, senior, mid, junior], "
@@ -247,21 +262,63 @@ async def _llm_person_infer(
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             resp = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                f"{settings.openrouter_url}/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", **_openrouter_headers(settings)},
                 json={
-                    "model": model,
+                    "model": settings.openrouter_model,
                     "messages": [{"role": "user", "content": prompt}],
                     "response_format": {"type": "json_object"},
                 },
             )
         if resp.status_code != 200:
             return None
-        data = json.loads(resp.json()["choices"][0]["message"]["content"])
+        data = _parse_llm_json(resp.json()["choices"][0]["message"]["content"])
         return PersonEnrichment(
             seniority=data.get("seniority", ""),
             role_type=data.get("role_type") or [],
             country=data.get("country", ""),
+            source="llm",
+        )
+    except Exception:  # noqa: BLE001
+        return None
+
+
+# ── Tier 4: LLM inference (company) ──────────────────────────────────────────
+
+
+async def _llm_company_infer(
+    name: str, settings: Settings
+) -> CompanyEnrichment | None:
+    api_key = settings.openrouter_api_key.get_secret_value()  # type: ignore[union-attr]
+    prompt = (
+        f"Provide details for the company named '{name}'. "
+        "Return JSON with keys: website (string), linkedin_url (string), "
+        "size (one of: '1-10','11-50','51-200','201-500','501-2000','2001-10000','10000+' or ''), "
+        "country (ISO alpha-2 or ''), tech_stack (list of strings). "
+        "Use empty string or empty list for unknown fields."
+    )
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            resp = await client.post(
+                f"{settings.openrouter_url}/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", **_openrouter_headers(settings)},
+                json={
+                    "model": settings.openrouter_model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "response_format": {"type": "json_object"},
+                },
+            )
+        if resp.status_code != 200:
+            return None
+        data = _parse_llm_json(resp.json()["choices"][0]["message"]["content"])
+        if not any([data.get("website"), data.get("linkedin_url"), data.get("size"), data.get("country")]):
+            return None
+        return CompanyEnrichment(
+            website=data.get("website", ""),
+            linkedin_url=data.get("linkedin_url", ""),
+            size=data.get("size", ""),
+            country=data.get("country", ""),
+            tech_stack=data.get("tech_stack") or [],
             source="llm",
         )
     except Exception:  # noqa: BLE001
@@ -326,11 +383,7 @@ async def enrich_person(
         and perplexity_model
         and settings.openrouter_api_key
     ):
-        perp = await _perplexity_person(
-            name, company,
-            settings.openrouter_api_key.get_secret_value(),
-            model=perplexity_model,
-        )
+        perp = await _perplexity_person(name, company, settings, model=perplexity_model)
         if perp:
             result = _merge_person(result, perp)
 
@@ -340,11 +393,7 @@ async def enrich_person(
         and (not result.seniority or not result.role_type)
         and settings.openrouter_api_key
     ):
-        llm = await _llm_person_infer(
-            name, company, position,
-            settings.openrouter_api_key.get_secret_value(),
-            model=settings.openrouter_model,
-        )
+        llm = await _llm_person_infer(name, company, position, settings)
         if llm:
             result = _merge_person(result, llm)
 
@@ -377,12 +426,14 @@ async def enrich_company(
         and perplexity_model
         and settings.openrouter_api_key
     ):
-        perp = await _perplexity_company(
-            name,
-            settings.openrouter_api_key.get_secret_value(),
-            model=perplexity_model,
-        )
+        perp = await _perplexity_company(name, settings, model=perplexity_model)
         if perp:
             result = _merge_company(result, perp)
+
+    # Tier 4: LLM inference (fallback when no previous tier found website/linkedin)
+    if not result.source and settings.openrouter_api_key:
+        llm = await _llm_company_infer(name, settings)
+        if llm:
+            result = _merge_company(result, llm)
 
     return result
