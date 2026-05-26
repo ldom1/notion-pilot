@@ -38,6 +38,7 @@ class NotionCompanySyncer:
         self._ds_id = data_source_id
         self._name_to_id: dict[str, str] = {}  # normalized name → page_id
         self._id_to_name: dict[str, str] = {}  # page_id → original name
+        self.details: dict[str, dict[str, str]] = {}  # page_id → {website, linkedin_url, size, country}
 
     def id_to_name(self, page_id: str) -> str:
         return self._id_to_name.get(page_id, "")
@@ -50,11 +51,23 @@ class NotionCompanySyncer:
                 kw["start_cursor"] = cursor
             result = await self._client.data_sources.query(**kw)
             for page in result["results"]:
-                name_prop = page["properties"].get("Name", {})
+                props = page["properties"]
+                name_prop = props.get("Name", {})
                 if name_prop.get("title"):
                     name = name_prop["title"][0]["plain_text"]
-                    self._name_to_id[normalize(name)] = page["id"]
-                    self._id_to_name[page["id"]] = name
+                    page_id = page["id"]
+                    self._name_to_id[normalize(name)] = page_id
+                    self._id_to_name[page_id] = name
+                    detail: dict[str, str] = {}
+                    if props.get("Website", {}).get("url"):
+                        detail["website"] = props["Website"]["url"]
+                    if props.get("Linkedin", {}).get("url"):
+                        detail["linkedin_url"] = props["Linkedin"]["url"]
+                    if props.get("Size", {}).get("select"):
+                        detail["size"] = props["Size"]["select"]["name"]
+                    if props.get("Country", {}).get("select"):
+                        detail["country"] = props["Country"]["select"]["name"]
+                    self.details[page_id] = detail
             if not result.get("has_more"):
                 break
             cursor = result["next_cursor"]

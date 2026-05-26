@@ -79,42 +79,48 @@ async def _apollo_person(name: str, company: str, api_key: str) -> PersonEnrichm
         return None
 
 
-async def _apollo_company(name: str, api_key: str) -> CompanyEnrichment | None:
+def _employees_to_size(n: int) -> str:
+    if n <= 0:
+        return ""
+    if n <= 10:
+        return "1-10"
+    if n <= 50:
+        return "11-50"
+    if n <= 200:
+        return "51-200"
+    if n <= 500:
+        return "201-500"
+    if n <= 2000:
+        return "501-2000"
+    if n <= 10000:
+        return "2001-10000"
+    return "10000+"
+
+
+async def _apollo_company(name: str, api_key: str, domain: str = "") -> CompanyEnrichment | None:
+    payload: dict[str, str] = {"domain": domain} if domain else {"name": name}
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             resp = await client.post(
                 "https://api.apollo.io/v1/organizations/enrich",
                 headers={"x-api-key": api_key, "Content-Type": "application/json"},
-                json={"name": name},
+                json=payload,
             )
         if resp.status_code != 200:
             return None
         org = resp.json().get("organization") or {}
         if not org:
             return None
-        raw_size = org.get("estimated_num_employees") or 0
-        if raw_size <= 0:
-            size = ""
-        elif raw_size <= 10:
-            size = "1-10"
-        elif raw_size <= 50:
-            size = "11-50"
-        elif raw_size <= 200:
-            size = "51-200"
-        elif raw_size <= 500:
-            size = "201-500"
-        elif raw_size <= 1000:
-            size = "501-1000"
-        else:
-            size = "1000+"
+        size = _employees_to_size(org.get("estimated_num_employees") or 0)
         linkedin = org.get("linkedin_url", "")
         website = org.get("website_url", "")
         country = org.get("country", "")
-        if not any([linkedin, website]):
+        tech_stack = [t.get("name", "") for t in (org.get("technology_names") or []) if t.get("name")]
+        if not any([linkedin, website, size, country]):
             return None
         return CompanyEnrichment(
             website=website, linkedin_url=linkedin, size=size,
-            country=country, source="apollo",
+            country=country, tech_stack=tech_stack, source="apollo",
         )
     except Exception:  # noqa: BLE001
         return None
@@ -405,14 +411,15 @@ async def enrich_person(
 async def enrich_company(
     name: str,
     settings: Settings,
+    domain: str = "",
     perplexity_model: str | None = "perplexity/sonar-pro",
 ) -> CompanyEnrichment:
     """Four-tier company enrichment. Never raises; returns partial results."""
     result = CompanyEnrichment()
 
-    # Tier 1: Apollo
+    # Tier 1: Apollo (domain lookup is much more reliable than name lookup)
     if settings.apollo_api_key:
-        apollo = await _apollo_company(name, settings.apollo_api_key.get_secret_value())
+        apollo = await _apollo_company(name, settings.apollo_api_key.get_secret_value(), domain=domain)
         if apollo:
             result = _merge_company(result, apollo)
 
