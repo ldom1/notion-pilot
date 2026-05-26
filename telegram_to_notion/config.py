@@ -97,6 +97,24 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         description="Brave Search API key for email enrichment during people import.",
     )
 
+    # ── CRM Enrichment (optional) ────────────────────────────────────────────
+    apollo_api_key: SecretStr | None = Field(
+        default=None,
+        description="Apollo.io API key for person/company enrichment (Tier 1).",
+    )
+
+    # ── Deals DB (optional) ──────────────────────────────────────────────────
+    notion_deals_database_id: str | None = Field(
+        default=None,
+        description="Notion database ID for the Deals database (standard databases API, not data_sources).",
+    )
+
+    # ── CRM conversation state ───────────────────────────────────────────────
+    conv_state_db: str = Field(
+        default="data/conv_state.db",
+        description="Path to SQLite file for Telegram CRM command conversation state.",
+    )
+
     # ── Discord (optional) ───────────────────────────────────────────────────
     discord_bot_token: SecretStr | None = Field(
         default=None, description="Discord bot token; enables the Discord adapter"
