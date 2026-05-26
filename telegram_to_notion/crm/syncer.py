@@ -129,6 +129,12 @@ class NotionPeopleSyncer:
                 linkedin_prop = props.get("Linkedin", {})
                 if linkedin_prop.get("url"):
                     candidate["linkedin_url"] = linkedin_prop["url"]
+                email_prop = props.get("E-mail pro", {})
+                if email_prop.get("email"):
+                    candidate["email"] = email_prop["email"]
+                phone_prop = props.get("Phone", {})
+                if phone_prop.get("phone_number"):
+                    candidate["phone"] = phone_prop["phone_number"]
                 self._existing.append(candidate)
             if not result.get("has_more"):
                 break

@@ -19,6 +19,8 @@ class CandidateRecord(_CandidateBase, total=False):
     seniority: str
     role_type: list[str]
     linkedin_url: str
+    email: str
+    phone: str
 
 
 class DedupStatus(Enum):
