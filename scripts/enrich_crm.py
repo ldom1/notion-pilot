@@ -95,21 +95,32 @@ async def enrich_companies(limit: int, dry_run: bool) -> None:
     await company_syncer.load_snapshot()
 
     enriched = skipped = wrote = 0
-    items = list(company_syncer._id_to_name.items())
-    logger.info("{} companies to process", len(items))
+    # Only process companies missing at least one key field
+    items = [
+        (pid, name) for pid, name in company_syncer._id_to_name.items()
+        if not all([
+            company_syncer.details.get(pid, {}).get("linkedin_url"),
+            company_syncer.details.get(pid, {}).get("size"),
+            company_syncer.details.get(pid, {}).get("country"),
+        ])
+    ]
+    logger.info("{} companies need enrichment (out of {})", len(items), len(company_syncer._id_to_name))
 
     for page_id, name in items[:limit]:
-        logger.info("Enriching company {}...", name)
-        enrichment = await enrich_company(name, settings)
+        existing = company_syncer.details.get(page_id, {})
+        website = existing.get("website", "")
+        domain = website.split("//")[-1].split("/")[0].removeprefix("www.") if website else ""
+        logger.info("Enriching company {}{}...", name, f" (domain={domain})" if domain else "")
+        enrichment = await enrich_company(name, settings, domain=domain)
 
         props: dict[str, object] = {}
-        if enrichment.linkedin_url:
+        if enrichment.linkedin_url and not existing.get("linkedin_url"):
             props["Linkedin"] = {"url": enrichment.linkedin_url}
-        if enrichment.website:
+        if enrichment.website and not existing.get("website"):
             props["Website"] = {"url": enrichment.website}
-        if enrichment.size:
+        if enrichment.size and not existing.get("size"):
             props["Size"] = {"select": {"name": enrichment.size}}
-        if enrichment.country:
+        if enrichment.country and not existing.get("country"):
             props["Country"] = {"select": {"name": enrichment.country}}
         if enrichment.tech_stack:
             props["Tech Stack"] = {"multi_select": [{"name": t} for t in enrichment.tech_stack]}
