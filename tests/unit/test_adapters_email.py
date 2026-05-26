@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+pytest.importorskip("imapclient")
 from telegram_to_notion.adapters.email import _decode_str, _plain_body, _sender_allowed
 
 
