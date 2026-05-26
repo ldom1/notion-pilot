@@ -18,8 +18,8 @@ from loguru import logger
 from notion_client import AsyncClient
 
 from telegram_to_notion.config import load_settings
-from telegram_to_notion.crm.dedup import DedupStatus, find_match
-from telegram_to_notion.crm.enrichment import find_email
+from telegram_to_notion.utils.dedup import DedupStatus, find_match
+from telegram_to_notion.utils.enrichment import enrich_person
 from telegram_to_notion.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
 
 _DEFAULT_CSV = Path("data/Basic_LinkedInDataExport_05-20-2026.zip/Connections.csv")
@@ -111,12 +111,11 @@ async def run(dry_run: bool, enrich: bool, csv_path: Path) -> None:
 
         try:
             email = person.email
-            if enrich and not email and settings.brave_api_key:
+            if enrich and not email:
                 await asyncio.sleep(1)  # rate limit: 1 req/s
-                email = await find_email(
-                    person.name, person.company,
-                    settings.brave_api_key.get_secret_value()
-                ) or ""
+                enrichment = await enrich_person(person.name, person.company, settings)
+                if enrichment.email:
+                    email = enrichment.email
 
             result = await people_syncer.upsert(PersonRecord(
                 name=person.name,

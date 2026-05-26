@@ -166,3 +166,46 @@ class TestNotionPeopleSyncer:
         await syncer.upsert(PersonRecord(name="X", company="Y"))
         props = client.pages.create.call_args.kwargs["properties"]
         assert props["Dans mon réseau ?"]["select"]["name"] == "Yes"
+
+    async def test_upsert_sets_phone_seniority_role_type(self):
+        syncer, client = await TestNotionPeopleSyncer._make_syncer(TestNotionPeopleSyncer, [], [])
+        await syncer.upsert(PersonRecord(
+            name="New Person",
+            company="NewCorp",
+            phone="+33612345678",
+            seniority="vp",
+            role_type=["engineering", "management"],
+        ))
+        props = client.pages.create.call_args.kwargs["properties"]
+        assert props["Phone"]["phone_number"] == "+33612345678"
+        assert props["Seniority"]["select"]["name"] == "vp"
+        assert {"name": "engineering"} in props["Role Type"]["multi_select"]
+        assert {"name": "management"} in props["Role Type"]["multi_select"]
+
+
+async def test_load_snapshot_reads_optional_fields():
+    client = _mock_people_client(
+        people_pages=[{
+            "id": "p1",
+            "properties": {
+                "Nom": {"title": [{"plain_text": "Alice Martin"}]},
+                "Entreprise": {"relation": []},
+                "Fonction": {"rich_text": [{"plain_text": "VP Engineering"}]},
+                "Seniority": {"select": {"name": "vp"}},
+                "Role Type": {"multi_select": [{"name": "engineering"}]},
+                "Linkedin": {"url": "https://linkedin.com/in/alice"},
+            },
+        }],
+        company_pages=[],
+    )
+    company_syncer = NotionCompanySyncer(client, "fake-companies-ds")
+    await company_syncer.load_snapshot()
+    people_syncer = NotionPeopleSyncer(client, "fake-people-ds", company_syncer)
+    await people_syncer.load_snapshot()
+
+    assert len(people_syncer._existing) == 1
+    candidate = people_syncer._existing[0]
+    assert candidate.get("position") == "VP Engineering"
+    assert candidate.get("seniority") == "vp"
+    assert candidate.get("role_type") == ["engineering"]
+    assert "linkedin.com/in/alice" in candidate.get("linkedin_url", "")

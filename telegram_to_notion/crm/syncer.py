@@ -6,7 +6,7 @@ from loguru import logger
 from notion_client import AsyncClient
 from rapidfuzz.fuzz import token_sort_ratio
 
-from telegram_to_notion.crm.dedup import CandidateRecord, DedupStatus, find_match, normalize
+from telegram_to_notion.utils.dedup import CandidateRecord, DedupStatus, find_match, normalize
 
 
 @dataclass
@@ -16,6 +16,9 @@ class PersonRecord:
     position: str = field(default="")
     linkedin_url: str = field(default="")
     email: str = field(default="")
+    phone: str = field(default="")
+    seniority: str = field(default="")
+    role_type: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -109,7 +112,24 @@ class NotionPeopleSyncer:
                     continue
                 company_ids = [r["id"] for r in props.get("Entreprise", {}).get("relation", [])]
                 company = self._company_syncer.id_to_name(company_ids[0]) if company_ids else ""
-                self._existing.append({"name": name, "company": company, "page_id": page["id"]})
+                candidate: CandidateRecord = {
+                    "name": name,
+                    "company": company,
+                    "page_id": page["id"],
+                }
+                position_prop = props.get("Fonction", {})
+                if position_prop.get("rich_text"):
+                    candidate["position"] = position_prop["rich_text"][0]["plain_text"]
+                seniority_prop = props.get("Seniority", {})
+                if seniority_prop.get("select"):
+                    candidate["seniority"] = seniority_prop["select"]["name"]
+                role_type_prop = props.get("Role Type", {})
+                if role_type_prop.get("multi_select"):
+                    candidate["role_type"] = [o["name"] for o in role_type_prop["multi_select"]]
+                linkedin_prop = props.get("Linkedin", {})
+                if linkedin_prop.get("url"):
+                    candidate["linkedin_url"] = linkedin_prop["url"]
+                self._existing.append(candidate)
             if not result.get("has_more"):
                 break
             cursor = result["next_cursor"]
@@ -139,6 +159,14 @@ class NotionPeopleSyncer:
             properties["Linkedin"] = {"url": person.linkedin_url}
         if person.email:
             properties["E-mail pro"] = {"email": person.email}
+        if person.phone:
+            properties["Phone"] = {"phone_number": person.phone}
+        if person.seniority:
+            properties["Seniority"] = {"select": {"name": person.seniority}}
+        if person.role_type:
+            properties["Role Type"] = {
+                "multi_select": [{"name": rt} for rt in person.role_type]
+            }
         if company_id:
             properties["Entreprise"] = {"relation": [{"id": company_id}]}
 
