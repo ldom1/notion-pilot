@@ -54,7 +54,8 @@ async def _apollo_person(name: str, company: str, api_key: str) -> PersonEnrichm
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             resp = await client.post(
                 "https://api.apollo.io/v1/people/match",
-                json={"name": name, "organization_name": company, "api_key": api_key},
+                headers={"x-api-key": api_key, "Content-Type": "application/json"},
+                json={"name": name, "organization_name": company},
             )
         if resp.status_code != 200:
             return None
@@ -83,7 +84,8 @@ async def _apollo_company(name: str, api_key: str) -> CompanyEnrichment | None:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             resp = await client.post(
                 "https://api.apollo.io/v1/organizations/enrich",
-                json={"name": name, "api_key": api_key},
+                headers={"x-api-key": api_key, "Content-Type": "application/json"},
+                json={"name": name},
             )
         if resp.status_code != 200:
             return None
