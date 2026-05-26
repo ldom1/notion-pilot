@@ -1,4 +1,4 @@
-"""Fuzzy deduplication for people and company records."""
+"""Fuzzy deduplication for people and company records. Pure — no Notion dependency."""
 import unicodedata
 from dataclasses import dataclass, field
 from enum import Enum
@@ -7,17 +7,24 @@ from typing import TypedDict
 from rapidfuzz.fuzz import token_sort_ratio
 
 
-class CandidateRecord(TypedDict):
-    """Type for candidate records in dedup matching."""
+class _CandidateBase(TypedDict):
     name: str
     company: str
     page_id: str
 
 
+class CandidateRecord(_CandidateBase, total=False):
+    """Extended candidate — required: name/company/page_id; optional: prospection metadata."""
+    position: str
+    seniority: str
+    role_type: list[str]
+    linkedin_url: str
+
+
 class DedupStatus(Enum):
-    SKIP = "skip"      # score >= 85 — definite duplicate
-    REVIEW = "review"  # score 75–84 — uncertain, log for human review
-    NEW = "new"        # score < 75 — treat as new record
+    SKIP = "skip"
+    REVIEW = "review"
+    NEW = "new"
 
 
 @dataclass
@@ -29,7 +36,7 @@ class MatchResult:
 
 
 def normalize(text: str) -> str:
-    """Lowercase, strip whitespace, remove diacritics for comparison."""
+    """Lowercase, strip whitespace, remove diacritics."""
     nfkd = unicodedata.normalize("NFKD", text.strip().lower())
     return "".join(c for c in nfkd if not unicodedata.combining(c))
 
@@ -43,10 +50,7 @@ def find_match(
     company: str,
     candidates: list[CandidateRecord],
 ) -> MatchResult:
-    """Return best fuzzy match from candidates list.
-
-    Each candidate dict must have keys: name, company, page_id.
-    """
+    """Return best fuzzy match from candidates. Each must have: name, company, page_id."""
     if not candidates:
         return MatchResult(DedupStatus.NEW, 0.0)
 
@@ -58,8 +62,6 @@ def find_match(
         if c["company"]:
             score = float(token_sort_ratio(key, _key(c["name"], c["company"])))
         else:
-            # Candidate has no company — compare name-only to avoid long company strings
-            # diluting what is effectively a name-only match.
             score = float(token_sort_ratio(normalize(name), normalize(c["name"])))
         if score > best_score:
             best_score = score

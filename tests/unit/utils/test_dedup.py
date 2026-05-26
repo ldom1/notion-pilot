@@ -1,6 +1,5 @@
-"""Unit tests for crm/dedup.py — no network, no Notion."""
-import pytest
-from telegram_to_notion.crm.dedup import DedupStatus, MatchResult, find_match, normalize
+"""Unit tests for utils/dedup.py — no network, no Notion."""
+from telegram_to_notion.utils.dedup import DedupStatus, MatchResult, find_match, normalize
 
 
 def test_normalize_lowercases_and_strips():
@@ -26,7 +25,6 @@ def test_find_match_name_reorder():
 
 
 def test_find_match_review_range():
-    # same name, different company → score ~81 (review range)
     candidates = [{"name": "Jean Dupont", "company": "Engie", "page_id": "abc"}]
     result = find_match("Jean Dupont", "EDF", candidates)
     assert result.status == DedupStatus.REVIEW
@@ -44,3 +42,10 @@ def test_find_match_empty_candidates():
     result = find_match("Jean Dupont", "EDF", [])
     assert result.status == DedupStatus.NEW
     assert result.score == 0.0
+
+
+def test_candidate_record_accepts_optional_fields():
+    # CandidateRecord TypedDict allows optional prospection fields
+    c = {"name": "A", "company": "B", "page_id": "p", "seniority": "vp", "role_type": ["sales"]}
+    result = find_match("A", "B", [c])
+    assert result.status == DedupStatus.SKIP
