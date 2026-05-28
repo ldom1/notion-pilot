@@ -1,4 +1,5 @@
 """Unit tests for crm/conv_state.py — uses in-memory SQLite."""
+
 import time
 
 import pytest
@@ -16,7 +17,9 @@ def test_get_returns_none_when_empty(store):
 
 
 def test_set_and_get_roundtrip(store):
-    state = ConvState(chat_id=1, command="lead", collected={"name": "Alice"}, pending_field="company")
+    state = ConvState(
+        chat_id=1, command="lead", collected={"name": "Alice"}, pending_field="company"
+    )
     store.set(state)
     result = store.get(1)
     assert result is not None

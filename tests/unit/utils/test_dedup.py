@@ -1,5 +1,6 @@
 """Unit tests for utils/dedup.py — no network, no Notion."""
-from telegram_to_notion.utils.dedup import DedupStatus, MatchResult, find_match, normalize
+
+from telegram_to_notion.utils.dedup import DedupStatus, find_match, normalize
 
 
 def test_normalize_lowercases_and_strips():

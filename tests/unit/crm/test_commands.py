@@ -1,4 +1,5 @@
 """Unit tests for crm/commands.py."""
+
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 

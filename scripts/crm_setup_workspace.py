@@ -14,6 +14,7 @@ Output: prints the three DB IDs to add to .env.
 Note: notion-client 3.x silently drops the `properties` arg on databases.create().
 This script uses raw httpx calls to ensure properties are applied correctly.
 """
+
 import asyncio
 import sys
 from typing import Any
@@ -46,7 +47,9 @@ def _page_id_from_url(value: str) -> str:
     return raw
 
 
-async def _create_page(client: httpx.AsyncClient, parent_page_id: str, title: str, emoji: str) -> str:
+async def _create_page(
+    client: httpx.AsyncClient, parent_page_id: str, title: str, emoji: str
+) -> str:
     r = await client.post(
         f"{NOTION_API}/pages",
         json={

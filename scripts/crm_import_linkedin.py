@@ -8,6 +8,7 @@ Flags:
     --no-enrich   Skip Brave Search email lookup.
     --csv PATH    Path to Connections.csv (default: auto-detected from data/ dir).
 """
+
 import asyncio
 import csv
 import io
@@ -37,21 +38,32 @@ def _parse_connections(csv_path: Path) -> list[PersonRecord]:
         name = f"{row['First Name'].strip()} {row['Last Name'].strip()}".strip()
         if not name:
             continue
-        records.append(PersonRecord(
-            name=name,
-            company=row.get("Company", "").strip(),
-            position=row.get("Position", "").strip(),
-            linkedin_url=row.get("URL", "").strip(),
-            email=row.get("Email Address", "").strip(),
-        ))
+        records.append(
+            PersonRecord(
+                name=name,
+                company=row.get("Company", "").strip(),
+                position=row.get("Position", "").strip(),
+                linkedin_url=row.get("URL", "").strip(),
+                email=row.get("Email Address", "").strip(),
+            )
+        )
     return records
 
 
 def _write_review_row(row: dict[str, str]) -> None:
     write_header = not _REVIEW_CSV.exists()
     with _REVIEW_CSV.open("a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["score", "input_name", "input_company",
-                                                "matched_name", "matched_company", "linkedin_url"])
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "score",
+                "input_name",
+                "input_company",
+                "matched_name",
+                "matched_company",
+                "linkedin_url",
+            ],
+        )
         if write_header:
             writer.writeheader()
         writer.writerow(row)
@@ -60,14 +72,27 @@ def _write_review_row(row: dict[str, str]) -> None:
 def _write_skiped_row(row: dict[str, str]) -> None:
     write_header = not _SKIPED_CSV.exists()
     with _SKIPED_CSV.open("a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["score", "input_name", "input_company",
-                                                "matched_name", "matched_company", "linkedin_url"])
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "score",
+                "input_name",
+                "input_company",
+                "matched_name",
+                "matched_company",
+                "linkedin_url",
+            ],
+        )
         if write_header:
             writer.writeheader()
         writer.writerow(row)
 
 
-_STATUS_MAP = {DedupStatus.SKIP: "skipped", DedupStatus.REVIEW: "review", DedupStatus.NEW: "created"}
+_STATUS_MAP = {
+    DedupStatus.SKIP: "skipped",
+    DedupStatus.REVIEW: "review",
+    DedupStatus.NEW: "created",
+}
 
 
 async def run(dry_run: bool, enrich: bool, csv_path: Path) -> None:
@@ -82,7 +107,9 @@ async def run(dry_run: bool, enrich: bool, csv_path: Path) -> None:
 
     client = AsyncClient(auth=settings.notion_token.get_secret_value())
     company_syncer = NotionCompanySyncer(client, settings.notion_companies_data_source_id)
-    people_syncer = NotionPeopleSyncer(client, settings.notion_people_data_source_id, company_syncer)
+    people_syncer = NotionPeopleSyncer(
+        client, settings.notion_people_data_source_id, company_syncer
+    )
 
     logger.info("Loading Notion snapshots...")
     await company_syncer.load_snapshot()
@@ -99,14 +126,16 @@ async def run(dry_run: bool, enrich: bool, csv_path: Path) -> None:
             status = _STATUS_MAP[match.status]
             counts[status] += 1
             if match.status == DedupStatus.SKIP:
-                _write_skiped_row({
-                    "score": f"{match.score:.1f}",
-                    "input_name": person.name,
-                    "input_company": person.company,
-                    "matched_name": match.matched_name,
-                    "matched_company": match.matched_company,
-                    "linkedin_url": person.linkedin_url,
-                })
+                _write_skiped_row(
+                    {
+                        "score": f"{match.score:.1f}",
+                        "input_name": person.name,
+                        "input_company": person.company,
+                        "matched_name": match.matched_name,
+                        "matched_company": match.matched_company,
+                        "linkedin_url": person.linkedin_url,
+                    }
+                )
             continue
 
         try:
@@ -117,33 +146,39 @@ async def run(dry_run: bool, enrich: bool, csv_path: Path) -> None:
                 if enrichment.email:
                     email = enrichment.email
 
-            result = await people_syncer.upsert(PersonRecord(
-                name=person.name,
-                company=person.company,
-                position=person.position,
-                linkedin_url=person.linkedin_url,
-                email=email,
-            ))
+            result = await people_syncer.upsert(
+                PersonRecord(
+                    name=person.name,
+                    company=person.company,
+                    position=person.position,
+                    linkedin_url=person.linkedin_url,
+                    email=email,
+                )
+            )
             counts[result.status] += 1
 
             if result.status == "skipped":
-                _write_skiped_row({
-                    "score": f"{result.score:.1f}",
-                    "input_name": person.name,
-                    "input_company": person.company,
-                    "matched_name": result.matched_name,
-                    "matched_company": result.matched_company,
-                    "linkedin_url": person.linkedin_url,
-                })
+                _write_skiped_row(
+                    {
+                        "score": f"{result.score:.1f}",
+                        "input_name": person.name,
+                        "input_company": person.company,
+                        "matched_name": result.matched_name,
+                        "matched_company": result.matched_company,
+                        "linkedin_url": person.linkedin_url,
+                    }
+                )
             if result.status == "review":
-                _write_review_row({
-                    "score": f"{result.score:.1f}",
-                    "input_name": person.name,
-                    "input_company": person.company,
-                    "matched_name": result.matched_name,
-                    "matched_company": result.matched_company,
-                    "linkedin_url": person.linkedin_url,
-                })
+                _write_review_row(
+                    {
+                        "score": f"{result.score:.1f}",
+                        "input_name": person.name,
+                        "input_company": person.company,
+                        "matched_name": result.matched_name,
+                        "matched_company": result.matched_company,
+                        "linkedin_url": person.linkedin_url,
+                    }
+                )
 
         except Exception:  # noqa: BLE001
             logger.exception("Failed to upsert {} @ {}", person.name, person.company)
@@ -153,8 +188,14 @@ async def run(dry_run: bool, enrich: bool, csv_path: Path) -> None:
             logger.info("Progress: {}/{} — {}", i + 1, len(records), counts)
 
     mode = "DRY RUN" if dry_run else "LIVE"
-    logger.info("[{}] Done. created={} skipped={} review={} error={}",
-                mode, counts["created"], counts["skipped"], counts["review"], counts["error"])
+    logger.info(
+        "[{}] Done. created={} skipped={} review={} error={}",
+        mode,
+        counts["created"],
+        counts["skipped"],
+        counts["review"],
+        counts["error"],
+    )
     if counts.get("review") and not dry_run:
         logger.info("Review {} borderline matches in {}", counts["review"], _REVIEW_CSV)
 
@@ -172,8 +213,10 @@ def _arg(prefix: str) -> str | None:
 
 if __name__ == "__main__":
     csv_path = Path(_arg("--csv") or str(_DEFAULT_CSV))
-    asyncio.run(run(
-        dry_run=_flag("--dry-run"),
-        enrich=not _flag("--no-enrich"),
-        csv_path=csv_path,
-    ))
+    asyncio.run(
+        run(
+            dry_run=_flag("--dry-run"),
+            enrich=not _flag("--no-enrich"),
+            csv_path=csv_path,
+        )
+    )

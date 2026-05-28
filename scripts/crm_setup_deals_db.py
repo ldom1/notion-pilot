@@ -3,6 +3,7 @@
 The DB shell was created via databases.create() but notion-client 3.x silently
 drops the properties arg. This script patches them in via raw httpx.
 """
+
 import asyncio
 import os
 

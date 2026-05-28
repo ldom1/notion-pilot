@@ -16,7 +16,6 @@ class SourceAdapter(Protocol):
 
     async def run(self, handler: MessageHandler) -> None:
         """Start the adapter loop. Runs until cancelled."""
-        ...
 
 
 @runtime_checkable
@@ -27,4 +26,3 @@ class SinkAdapter(Protocol):
 
     async def send(self, text: str) -> None:
         """Post a text message via this sink."""
-        ...

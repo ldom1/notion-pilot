@@ -1,4 +1,5 @@
 """Notion People and Company syncers with fuzzy dedup."""
+
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -38,7 +39,9 @@ class NotionCompanySyncer:
         self._ds_id = data_source_id
         self._name_to_id: dict[str, str] = {}  # normalized name → page_id
         self._id_to_name: dict[str, str] = {}  # page_id → original name
-        self.details: dict[str, dict[str, str]] = {}  # page_id → {website, linkedin_url, size, country}
+        self.details: dict[
+            str, dict[str, str]
+        ] = {}  # page_id → {website, linkedin_url, size, country}
 
     def id_to_name(self, page_id: str) -> str:
         return self._id_to_name.get(page_id, "")
@@ -46,10 +49,10 @@ class NotionCompanySyncer:
     async def load_snapshot(self) -> None:
         cursor: str | None = None
         while True:
-            kw: dict[str, object] = dict(data_source_id=self._ds_id, page_size=100)
+            kw: dict[str, object] = {"data_source_id": self._ds_id, "page_size": 100}
             if cursor:
                 kw["start_cursor"] = cursor
-            result = await self._client.data_sources.query(**kw)
+            result = await self._client.data_sources.query(**kw)  # type: ignore[arg-type]
             for page in result["results"]:
                 props = page["properties"]
                 name_prop = props.get("Name", {})
@@ -84,11 +87,11 @@ class NotionCompanySyncer:
         norm = normalize(name)
         best_score = 0.0
         best_id = ""
-        for cached_norm, page_id in self._name_to_id.items():
+        for cached_norm, pid in self._name_to_id.items():
             score = float(token_sort_ratio(norm, cached_norm))
             if score > best_score:
                 best_score = score
-                best_id = page_id
+                best_id = pid
         if best_score >= 85 and best_id:
             return best_id
         page = await self._client.pages.create(
@@ -120,10 +123,10 @@ class NotionPeopleSyncer:
         """Load all existing people into memory. Call after company_syncer.load_snapshot()."""
         cursor: str | None = None
         while True:
-            kw: dict[str, object] = dict(data_source_id=self._ds_id, page_size=100)
+            kw: dict[str, object] = {"data_source_id": self._ds_id, "page_size": 100}
             if cursor:
                 kw["start_cursor"] = cursor
-            result = await self._client.data_sources.query(**kw)
+            result = await self._client.data_sources.query(**kw)  # type: ignore[arg-type]
             for page in result["results"]:
                 props = page["properties"]
                 name_prop = props.get("Nom", {})
@@ -165,11 +168,19 @@ class NotionPeopleSyncer:
         match = find_match(person.name, person.company, self._existing)
 
         if match.status == DedupStatus.SKIP:
-            return UpsertResult("skipped", score=match.score,
-                                matched_name=match.matched_name, matched_company=match.matched_company)
+            return UpsertResult(
+                "skipped",
+                score=match.score,
+                matched_name=match.matched_name,
+                matched_company=match.matched_company,
+            )
         if match.status == DedupStatus.REVIEW:
-            return UpsertResult("review", score=match.score,
-                                matched_name=match.matched_name, matched_company=match.matched_company)
+            return UpsertResult(
+                "review",
+                score=match.score,
+                matched_name=match.matched_name,
+                matched_company=match.matched_company,
+            )
 
         company_id = ""
         if person.company:
@@ -190,9 +201,7 @@ class NotionPeopleSyncer:
         if person.seniority:
             properties["Seniority"] = {"select": {"name": person.seniority}}
         if person.role_type:
-            properties["Role Type"] = {
-                "multi_select": [{"name": rt} for rt in person.role_type]
-            }
+            properties["Role Type"] = {"multi_select": [{"name": rt} for rt in person.role_type]}
         if company_id:
             properties["Entreprise"] = {"relation": [{"id": company_id}]}
 

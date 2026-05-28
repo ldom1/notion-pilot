@@ -30,7 +30,9 @@ async def test_process_message_returns_page_id():
     mock_writer.create_page.return_value = "page-abc"
 
     with patch(
-        "telegram_to_notion.pipelines.knowledge.interpret_message", new_callable=AsyncMock, return_value=props
+        "telegram_to_notion.pipelines.knowledge.interpret_message",
+        new_callable=AsyncMock,
+        return_value=props,
     ):
         result = await process_message(mock_settings, mock_writer, _make_incoming())
 

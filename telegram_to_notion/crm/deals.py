@@ -1,7 +1,9 @@
 """Notion Deals syncer — standard databases API (not data_sources)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 import httpx
 
@@ -42,8 +44,8 @@ class NotionDealsSyncer:
         }
         self._snapshot: dict[str, str] = {}  # title → page_id
 
-    def _to_properties(self, deal: DealRecord) -> dict:
-        props: dict = {
+    def _to_properties(self, deal: DealRecord) -> dict[str, Any]:
+        props: dict[str, Any] = {
             "Name": {"title": [{"text": {"content": deal.title}}]},
         }
         if deal.stage:
@@ -70,7 +72,10 @@ class NotionDealsSyncer:
         resp = await self._client.post(
             f"{_NOTION_BASE}/pages",
             headers=self._headers,
-            json={"parent": {"database_id": self._database_id}, "properties": self._to_properties(deal)},
+            json={
+                "parent": {"database_id": self._database_id},
+                "properties": self._to_properties(deal),
+            },
         )
         resp.raise_for_status()
         page_id: str = resp.json()["id"]
@@ -98,7 +103,7 @@ class NotionDealsSyncer:
         """Load existing deals into memory. Call once at startup."""
         cursor: str | None = None
         while True:
-            body: dict = {"page_size": 100}
+            body: dict[str, Any] = {"page_size": 100}
             if cursor:
                 body["start_cursor"] = cursor
             resp = await self._client.post(

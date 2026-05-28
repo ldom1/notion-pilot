@@ -1,7 +1,6 @@
 """Unit tests for email adapter helpers — no network, no IMAP connection."""
 
 import email as email_lib
-from datetime import datetime, timezone
 
 import pytest
 

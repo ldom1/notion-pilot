@@ -26,11 +26,11 @@ class DiscordAdapter:
         self._client: discord.Client = discord.Client(intents=intents)
 
     async def run(self, handler: MessageHandler) -> None:
-        @self._client.event
+        @self._client.event  # type: ignore[untyped-decorator]
         async def on_ready() -> None:
             logger.info("discord adapter: connected as {}", self._client.user)
 
-        @self._client.event
+        @self._client.event  # type: ignore[untyped-decorator]
         async def on_message(discord_msg: discord.Message) -> None:
             if discord_msg.author == self._client.user:
                 return
@@ -50,6 +50,7 @@ class DiscordAdapter:
             )
             await handler(incoming)
 
+        assert self._settings.discord_bot_token is not None
         await self._client.start(self._settings.discord_bot_token.get_secret_value())
 
     # Sink is scaffolded — not yet wired into the pipeline. Will be connected

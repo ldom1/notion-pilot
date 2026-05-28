@@ -104,6 +104,7 @@ class EmailAdapter:
         client = IMAPClient(self._settings.imap_host, port=port, ssl=use_ssl)
         if not use_ssl:
             client.starttls()
+        assert self._settings.imap_password is not None
         client.login(
             self._settings.imap_user,
             self._settings.imap_password.get_secret_value(),
