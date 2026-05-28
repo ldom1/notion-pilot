@@ -55,6 +55,7 @@ class IncomingMessage(BaseModel):
     sent_at: datetime
     media_type: MediaType
     media: MediaPayload | None
+    source_adapter: str = Field(..., min_length=1)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -132,7 +133,7 @@ class NotionDatabaseProperties(BaseModel):
         src = infer_source_label(body) if body else None
         return cls(
             name=msg.name,
-            label=["telegram"],
+            label=[msg.source_adapter],
             entry_type=msg.media_type.value,
             url=url,
             source=src,
@@ -141,7 +142,7 @@ class NotionDatabaseProperties(BaseModel):
             status="Not analysed",
         )
 
-    def to_notion_properties(self) -> dict[str, Any]:
+    def to_notion_properties(self) -> dict[str, Any]:  # noqa: PLR0912
         """Return a Notion-API-ready properties payload."""
         labels = (
             self.label if isinstance(self.label, list) else ([self.label] if self.label else [])
@@ -162,3 +163,33 @@ class NotionDatabaseProperties(BaseModel):
         if self.source:
             props["Source"] = {"select": {"name": self.source}}
         return props
+
+
+class PersonContactProperties(BaseModel):
+    """Minimal row for a Notion People / Contacts database."""
+
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True)
+
+    name: str
+    email: str
+    last_subject: str = ""
+    last_contact: datetime
+
+    def to_notion_properties(self) -> dict[str, Any]:
+        return {
+            "Name": {"title": [{"text": {"content": self.name[:2000]}}]},
+            "Email": {"email": self.email},
+            "Last Subject": {"rich_text": [{"text": {"content": self.last_subject[:2000]}}]},
+            "Last Contact": {"date": {"start": self.last_contact.isoformat()}},
+        }
+
+    @classmethod
+    def from_incoming(cls, msg: IncomingMessage) -> "PersonContactProperties":
+        display = msg.sender.split("@")[0].replace(".", " ").replace("_", " ").title()
+        subject = msg.text.splitlines()[0][:200] if msg.text else ""
+        return cls(
+            name=display or msg.sender,
+            email=msg.sender,
+            last_subject=subject,
+            last_contact=msg.sent_at,
+        )

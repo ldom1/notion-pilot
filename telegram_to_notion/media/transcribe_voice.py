@@ -2,9 +2,8 @@
 
 from pathlib import Path
 
-from loguru import logger
-
 from faster_whisper import WhisperModel
+from loguru import logger
 
 
 def transcribe_file(

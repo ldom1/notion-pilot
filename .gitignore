@@ -66,3 +66,6 @@ models/
 # Ad-hoc debug logs
 *.log
 logs/
+
+# --- Data files ---
+data/

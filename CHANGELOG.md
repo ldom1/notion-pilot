@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `crm/` package: `NotionPeopleSyncer`, `NotionCompanySyncer`, fuzzy dedup (`rapidfuzz`), Brave Search email enrichment
+- `scripts/import_linkedin.py`: batch import of LinkedIn `Connections.csv` into Notion People database
+  - Fuzzy dedup on Name+Company (skip ≥ 85, review 75–84, create < 75)
+  - Company resolution: fuzzy match against existing Notion companies, auto-creates new ones
+  - Optional Brave Search email enrichment (`--no-enrich` to skip, rate-limited 1 req/s)
+  - Borderline matches written to `data/import-review.csv` for manual review
+  - `--dry-run` mode: counts only, no Notion writes
+- Config: `NOTION_PEOPLE_DATA_SOURCE_ID`, `NOTION_COMPANIES_DATA_SOURCE_ID`, `BRAVE_API_KEY` (all optional)
+- Source adapter abstraction: `SourceAdapter` and `SinkAdapter` protocols in `telegram_to_notion/adapters/`
+- IMAP email adapter: polls unseen messages, filters by sender allowlist (`IMAP_ALLOWED_SENDERS`), archives processed emails (`uv sync --extra email`)
+- Discord adapter: source (messages → Notion) + sink scaffolded for future pipeline notifications (`uv sync --extra discord`)
+- `pipeline.py`: shared enrichment + Notion write logic extracted from `bot.py`
+- Optional dep extras: `uv sync --extra email`, `uv sync --extra discord`
+
+### Changed
+- `TELEGRAM_BOT_TOKEN` is now optional — bot starts with any configured adapter
+- `IncomingMessage` has a new required field `source_adapter` (label in Notion reflects the source)
+
 ## [1.0.0] - 2026-04-18
 
 First stable release. Consolidates the v0.1 → v0.3 iterations into a production-ready

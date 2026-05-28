@@ -14,6 +14,15 @@ dependencies = [
     "loguru>=0.7.3",
     "python-dotenv>=1.2.2",
     "faster-whisper>=1.2.1",
+    "rapidfuzz>=3.14.5",
+]
+
+[project.optional-dependencies]
+email = [
+    "imapclient>=3.1.0",
+]
+discord = [
+    "discord-py>=2.3",
 ]
 
 [dependency-groups]
@@ -59,3 +68,22 @@ plugins = ["pydantic.mypy"]
 [[tool.mypy.overrides]]
 module = "faster_whisper"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["imapclient", "imapclient.imapclient"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "discord"
+ignore_missing_imports = true
+
+[tool.pylint.master]
+# Optional dependencies not installed in the CI environment
+ignored-modules = ["discord", "imapclient", "imapclient.imapclient"]
+
+[tool.pylint.messages_control]
+disable = [
+    "C0415",  # import-outside-toplevel: intentional lazy imports for optional deps
+    "R0903",  # too-few-public-methods: Protocol classes have few methods by design
+    "W0718",  # broad-exception-caught: intentional catch-all in adapter error handlers
+]

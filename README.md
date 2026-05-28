@@ -47,6 +47,15 @@ Send your bot a message on Telegram. Send `/ping` to confirm it's alive.
 - A [Notion integration](https://www.notion.so/my-integrations) + a database shared with it, containing columns: `Name` (title), `Label` (multi-select), `Type` (select), `Link` (url), `Source` (select), `Description` (text), `Interest` (select), `Status` (status)
 - *(Optional)* An [OpenRouter API key](https://openrouter.ai/keys) for LLM enrichment
 
+### Optional adapters
+
+```bash
+uv sync --extra email     # IMAP email ingestion
+uv sync --extra discord   # Discord source + notifications
+```
+
+Set the relevant env vars (see `.env.example`) — adapters activate automatically when their credentials are present.
+
 ## Try it without Telegram
 
 ```bash
@@ -74,15 +83,21 @@ uv run ruff check . && uv run mypy telegram_to_notion
 
 ```
 telegram_to_notion/
-├── bot.py            # Telegram long-polling listener + handlers
-├── config.py         # Pydantic settings from .env
-├── models.py         # IncomingMessage + NotionDatabaseProperties
-├── notion.py         # NotionDatabaseWriter (create / update / delete)
+├── adapters/
+│   ├── __init__.py    # SourceAdapter + SinkAdapter protocols
+│   ├── telegram.py    # Telegram long-polling source
+│   ├── email.py       # IMAP polling source (optional: uv sync --extra email)
+│   └── discord.py     # Discord source + notification sink (optional: uv sync --extra discord)
+├── bot.py             # Runner: activates adapters from env, asyncio.gather
+├── config.py          # Pydantic settings from .env
+├── models.py          # IncomingMessage + NotionDatabaseProperties
+├── notion.py          # NotionDatabaseWriter
+├── pipeline.py        # Shared: interpret_message → create_page
 ├── llm/
-│   ├── openrouter.py # Structured JSON extraction via chat completions
-│   ├── prompt.py     # System prompt built from the Pydantic model
+│   ├── openrouter.py  # Structured JSON extraction via chat completions
+│   ├── prompt.py      # System prompt built from the Pydantic model
 │   └── source_hints.py
-└── media/            # Photo + voice download, on-device transcription
+└── media/             # Photo + voice download, on-device transcription
 ```
 
 Contributions welcome. Short & sharp.
