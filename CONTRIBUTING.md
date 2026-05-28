@@ -11,7 +11,7 @@ Thanks for your interest! This project is small and opinionated — PRs that kee
 ## Dev setup
 
 ```bash
-git clone https://github.com/ldom1/telegram-to-notion && cd telegram-to-notion
+git clone https://github.com/ldom1/notion-pilot && cd notion-pilot
 cp .env.example .env   # fill in TELEGRAM_BOT_TOKEN, NOTION_TOKEN, NOTION_DATABASE_ID
 uv sync
 ```
@@ -23,8 +23,8 @@ Your PR must pass all of the following locally (CI runs the same set):
 ```bash
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy telegram_to_notion
-uv run pylint telegram_to_notion --fail-under=9.5
+uv run mypy notion_pilot
+uv run pylint notion_pilot --fail-under=9.5
 uv run pytest tests/unit -v
 ```
 

@@ -2,8 +2,8 @@
 
 from datetime import datetime, timezone
 
-from telegram_to_notion.llm.prompt import build_openrouter_system_prompt
-from telegram_to_notion.models import IncomingMessage, MediaType
+from notion_pilot.shared.llm.prompt import build_openrouter_system_prompt
+from notion_pilot.shared.models import IncomingMessage, MediaType
 
 
 def _msg(text: str = "Hi", media_type: MediaType = MediaType.TEXT) -> IncomingMessage:

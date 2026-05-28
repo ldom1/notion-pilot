@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Renamed project to **Notion Pilot** (`notion-pilot` / `notion_pilot`)
+- Reorganized package structure: `shared/` core, `inbox/` (formerly `pipelines/`), `crm/`, `scripts/crm/`
+- GitHub repo renamed from `telegram-to-notion` to `notion-pilot`
+
 ### Added
 - `crm/` package: `NotionPeopleSyncer`, `NotionCompanySyncer`, fuzzy dedup (`rapidfuzz`), Brave Search email enrichment
 - `scripts/import_linkedin.py`: batch import of LinkedIn `Connections.csv` into Notion People database

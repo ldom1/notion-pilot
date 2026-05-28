@@ -10,11 +10,11 @@ from pathlib import Path
 import pytest
 from notion_client import AsyncClient
 
-from telegram_to_notion.config import load_settings
-from telegram_to_notion.llm.openrouter import interpret_message
-from telegram_to_notion.media.transcribe_voice import transcribe_file
-from telegram_to_notion.models import IncomingMessage, MediaType, NotionDatabaseProperties
-from telegram_to_notion.notion import NotionDatabaseWriter
+from notion_pilot.shared.config import load_settings
+from notion_pilot.shared.llm.openrouter import interpret_message
+from notion_pilot.shared.media.transcribe_voice import transcribe_file
+from notion_pilot.shared.models import IncomingMessage, MediaType, NotionDatabaseProperties
+from notion_pilot.shared.notion import NotionDatabaseWriter
 
 pytestmark = pytest.mark.integration
 

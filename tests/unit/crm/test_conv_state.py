@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from telegram_to_notion.crm.conv_state import ConvState, ConvStateStore
+from notion_pilot.crm.conv_state import ConvState, ConvStateStore
 
 
 @pytest.fixture
