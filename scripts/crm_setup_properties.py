@@ -37,6 +37,8 @@ _PEOPLE_NEW_PROPS = {
 }
 
 _COMPANIES_NEW_PROPS = {
+    "Linkedin": {"url": {}},
+    "Website": {"url": {}},
     "Size": {
         "select": {
             "options": [
@@ -65,7 +67,7 @@ _COMPANIES_NEW_PROPS = {
 
 async def _patch_database(client: httpx.AsyncClient, token: str, db_id: str, props: dict) -> None:
     resp = await client.patch(
-        f"{_NOTION_BASE}/databases/{db_id}",
+        f"{_NOTION_BASE}/data_sources/{db_id}",
         headers={
             "Notion-Version": _NOTION_VERSION,
             "Authorization": f"Bearer {token}",
