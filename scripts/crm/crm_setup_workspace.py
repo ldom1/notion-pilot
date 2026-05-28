@@ -23,6 +23,7 @@ import httpx
 from loguru import logger
 
 from notion_pilot.shared.config import load_settings
+from notion_pilot.shared.utils.notion_urls import page_id_from_url
 
 NOTION_VERSION = "2026-03-11"
 NOTION_API = "https://api.notion.com/v1"
@@ -35,16 +36,6 @@ def _arg(name: str) -> str | None:
         if a.startswith(f"{name}="):
             return a.split("=", 1)[1]
     return None
-
-
-def _page_id_from_url(value: str) -> str:
-    """Accept a raw UUID or a Notion URL and return a hyphenated UUID."""
-    value = value.split("?")[0].split("#")[0]
-    segment = value.rstrip("/").rsplit("/", 1)[-1]
-    raw = segment.rsplit("-", 1)[-1] if "-" in segment else segment
-    if len(raw) == 32:  # noqa: PLR2004
-        return f"{raw[:8]}-{raw[8:12]}-{raw[12:16]}-{raw[16:20]}-{raw[20:]}"
-    return raw
 
 
 async def _create_page(
@@ -209,4 +200,4 @@ if __name__ == "__main__":
         logger.error("Usage: uv run python scripts/setup_crm.py --parent-id <PAGE_ID_OR_URL>")
         sys.exit(1)
     _title = _arg("--page-title") or "CRM"
-    asyncio.run(main(_page_id_from_url(_parent), _title))
+    asyncio.run(main(page_id_from_url(_parent), _title))
