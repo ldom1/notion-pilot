@@ -75,8 +75,9 @@ module = ["imapclient", "imapclient.imapclient"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "discord"
+module = ["discord", "notion_pilot.shared.adapters.discord"]
 ignore_missing_imports = true
+warn_unused_ignores = false
 
 [tool.pylint.master]
 # Optional dependencies not installed in the CI environment
