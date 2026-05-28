@@ -1,4 +1,5 @@
 """SQLite-backed per-chat conversation state for Telegram CRM commands."""
+
 from __future__ import annotations
 
 import json

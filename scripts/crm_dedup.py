@@ -9,6 +9,7 @@ Usage:
     uv run python scripts/crm_dedup.py --people
     uv run python scripts/crm_dedup.py --people --companies --threshold 80
 """
+
 import argparse
 import asyncio
 from dataclasses import dataclass
@@ -40,9 +41,7 @@ class DuplicatePair:
     context_b: str = ""
 
 
-def _find_company_duplicates(
-    id_to_name: dict[str, str], threshold: float
-) -> list[DuplicatePair]:
+def _find_company_duplicates(id_to_name: dict[str, str], threshold: float) -> list[DuplicatePair]:
     items = [(pid, name, normalize(name)) for pid, name in id_to_name.items()]
     pairs: list[DuplicatePair] = []
     for i, (id_a, name_a, norm_a) in enumerate(items):
@@ -53,9 +52,7 @@ def _find_company_duplicates(
     return sorted(pairs, key=lambda p: -p.score)
 
 
-def _find_people_duplicates(
-    existing: list[dict], threshold: float
-) -> list[DuplicatePair]:
+def _find_people_duplicates(existing: list[dict], threshold: float) -> list[DuplicatePair]:
     def key(r: dict) -> str:
         return normalize(f"{r['name']} {r.get('company', '')}")
 
@@ -93,7 +90,9 @@ async def dedup_companies(threshold: float) -> None:
     client = AsyncClient(auth=settings.notion_token.get_secret_value())
     syncer = NotionCompanySyncer(client, settings.notion_companies_data_source_id)
     await syncer.load_snapshot()
-    logger.info("Scanning {} companies for duplicates (threshold={})...", len(syncer._id_to_name), threshold)
+    logger.info(
+        "Scanning {} companies for duplicates (threshold={})...", len(syncer._id_to_name), threshold
+    )
     pairs = _find_company_duplicates(syncer._id_to_name, threshold)
     _print_pairs(pairs, "Companies")
 
@@ -105,7 +104,9 @@ async def dedup_people(threshold: float) -> None:
         return
     client = AsyncClient(auth=settings.notion_token.get_secret_value())
     company_syncer = NotionCompanySyncer(client, settings.notion_companies_data_source_id or "")
-    people_syncer = NotionPeopleSyncer(client, settings.notion_people_data_source_id, company_syncer)
+    people_syncer = NotionPeopleSyncer(
+        client, settings.notion_people_data_source_id, company_syncer
+    )
     await company_syncer.load_snapshot()
     await people_syncer.load_snapshot()
     existing = [dict(r) for r in people_syncer._existing]
@@ -119,7 +120,9 @@ def main() -> None:
     parser.add_argument("--people", action="store_true")
     parser.add_argument("--companies", action="store_true")
     parser.add_argument(
-        "--threshold", type=float, default=_DEFAULT_THRESHOLD,
+        "--threshold",
+        type=float,
+        default=_DEFAULT_THRESHOLD,
         help="Minimum similarity score 0-100 (default: %(default)s)",
     )
     args = parser.parse_args()

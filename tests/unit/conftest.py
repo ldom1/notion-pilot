@@ -1,4 +1,5 @@
 """Unit test configuration — isolates tests from .env file."""
+
 import pytest
 from pydantic_settings import SettingsConfigDict
 

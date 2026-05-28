@@ -1,9 +1,10 @@
 """CRM command registry for Telegram. Adding a command = one new COMMANDS entry."""
+
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable
+from dataclasses import dataclass
+from typing import Awaitable, Callable
 
 import httpx
 from loguru import logger
@@ -39,7 +40,9 @@ async def _handle_people(collected: dict[str, str], settings: Settings) -> str:
     token = settings.notion_token.get_secret_value()
     client = AsyncClient(auth=token)
     company_syncer = NotionCompanySyncer(client, settings.notion_companies_data_source_id or "")
-    people_syncer = NotionPeopleSyncer(client, settings.notion_people_data_source_id or "", company_syncer)
+    people_syncer = NotionPeopleSyncer(
+        client, settings.notion_people_data_source_id or "", company_syncer
+    )
     await company_syncer.load_snapshot()
     await people_syncer.load_snapshot()
 
@@ -76,13 +79,15 @@ async def _handle_deal(collected: dict[str, str], settings: Settings) -> str:
         return "⚠ NOTION_DEALS_DATABASE_ID not set — cannot create deal."
 
     async with _httpx.AsyncClient() as http:
-        syncer = NotionDealsSyncer(http, settings.notion_token.get_secret_value(), settings.notion_deals_database_id)
+        syncer = NotionDealsSyncer(
+            http, settings.notion_token.get_secret_value(), settings.notion_deals_database_id
+        )
         deal = DealRecord(
             title=collected["title"],
             stage=collected.get("stage", "Prospect"),
             notes=collected.get("notes", ""),
         )
-        page_id, created = await syncer.upsert(deal)
+        _page_id, created = await syncer.upsert(deal)
     action = "Created" if created else "Updated"
     return f"✓ {action} deal: {deal.title}"
 
@@ -118,7 +123,7 @@ async def _handle_enrich(collected: dict[str, str], settings: Settings) -> str:
     return f"✓ Enriched {collected['name']}:\n" + "\n".join(f"  • {p}" for p in parts)
 
 
-async def _handle_knowledge(collected: dict[str, str], settings: Settings) -> str:
+async def _handle_knowledge(_collected: dict[str, str], _settings: Settings) -> str:
     return "__KNOWLEDGE__"  # sentinel: caller routes to knowledge pipeline
 
 
@@ -219,7 +224,11 @@ COMMANDS: dict[str, CommandDef] = {
         description="Add or update a deal in the Deals database",
         fields=[
             FieldDef("title", "Deal name/title?"),
-            FieldDef("stage", "Stage? (Prospect / Qualification / Proposal / Negotiation)", required=False),
+            FieldDef(
+                "stage",
+                "Stage? (Prospect / Qualification / Proposal / Negotiation)",
+                required=False,
+            ),
             FieldDef("notes", "Any notes?", required=False),
         ],
         llm_prompt="Extract the deal title, stage, and notes from this message.",

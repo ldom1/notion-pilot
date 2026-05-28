@@ -1,9 +1,10 @@
 """Unit tests for crm/deals.py — mocked httpx."""
+
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 
-from telegram_to_notion.crm.deals import DealRecord, DealUpsertResult, NotionDealsSyncer
+from telegram_to_notion.crm.deals import DealRecord, NotionDealsSyncer
 
 
 def _mock_client(create_id: str = "new-deal-id", snapshot_results: list | None = None):
@@ -57,7 +58,14 @@ async def test_create_sets_stage():
     client.post = patched_post
     syncer = NotionDealsSyncer(client, "token", "db-id")
     await syncer.create(DealRecord(title="Deal", stage="Proposal"))
-    assert captured.get("json", {}).get("properties", {}).get("Stage", {}).get("select", {}).get("name") == "Proposal"
+    assert (
+        captured.get("json", {})
+        .get("properties", {})
+        .get("Stage", {})
+        .get("select", {})
+        .get("name")
+        == "Proposal"
+    )
 
 
 async def test_upsert_creates_new_when_not_in_snapshot():

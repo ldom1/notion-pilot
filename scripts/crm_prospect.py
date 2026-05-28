@@ -5,6 +5,7 @@ Usage:
     uv run python scripts/crm_prospect.py --pitch "I want to sell HPC-as-a-service to energy companies"
     uv run python scripts/crm_prospect.py --pitch "Sell optimization software" --limit 5
 """
+
 import argparse
 import asyncio
 
@@ -29,7 +30,9 @@ async def run(pitch: str, top_k: int) -> None:
     logger.info("Loading People snapshot from Notion...")
     client = AsyncClient(auth=settings.notion_token.get_secret_value())
     company_syncer = NotionCompanySyncer(client, settings.notion_companies_data_source_id or "")
-    people_syncer = NotionPeopleSyncer(client, settings.notion_people_data_source_id, company_syncer)
+    people_syncer = NotionPeopleSyncer(
+        client, settings.notion_people_data_source_id, company_syncer
+    )
     await company_syncer.load_snapshot()
     await people_syncer.load_snapshot()
 
@@ -41,9 +44,9 @@ async def run(pitch: str, top_k: int) -> None:
         print("No ranked contacts returned.")
         return
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Top {len(ranked)} contacts for: {pitch}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     for i, contact in enumerate(ranked, 1):
         linkedin = f"\n   LinkedIn: {contact.linkedin_url}" if contact.linkedin_url else ""
         print(

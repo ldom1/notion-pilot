@@ -1,4 +1,5 @@
 """Fuzzy deduplication for people and company records. Pure — no Notion dependency."""
+
 import unicodedata
 from dataclasses import dataclass, field
 from enum import Enum
@@ -15,6 +16,7 @@ class _CandidateBase(TypedDict):
 
 class CandidateRecord(_CandidateBase, total=False):
     """Extended candidate — required: name/company/page_id; optional: prospection metadata."""
+
     position: str
     seniority: str
     role_type: list[str]

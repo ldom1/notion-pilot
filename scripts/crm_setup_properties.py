@@ -6,8 +6,8 @@ Safe to re-run: existing properties are left untouched.
 Usage:
     uv run python scripts/setup_notion_crm.py
 """
+
 import asyncio
-import sys
 
 import httpx
 from loguru import logger
@@ -55,11 +55,7 @@ _COMPANIES_NEW_PROPS = {
             ]
         }
     },
-    "Tier": {
-        "select": {
-            "options": [{"name": t, "color": "default"} for t in ["1", "2", "3"]]
-        }
-    },
+    "Tier": {"select": {"options": [{"name": t, "color": "default"} for t in ["1", "2", "3"]]}},
     "Tech Stack": {"multi_select": {"options": []}},
     "Country": {"select": {"options": []}},
 }
@@ -89,13 +85,17 @@ async def main() -> None:
     async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
         if settings.notion_people_data_source_id:
             logger.info("Patching People DB ({})...", settings.notion_people_data_source_id)
-            await _patch_database(client, token, settings.notion_people_data_source_id, _PEOPLE_NEW_PROPS)
+            await _patch_database(
+                client, token, settings.notion_people_data_source_id, _PEOPLE_NEW_PROPS
+            )
         else:
             logger.warning("NOTION_PEOPLE_DATA_SOURCE_ID not set — skipping People DB")
 
         if settings.notion_companies_data_source_id:
             logger.info("Patching Companies DB ({})...", settings.notion_companies_data_source_id)
-            await _patch_database(client, token, settings.notion_companies_data_source_id, _COMPANIES_NEW_PROPS)
+            await _patch_database(
+                client, token, settings.notion_companies_data_source_id, _COMPANIES_NEW_PROPS
+            )
         else:
             logger.warning("NOTION_COMPANIES_DATA_SOURCE_ID not set — skipping Companies DB")
 

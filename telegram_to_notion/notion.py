@@ -9,6 +9,9 @@ from notion_client.errors import APIResponseError
 
 @runtime_checkable
 class _HasNotionProperties(Protocol):
+    @property
+    def name(self) -> str: ...
+
     def to_notion_properties(self) -> dict[str, Any]: ...
 
 

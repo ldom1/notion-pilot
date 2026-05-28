@@ -1,4 +1,5 @@
 """LLM-powered contact ranking for a B2B sales pitch."""
+
 from __future__ import annotations
 
 import json
@@ -41,7 +42,7 @@ async def rank_contacts(
     prompt = (
         f"You are a B2B sales assistant. For this pitch:\n\n{pitch}\n\n"
         "Rank these contacts by their likelihood to be decision-makers or strong influencers. "
-        "Return JSON: {\"rankings\": [{\"index\": 1, \"score\": 0.9, \"reasoning\": \"...\"}]}.\n\n"
+        'Return JSON: {"rankings": [{"index": 1, "score": 0.9, "reasoning": "..."}]}.\n\n'
         f"Contacts:\n{contacts_text}"
     )
 
@@ -66,14 +67,16 @@ async def rank_contacts(
         idx = int(r["index"]) - 1
         if 0 <= idx < len(candidates):
             c = candidates[idx]
-            ranked.append(RankedContact(
-                page_id=c["page_id"],
-                name=c["name"],
-                company=c["company"],
-                position=c.get("position", ""),
-                score=float(r.get("score", 0.0)),
-                reasoning=str(r.get("reasoning", "")),
-                linkedin_url=c.get("linkedin_url", ""),
-            ))
+            ranked.append(
+                RankedContact(
+                    page_id=c["page_id"],
+                    name=c["name"],
+                    company=c["company"],
+                    position=c.get("position", ""),
+                    score=float(r.get("score", 0.0)),
+                    reasoning=str(r.get("reasoning", "")),
+                    linkedin_url=c.get("linkedin_url", ""),
+                )
+            )
 
     return sorted(ranked, key=lambda x: x.score, reverse=True)[:top_k]

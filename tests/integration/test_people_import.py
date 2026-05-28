@@ -1,4 +1,5 @@
 """Integration test — dry-run import against real Notion (reads only, no writes)."""
+
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,7 @@ def test_parse_connections_returns_records():
 
 async def test_dry_run_completes_without_error():
     from telegram_to_notion.config import load_settings
+
     settings = load_settings()
     if not settings.notion_people_data_source_id:
         pytest.skip("NOTION_PEOPLE_DATA_SOURCE_ID not set")

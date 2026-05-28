@@ -1,4 +1,5 @@
 """Four-tier person and company enrichment. Never raises; returns partial results."""
+
 from __future__ import annotations
 
 import json
@@ -112,8 +113,13 @@ async def _apollo_person(name: str, company: str, api_key: str) -> PersonEnrichm
         if not any([email, phone, linkedin]):
             return None
         return PersonEnrichment(
-            email=email, phone=phone, linkedin_url=linkedin,
-            seniority=seniority, role_type=role_type, country=country, source="apollo",
+            email=email,
+            phone=phone,
+            linkedin_url=linkedin,
+            seniority=seniority,
+            role_type=role_type,
+            country=country,
+            source="apollo",
         )
     except Exception:  # noqa: BLE001
         return None
@@ -173,13 +179,20 @@ async def _apollo_company(name: str, api_key: str, domain: str = "") -> CompanyE
         linkedin = org.get("linkedin_url", "")
         website = org.get("website_url", "")
         country = org.get("country", "")
-        tech_stack = [t.get("name", "") for t in (org.get("technology_names") or []) if t.get("name")]
+        tech_stack = [
+            t.get("name", "") for t in (org.get("technology_names") or []) if t.get("name")
+        ]
         logo_url = org.get("logo_url", "")
         if not any([linkedin, website, size, country]):
             return None
         return CompanyEnrichment(
-            website=website, linkedin_url=linkedin, size=size,
-            country=country, tech_stack=tech_stack, logo_url=logo_url, source="apollo",
+            website=website,
+            linkedin_url=linkedin,
+            size=size,
+            country=country,
+            tech_stack=tech_stack,
+            logo_url=logo_url,
+            source="apollo",
         )
     except Exception:  # noqa: BLE001
         return None
@@ -326,8 +339,8 @@ async def _llm_person_infer(
     api_key = settings.openrouter_api_key.get_secret_value()  # type: ignore[union-attr]
     prompt = (
         f"Infer professional attributes for {name}, {position or 'unknown role'} at {company}. "
-        "Return JSON: {\"seniority\": one of [founder, c_suite, vp, director, manager, senior, mid, junior], "
-        "\"role_type\": list e.g. [\"engineering\"], \"country\": ISO alpha-2 or \"\"}. "
+        'Return JSON: {"seniority": one of [founder, c_suite, vp, director, manager, senior, mid, junior], '
+        '"role_type": list e.g. ["engineering"], "country": ISO alpha-2 or ""}. '
         "Reason from company name and job title only."
     )
     try:
@@ -357,9 +370,7 @@ async def _llm_person_infer(
 # ── Tier 4: LLM inference (company) ──────────────────────────────────────────
 
 
-async def _llm_company_infer(
-    name: str, settings: Settings
-) -> CompanyEnrichment | None:
+async def _llm_company_infer(name: str, settings: Settings) -> CompanyEnrichment | None:
     api_key = settings.openrouter_api_key.get_secret_value()  # type: ignore[union-attr]
     prompt = (
         f"Provide details for the company named '{name}'. "
@@ -384,7 +395,9 @@ async def _llm_company_infer(
         if resp.status_code != 200:
             return None
         data = _parse_llm_json(resp.json()["choices"][0]["message"]["content"])
-        if not any([data.get("website"), data.get("linkedin_url"), data.get("size"), data.get("country")]):
+        if not any(
+            [data.get("website"), data.get("linkedin_url"), data.get("size"), data.get("country")]
+        ):
             return None
         return CompanyEnrichment(
             website=data.get("website", ""),
@@ -507,7 +520,9 @@ async def enrich_company(
 
     # Tier 1: Apollo (domain lookup is much more reliable than name lookup)
     if settings.apollo_api_key:
-        apollo = await _apollo_company(name, settings.apollo_api_key.get_secret_value(), domain=domain)
+        apollo = await _apollo_company(
+            name, settings.apollo_api_key.get_secret_value(), domain=domain
+        )
         if apollo:
             result = _merge_company(result, apollo)
 

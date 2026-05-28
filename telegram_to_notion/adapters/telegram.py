@@ -105,12 +105,12 @@ class TelegramAdapter:
                     return
                 # Fall through to knowledge pipeline
                 incoming = await _to_incoming(settings, msg)
-                page_id = await handler(incoming)
+                await handler(incoming)
                 await _send_reply(msg, f"Saved to Notion.\nTitle: {incoming.name[:120]}")
                 return
 
             # Try LLM extraction from the command message body
-            body = text[len(cmd_name) + 2:].strip()  # strip "/command " prefix
+            body = text[len(cmd_name) + 2 :].strip()  # strip "/command " prefix
             collected = await extract_fields_from_text(body, cmd, settings) if body else {}
 
             state = ConvState(
@@ -207,6 +207,7 @@ class TelegramAdapter:
             if update.message is not None:
                 await update.message.reply_text("telegram-to-notion: ok")
 
+        assert self._settings.telegram_bot_token is not None
         app = (
             ApplicationBuilder().token(self._settings.telegram_bot_token.get_secret_value()).build()
         )

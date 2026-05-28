@@ -1,7 +1,7 @@
 """Unit tests for crm/syncer.py — mocked Notion client."""
+
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 
 from telegram_to_notion.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
 
@@ -9,18 +9,14 @@ from telegram_to_notion.crm.syncer import NotionCompanySyncer, NotionPeopleSynce
 def _make_company_page(page_id: str, name: str) -> dict:
     return {
         "id": page_id,
-        "properties": {
-            "Name": {"type": "title", "title": [{"plain_text": name}]}
-        },
+        "properties": {"Name": {"type": "title", "title": [{"plain_text": name}]}},
     }
 
 
 def _mock_ds_query(pages: list[dict]):
     mock = AsyncMock()
     mock.data_sources = MagicMock()
-    mock.data_sources.query = AsyncMock(
-        return_value={"results": pages, "has_more": False}
-    )
+    mock.data_sources.query = AsyncMock(return_value={"results": pages, "has_more": False})
     mock.pages = MagicMock()
     mock.pages.create = AsyncMock(return_value={"id": "new-company-id"})
     return mock
@@ -28,10 +24,12 @@ def _mock_ds_query(pages: list[dict]):
 
 class TestNotionCompanySyncer:
     async def test_load_snapshot_populates_cache(self):
-        client = _mock_ds_query([
-            _make_company_page("id-edf", "EDF"),
-            _make_company_page("id-rte", "RTE"),
-        ])
+        client = _mock_ds_query(
+            [
+                _make_company_page("id-edf", "EDF"),
+                _make_company_page("id-rte", "RTE"),
+            ]
+        )
         syncer = NotionCompanySyncer(client, "fake-ds-id")
         await syncer.load_snapshot()
 
@@ -132,7 +130,9 @@ class TestNotionPeopleSyncer:
         companies = [_make_company_page("c1", "Engie")]
         syncer, client = await self._make_syncer(people, companies)
 
-        result = await syncer.upsert(PersonRecord(name="Bob Bernard", company="OVHcloud", position="CTO"))
+        result = await syncer.upsert(
+            PersonRecord(name="Bob Bernard", company="OVHcloud", position="CTO")
+        )
         assert result.status == "created"
         assert result.page_id == "new-person-id"
         client.pages.create.assert_called()
@@ -143,7 +143,9 @@ class TestNotionPeopleSyncer:
         companies = []
         syncer, client = await self._make_syncer(people, companies)
 
-        result = await syncer.upsert(PersonRecord(name="Jean Dupont", company="Zzz Corp Far Far Away XYZ"))
+        result = await syncer.upsert(
+            PersonRecord(name="Jean Dupont", company="Zzz Corp Far Far Away XYZ")
+        )
         # could be REVIEW or SKIP depending on score — must NOT be "created"
         assert result.status in ("skipped", "review")
         client.pages.create.assert_not_called()
@@ -151,12 +153,14 @@ class TestNotionPeopleSyncer:
     async def test_upsert_sets_linkedin_and_email(self):
         syncer, client = await self._make_syncer([], [])
 
-        await syncer.upsert(PersonRecord(
-            name="New Person",
-            company="NewCorp",
-            linkedin_url="https://linkedin.com/in/newperson",
-            email="new@newcorp.com",
-        ))
+        await syncer.upsert(
+            PersonRecord(
+                name="New Person",
+                company="NewCorp",
+                linkedin_url="https://linkedin.com/in/newperson",
+                email="new@newcorp.com",
+            )
+        )
         props = client.pages.create.call_args.kwargs["properties"]
         assert props["Linkedin"]["url"] == "https://linkedin.com/in/newperson"
         assert props["E-mail pro"]["email"] == "new@newcorp.com"
@@ -169,13 +173,15 @@ class TestNotionPeopleSyncer:
 
     async def test_upsert_sets_phone_seniority_role_type(self):
         syncer, client = await TestNotionPeopleSyncer._make_syncer(TestNotionPeopleSyncer, [], [])
-        await syncer.upsert(PersonRecord(
-            name="New Person",
-            company="NewCorp",
-            phone="+33612345678",
-            seniority="vp",
-            role_type=["engineering", "management"],
-        ))
+        await syncer.upsert(
+            PersonRecord(
+                name="New Person",
+                company="NewCorp",
+                phone="+33612345678",
+                seniority="vp",
+                role_type=["engineering", "management"],
+            )
+        )
         props = client.pages.create.call_args.kwargs["properties"]
         assert props["Phone"]["phone_number"] == "+33612345678"
         assert props["Seniority"]["select"]["name"] == "vp"
@@ -185,17 +191,19 @@ class TestNotionPeopleSyncer:
 
 async def test_load_snapshot_reads_optional_fields():
     client = _mock_people_client(
-        people_pages=[{
-            "id": "p1",
-            "properties": {
-                "Nom": {"title": [{"plain_text": "Alice Martin"}]},
-                "Entreprise": {"relation": []},
-                "Fonction": {"rich_text": [{"plain_text": "VP Engineering"}]},
-                "Seniority": {"select": {"name": "vp"}},
-                "Role Type": {"multi_select": [{"name": "engineering"}]},
-                "Linkedin": {"url": "https://linkedin.com/in/alice"},
-            },
-        }],
+        people_pages=[
+            {
+                "id": "p1",
+                "properties": {
+                    "Nom": {"title": [{"plain_text": "Alice Martin"}]},
+                    "Entreprise": {"relation": []},
+                    "Fonction": {"rich_text": [{"plain_text": "VP Engineering"}]},
+                    "Seniority": {"select": {"name": "vp"}},
+                    "Role Type": {"multi_select": [{"name": "engineering"}]},
+                    "Linkedin": {"url": "https://linkedin.com/in/alice"},
+                },
+            }
+        ],
         company_pages=[],
     )
     company_syncer = NotionCompanySyncer(client, "fake-companies-ds")

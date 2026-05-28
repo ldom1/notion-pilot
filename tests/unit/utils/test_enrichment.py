@@ -1,10 +1,10 @@
 """Unit tests for utils/enrichment.py — all HTTP mocked."""
+
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from telegram_to_notion.config import Settings
 from telegram_to_notion.utils.enrichment import (
-    CompanyEnrichment,
     PersonEnrichment,
     enrich_company,
     enrich_person,
@@ -41,9 +41,11 @@ async def test_no_keys_returns_empty():
 async def test_brave_finds_email():
     s = Settings(**_SETTINGS_BASE, brave_api_key="bk")
     brave_resp = {
-        "web": {"results": [
-            {"description": "Contact at jean.dupont@edf.fr for info.", "url": "https://edf.fr"},
-        ]}
+        "web": {
+            "results": [
+                {"description": "Contact at jean.dupont@edf.fr for info.", "url": "https://edf.fr"},
+            ]
+        }
     }
     with patch("telegram_to_notion.utils.enrichment.httpx.AsyncClient") as mock_cls:
         mock_cls.return_value = _mock_http_client(get_resp=brave_resp)
@@ -55,9 +57,11 @@ async def test_brave_finds_email():
 async def test_brave_finds_linkedin():
     s = Settings(**_SETTINGS_BASE, brave_api_key="bk")
     brave_resp = {
-        "web": {"results": [
-            {"description": "See profile.", "url": "https://www.linkedin.com/in/jean-dupont/"},
-        ]}
+        "web": {
+            "results": [
+                {"description": "See profile.", "url": "https://www.linkedin.com/in/jean-dupont/"},
+            ]
+        }
     }
     with patch("telegram_to_notion.utils.enrichment.httpx.AsyncClient") as mock_cls:
         mock_cls.return_value = _mock_http_client(get_resp=brave_resp)
@@ -68,9 +72,16 @@ async def test_brave_finds_linkedin():
 async def test_brave_returns_empty_triggers_perplexity():
     s = Settings(**_SETTINGS_BASE, brave_api_key="bk", openrouter_api_key="ok")
     brave_resp = {"web": {"results": [{"description": "no contact info", "url": "x"}]}}
-    perp_payload = json.dumps({
-        "email": "j@edf.fr", "phone": "", "linkedin_url": "", "seniority": "", "role_type": [], "country": "FR"
-    })
+    perp_payload = json.dumps(
+        {
+            "email": "j@edf.fr",
+            "phone": "",
+            "linkedin_url": "",
+            "seniority": "",
+            "role_type": [],
+            "country": "FR",
+        }
+    )
     perp_resp = {"choices": [{"message": {"content": perp_payload}}]}
     call_count = {"n": 0}
 
@@ -104,9 +115,11 @@ async def test_brave_returns_empty_triggers_perplexity():
 async def test_brave_found_something_skips_perplexity():
     s = Settings(**_SETTINGS_BASE, brave_api_key="bk", openrouter_api_key="ok")
     brave_resp = {
-        "web": {"results": [
-            {"description": "jean.dupont@edf.fr is the contact.", "url": "x"},
-        ]}
+        "web": {
+            "results": [
+                {"description": "jean.dupont@edf.fr is the contact.", "url": "x"},
+            ]
+        }
     }
     mock_client = AsyncMock()
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -118,7 +131,9 @@ async def test_brave_found_something_skips_perplexity():
     mock_client.post = AsyncMock()  # should NOT be called
 
     with patch("telegram_to_notion.utils.enrichment.httpx.AsyncClient", return_value=mock_client):
-        result = await enrich_person("Jean Dupont", "EDF", s, perplexity_model="perplexity/sonar-pro")
+        result = await enrich_person(
+            "Jean Dupont", "EDF", s, perplexity_model="perplexity/sonar-pro"
+        )
 
     assert result.email == "jean.dupont@edf.fr"
     mock_client.post.assert_not_called()
@@ -140,9 +155,11 @@ async def test_network_error_returns_empty():
 async def test_enrich_company_brave_finds_linkedin():
     s = Settings(**_SETTINGS_BASE, brave_api_key="bk")
     brave_resp = {
-        "web": {"results": [
-            {"description": "official page", "url": "https://www.linkedin.com/company/edf/"},
-        ]}
+        "web": {
+            "results": [
+                {"description": "official page", "url": "https://www.linkedin.com/company/edf/"},
+            ]
+        }
     }
     with patch("telegram_to_notion.utils.enrichment.httpx.AsyncClient") as mock_cls:
         mock_cls.return_value = _mock_http_client(get_resp=brave_resp)
