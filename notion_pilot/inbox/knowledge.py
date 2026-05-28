@@ -5,7 +5,7 @@ from notion_pilot.shared.config import Settings
 from notion_pilot.shared.llm.openrouter import interpret_message
 from notion_pilot.shared.models import IncomingMessage
 from notion_pilot.shared.notion import NotionDatabaseWriter
-from notion_pilot.pipelines.pipeline import build_pipeline
+from notion_pilot.inbox.pipeline import build_pipeline
 
 
 async def process_message(

@@ -6,7 +6,7 @@ from loguru import logger
 
 from notion_pilot.shared.adapters import SourceAdapter
 from notion_pilot.shared.config import Settings, load_settings
-from notion_pilot.pipelines import build_knowledge_pipeline, build_people_pipeline
+from notion_pilot.inbox import build_knowledge_pipeline, build_people_pipeline
 
 
 def _build_adapters(settings: Settings) -> list[SourceAdapter]:

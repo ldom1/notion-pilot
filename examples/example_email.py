@@ -19,7 +19,7 @@ from loguru import logger
 
 from notion_pilot.shared.adapters.email import EmailAdapter, _sender_allowed
 from notion_pilot.shared.config import load_settings
-from notion_pilot.pipelines import build_knowledge_pipeline, build_people_pipeline
+from notion_pilot.inbox import build_knowledge_pipeline, build_people_pipeline
 
 
 async def dry_run(adapter: EmailAdapter, folder: str | None = None) -> None:
