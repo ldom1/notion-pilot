@@ -18,9 +18,9 @@ from pathlib import Path
 from loguru import logger
 from notion_client import AsyncClient
 
-from notion_pilot.config import load_settings
-from notion_pilot.utils.dedup import DedupStatus, find_match
-from notion_pilot.utils.enrichment import enrich_person
+from notion_pilot.shared.config import load_settings
+from notion_pilot.shared.utils.dedup import DedupStatus, find_match
+from notion_pilot.shared.utils.enrichment import enrich_person
 from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
 
 _DEFAULT_CSV = Path("data/Basic_LinkedInDataExport_05-20-2026.zip/Connections.csv")

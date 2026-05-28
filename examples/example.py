@@ -10,10 +10,10 @@ from datetime import datetime, timezone
 from loguru import logger
 from notion_client import AsyncClient as NotionClient
 
-from notion_pilot.config import load_settings
-from notion_pilot.llm.openrouter import interpret_message
-from notion_pilot.models import IncomingMessage, MediaType
-from notion_pilot.notion import NotionDatabaseWriter
+from notion_pilot.shared.config import load_settings
+from notion_pilot.shared.llm.openrouter import interpret_message
+from notion_pilot.shared.models import IncomingMessage, MediaType
+from notion_pilot.shared.notion import NotionDatabaseWriter
 
 
 async def main() -> None:

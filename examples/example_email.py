@@ -17,8 +17,8 @@ import sys
 
 from loguru import logger
 
-from notion_pilot.adapters.email import EmailAdapter, _sender_allowed
-from notion_pilot.config import load_settings
+from notion_pilot.shared.adapters.email import EmailAdapter, _sender_allowed
+from notion_pilot.shared.config import load_settings
 from notion_pilot.pipelines import build_knowledge_pipeline, build_people_pipeline
 
 

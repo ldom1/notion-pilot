@@ -7,7 +7,7 @@ from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from notion_pilot.llm.source_hints import infer_source_label
+from notion_pilot.shared.llm.source_hints import infer_source_label
 
 _URL_RE = re.compile(r"https?://[^\s<>\[\]()]+", re.IGNORECASE)
 

@@ -3,7 +3,7 @@
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from notion_pilot.config import Settings
+from notion_pilot.shared.config import Settings
 from notion_pilot.crm.commands import (
     COMMANDS,
     CommandDef,

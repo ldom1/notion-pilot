@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from notion_pilot.config import Settings
-from notion_pilot.models import IncomingMessage, MediaType, NotionDatabaseProperties
+from notion_pilot.shared.config import Settings
+from notion_pilot.shared.models import IncomingMessage, MediaType, NotionDatabaseProperties
 from notion_pilot.pipelines.knowledge import process_message
 
 

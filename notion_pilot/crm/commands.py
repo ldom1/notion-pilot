@@ -9,7 +9,7 @@ from typing import Awaitable, Callable
 import httpx
 from loguru import logger
 
-from notion_pilot.config import Settings
+from notion_pilot.shared.config import Settings
 from notion_pilot.crm.conv_state import ConvState
 
 
@@ -106,7 +106,7 @@ async def _handle_lead(collected: dict[str, str], settings: Settings) -> str:
 
 
 async def _handle_enrich(collected: dict[str, str], settings: Settings) -> str:
-    from notion_pilot.utils.enrichment import enrich_person
+    from notion_pilot.shared.utils.enrichment import enrich_person
 
     enrichment = await enrich_person(collected["name"], collected.get("company", ""), settings)
     parts = []

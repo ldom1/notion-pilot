@@ -4,8 +4,8 @@ import asyncio
 
 from loguru import logger
 
-from notion_pilot.adapters import SourceAdapter
-from notion_pilot.config import Settings, load_settings
+from notion_pilot.shared.adapters import SourceAdapter
+from notion_pilot.shared.config import Settings, load_settings
 from notion_pilot.pipelines import build_knowledge_pipeline, build_people_pipeline
 
 
@@ -13,17 +13,17 @@ def _build_adapters(settings: Settings) -> list[SourceAdapter]:
     adapters: list[SourceAdapter] = []
 
     if settings.telegram_bot_token:
-        from notion_pilot.adapters.telegram import TelegramAdapter
+        from notion_pilot.shared.adapters.telegram import TelegramAdapter
 
         adapters.append(TelegramAdapter(settings))
 
     if settings.imap_host and settings.imap_user and settings.imap_password:
-        from notion_pilot.adapters.email import EmailAdapter
+        from notion_pilot.shared.adapters.email import EmailAdapter
 
         adapters.append(EmailAdapter(settings))
 
     if settings.discord_bot_token and settings.discord_channel_id:
-        from notion_pilot.adapters.discord import DiscordAdapter
+        from notion_pilot.shared.adapters.discord import DiscordAdapter
 
         adapters.append(DiscordAdapter(settings))
 
@@ -31,7 +31,7 @@ def _build_adapters(settings: Settings) -> list[SourceAdapter]:
 
 
 async def _main(settings: Settings) -> None:
-    from notion_pilot.adapters.email import EmailAdapter
+    from notion_pilot.shared.adapters.email import EmailAdapter
 
     adapters = _build_adapters(settings)
     if not adapters:

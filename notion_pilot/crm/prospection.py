@@ -7,8 +7,8 @@ from dataclasses import dataclass, field
 
 import httpx
 
-from notion_pilot.config import Settings
-from notion_pilot.utils.dedup import CandidateRecord
+from notion_pilot.shared.config import Settings
+from notion_pilot.shared.utils.dedup import CandidateRecord
 
 
 @dataclass

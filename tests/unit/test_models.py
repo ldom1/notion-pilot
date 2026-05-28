@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from notion_pilot.models import (
+from notion_pilot.shared.models import (
     IncomingMessage,
     MediaType,
     NotionDatabaseProperties,

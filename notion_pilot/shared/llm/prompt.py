@@ -1,7 +1,7 @@
 """System prompts for OpenRouter → Notion enrichment."""
 
-from notion_pilot.llm.source_hints import format_source_hint_for_prompt
-from notion_pilot.models import IncomingMessage, NotionDatabaseProperties
+from notion_pilot.shared.llm.source_hints import format_source_hint_for_prompt
+from notion_pilot.shared.models import IncomingMessage, NotionDatabaseProperties
 
 _EXCLUDED_FIELDS = {"status"}
 

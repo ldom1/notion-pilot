@@ -44,7 +44,7 @@ packages = ["notion_pilot"]
 source = "vcs"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "notion_pilot/_version.py"
+version-file = "notion_pilot/shared/_version.py"
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]

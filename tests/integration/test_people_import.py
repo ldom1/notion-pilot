@@ -19,7 +19,7 @@ def test_parse_connections_returns_records():
 
 
 async def test_dry_run_completes_without_error():
-    from notion_pilot.config import load_settings
+    from notion_pilot.shared.config import load_settings
 
     settings = load_settings()
     if not settings.notion_people_data_source_id:

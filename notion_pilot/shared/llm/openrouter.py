@@ -7,9 +7,9 @@ from typing import Any
 import httpx
 from loguru import logger
 
-from notion_pilot.config import Settings
-from notion_pilot.llm.prompt import build_openrouter_system_prompt
-from notion_pilot.models import IncomingMessage, NotionDatabaseProperties
+from notion_pilot.shared.config import Settings
+from notion_pilot.shared.llm.prompt import build_openrouter_system_prompt
+from notion_pilot.shared.models import IncomingMessage, NotionDatabaseProperties
 
 
 def _strip_json_fence(raw: str) -> str:

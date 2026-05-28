@@ -7,7 +7,7 @@ from loguru import logger
 from notion_client import AsyncClient
 from rapidfuzz.fuzz import token_sort_ratio
 
-from notion_pilot.utils.dedup import CandidateRecord, DedupStatus, find_match, normalize
+from notion_pilot.shared.utils.dedup import CandidateRecord, DedupStatus, find_match, normalize
 
 
 @dataclass

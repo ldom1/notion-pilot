@@ -3,8 +3,8 @@
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from notion_pilot.config import Settings
-from notion_pilot.utils.enrichment import (
+from notion_pilot.shared.config import Settings
+from notion_pilot.shared.utils.enrichment import (
     PersonEnrichment,
     enrich_company,
     enrich_person,
@@ -32,7 +32,7 @@ def _mock_http_client(get_resp=None, post_resp=None):
 
 async def test_no_keys_returns_empty():
     s = Settings(**_SETTINGS_BASE)
-    with patch("notion_pilot.utils.enrichment.httpx.AsyncClient") as mock_cls:
+    with patch("notion_pilot.shared.utils.enrichment.httpx.AsyncClient") as mock_cls:
         result = await enrich_person("Jean Dupont", "EDF", s)
     assert result == PersonEnrichment()
     mock_cls.assert_not_called()
@@ -47,7 +47,7 @@ async def test_brave_finds_email():
             ]
         }
     }
-    with patch("notion_pilot.utils.enrichment.httpx.AsyncClient") as mock_cls:
+    with patch("notion_pilot.shared.utils.enrichment.httpx.AsyncClient") as mock_cls:
         mock_cls.return_value = _mock_http_client(get_resp=brave_resp)
         result = await enrich_person("Jean Dupont", "EDF", s)
     assert result.email == "jean.dupont@edf.fr"
@@ -63,7 +63,7 @@ async def test_brave_finds_linkedin():
             ]
         }
     }
-    with patch("notion_pilot.utils.enrichment.httpx.AsyncClient") as mock_cls:
+    with patch("notion_pilot.shared.utils.enrichment.httpx.AsyncClient") as mock_cls:
         mock_cls.return_value = _mock_http_client(get_resp=brave_resp)
         result = await enrich_person("Jean Dupont", "EDF", s)
     assert "linkedin.com/in/jean-dupont" in result.linkedin_url
@@ -104,7 +104,7 @@ async def test_brave_returns_empty_triggers_perplexity():
     mock_client.get = _side_effect_get
     mock_client.post = _side_effect_post
 
-    with patch("notion_pilot.utils.enrichment.httpx.AsyncClient", return_value=mock_client):
+    with patch("notion_pilot.shared.utils.enrichment.httpx.AsyncClient", return_value=mock_client):
         result = await enrich_person("Jean Dupont", "EDF", s)
 
     assert result.email == "j@edf.fr"
@@ -130,7 +130,7 @@ async def test_brave_found_something_skips_perplexity():
     mock_client.get = AsyncMock(return_value=r)
     mock_client.post = AsyncMock()  # should NOT be called
 
-    with patch("notion_pilot.utils.enrichment.httpx.AsyncClient", return_value=mock_client):
+    with patch("notion_pilot.shared.utils.enrichment.httpx.AsyncClient", return_value=mock_client):
         result = await enrich_person(
             "Jean Dupont", "EDF", s, perplexity_model="perplexity/sonar-pro"
         )
@@ -146,7 +146,7 @@ async def test_network_error_returns_empty():
     mock_client.__aexit__ = AsyncMock(return_value=None)
     mock_client.get = AsyncMock(side_effect=Exception("timeout"))
 
-    with patch("notion_pilot.utils.enrichment.httpx.AsyncClient", return_value=mock_client):
+    with patch("notion_pilot.shared.utils.enrichment.httpx.AsyncClient", return_value=mock_client):
         result = await enrich_person("Jean Dupont", "EDF", s)
 
     assert result == PersonEnrichment()
@@ -161,7 +161,7 @@ async def test_enrich_company_brave_finds_linkedin():
             ]
         }
     }
-    with patch("notion_pilot.utils.enrichment.httpx.AsyncClient") as mock_cls:
+    with patch("notion_pilot.shared.utils.enrichment.httpx.AsyncClient") as mock_cls:
         mock_cls.return_value = _mock_http_client(get_resp=brave_resp)
         result = await enrich_company("EDF", s)
     assert "linkedin.com/company/edf" in result.linkedin_url

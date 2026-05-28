@@ -5,9 +5,9 @@ from datetime import timezone
 import discord
 from loguru import logger
 
-from notion_pilot.adapters import MessageHandler
-from notion_pilot.config import Settings
-from notion_pilot.models import IncomingMessage, MediaType
+from notion_pilot.shared.adapters import MessageHandler
+from notion_pilot.shared.config import Settings
+from notion_pilot.shared.models import IncomingMessage, MediaType
 
 
 class DiscordAdapter:

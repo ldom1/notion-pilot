@@ -1,9 +1,9 @@
 """Contact pipeline → Notion people database."""
 
-from notion_pilot.adapters import MessageHandler
-from notion_pilot.config import Settings
-from notion_pilot.models import IncomingMessage, PersonContactProperties
-from notion_pilot.notion import NotionDatabaseWriter
+from notion_pilot.shared.adapters import MessageHandler
+from notion_pilot.shared.config import Settings
+from notion_pilot.shared.models import IncomingMessage, PersonContactProperties
+from notion_pilot.shared.notion import NotionDatabaseWriter
 from notion_pilot.pipelines.pipeline import build_pipeline
 
 

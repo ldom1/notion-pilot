@@ -10,11 +10,11 @@ from pathlib import Path
 import pytest
 from notion_client import AsyncClient
 
-from notion_pilot.config import load_settings
-from notion_pilot.llm.openrouter import interpret_message
-from notion_pilot.media.transcribe_voice import transcribe_file
-from notion_pilot.models import IncomingMessage, MediaType, NotionDatabaseProperties
-from notion_pilot.notion import NotionDatabaseWriter
+from notion_pilot.shared.config import load_settings
+from notion_pilot.shared.llm.openrouter import interpret_message
+from notion_pilot.shared.media.transcribe_voice import transcribe_file
+from notion_pilot.shared.models import IncomingMessage, MediaType, NotionDatabaseProperties
+from notion_pilot.shared.notion import NotionDatabaseWriter
 
 pytestmark = pytest.mark.integration
 

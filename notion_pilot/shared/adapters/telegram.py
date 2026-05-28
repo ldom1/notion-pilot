@@ -17,13 +17,13 @@ from telegram.ext import (
     filters,
 )
 
-from notion_pilot.adapters import MessageHandler as PipelineHandler
-from notion_pilot.config import Settings
+from notion_pilot.shared.adapters import MessageHandler as PipelineHandler
+from notion_pilot.shared.config import Settings
 from notion_pilot.crm.commands import COMMANDS, extract_fields_from_text, get_next_prompt
 from notion_pilot.crm.conv_state import ConvState, ConvStateStore
-from notion_pilot.media import extract_photo, extract_voice
-from notion_pilot.media.transcribe_voice import transcribe_file
-from notion_pilot.models import IncomingMessage, MediaType
+from notion_pilot.shared.media import extract_photo, extract_voice
+from notion_pilot.shared.media.transcribe_voice import transcribe_file
+from notion_pilot.shared.models import IncomingMessage, MediaType
 
 
 async def _to_incoming(settings: Settings, msg: Message) -> IncomingMessage:

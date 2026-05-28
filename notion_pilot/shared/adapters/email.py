@@ -11,9 +11,9 @@ from imapclient import IMAPClient
 from imapclient.imapclient import SEEN
 from loguru import logger
 
-from notion_pilot.adapters import MessageHandler  # noqa: TCH001
-from notion_pilot.config import Settings
-from notion_pilot.models import IncomingMessage, MediaType
+from notion_pilot.shared.adapters import MessageHandler  # noqa: TCH001
+from notion_pilot.shared.config import Settings
+from notion_pilot.shared.models import IncomingMessage, MediaType
 
 
 def _decode_str(value: str) -> str:
