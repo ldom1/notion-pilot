@@ -1,11 +1,11 @@
-"""Telegram → Notion bridge: long-poll bot, forward messages to a Notion database."""
+"""Notion Pilot: self-hosted Notion automation — CRM and knowledge inbox, piloted by Telegram."""
 
 import sys
 from importlib.metadata import version
 
 from loguru import logger
 
-__version__ = version("telegram-to-notion")
+__version__ = version("notion-pilot")
 
 
 logger.remove()
