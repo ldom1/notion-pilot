@@ -1,7 +1,7 @@
 """Batch import LinkedIn connections into the Notion People database.
 
 Usage:
-    uv run python scripts/import_linkedin.py [--dry-run] [--no-enrich] [--csv PATH]
+    uv run python scripts/crm_import_linkedin.py [--dry-run] [--no-enrich] [--csv PATH]
 
 Flags:
     --dry-run     Parse and dedup, print counts, no Notion writes.

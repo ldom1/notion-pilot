@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.import_linkedin import _parse_connections, run
+from scripts.crm_import_linkedin import _parse_connections, run
 
 pytestmark = pytest.mark.integration
 

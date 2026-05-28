@@ -2,8 +2,8 @@
 """Prospection CLI — rank contacts for a B2B pitch.
 
 Usage:
-    uv run python scripts/prospect.py --pitch "I want to sell HPC-as-a-service to energy companies"
-    uv run python scripts/prospect.py --pitch "Sell optimization software" --limit 5
+    uv run python scripts/crm_prospect.py --pitch "I want to sell HPC-as-a-service to energy companies"
+    uv run python scripts/crm_prospect.py --pitch "Sell optimization software" --limit 5
 """
 import argparse
 import asyncio

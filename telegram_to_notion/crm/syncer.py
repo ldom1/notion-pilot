@@ -67,6 +67,13 @@ class NotionCompanySyncer:
                         detail["size"] = props["Size"]["select"]["name"]
                     if props.get("Country", {}).get("select"):
                         detail["country"] = props["Country"]["select"]["name"]
+                    if props.get("Sector", {}).get("select"):
+                        detail["sector"] = props["Sector"]["select"]["name"]
+                    icon = page.get("icon") or {}
+                    if icon.get("type") == "external":
+                        detail["icon_url"] = (icon.get("external") or {}).get("url", "")
+                    elif icon.get("type") == "emoji":
+                        detail["icon_url"] = icon.get("emoji", "")
                     self.details[page_id] = detail
             if not result.get("has_more"):
                 break

@@ -16,6 +16,44 @@ _LINKEDIN_CO_RE = re.compile(r"https?://(?:www\.)?linkedin\.com/company/[a-zA-Z0
 _JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 _TIMEOUT = httpx.Timeout(20.0)
 
+# LinkedIn industry taxonomy — used as controlled vocabulary for the sector field
+LINKEDIN_INDUSTRIES = (
+    "Accounting,Airlines/Aviation,Alternative Dispute Resolution,Alternative Medicine,"
+    "Animation,Apparel & Fashion,Architecture & Planning,Arts & Crafts,Automotive,"
+    "Aviation & Aerospace,Banking,Biotechnology,Broadcast Media,Building Materials,"
+    "Business Supplies & Equipment,Capital Markets,Chemicals,Civic & Social Organization,"
+    "Civil Engineering,Commercial Real Estate,Computer & Network Security,Computer Games,"
+    "Computer Hardware,Computer Networking,Computer Software,Construction,"
+    "Consumer Electronics,Consumer Goods,Consumer Services,Cosmetics,Dairy,Defense & Space,"
+    "Design,E-learning,Education Management,Electrical/Electronic Manufacturing,Entertainment,"
+    "Environmental Services,Events Services,Executive Office,Facilities Services,Farming,"
+    "Financial Services,Fine Art,Fishery,Food & Beverages,Food Production,Fund-Raising,"
+    "Furniture,Gambling & Casinos,Glass Ceramics & Concrete,Government Administration,"
+    "Government Relations,Graphic Design,Health Wellness & Fitness,Higher Education,"
+    "Hospital & Health Care,Hospitality,Human Resources,Import & Export,"
+    "Individual & Family Services,Industrial Automation,Information Services,"
+    "Information Technology & Services,Insurance,International Affairs,"
+    "International Trade & Development,Internet,Investment Banking,Investment Management,"
+    "Judiciary,Law Enforcement,Law Practice,Legal Services,Legislative Office,"
+    "Leisure Travel & Tourism,Libraries,Logistics & Supply Chain,Luxury Goods & Jewelry,"
+    "Machinery,Management Consulting,Maritime,Market Research,Marketing & Advertising,"
+    "Mechanical or Industrial Engineering,Media Production,Medical Devices,Medical Practice,"
+    "Mental Health Care,Military,Mining & Metals,Motion Pictures & Film,"
+    "Museums & Institutions,Music,Nanotechnology,Newspapers,"
+    "Non-profit Organization Management,Oil & Energy,Online Media,Outsourcing/Offshoring,"
+    "Package/Freight Delivery,Packaging & Containers,Paper & Forest Products,"
+    "Performing Arts,Pharmaceuticals,Philanthropy,Photography,Plastics,"
+    "Political Organization,Primary/Secondary Education,Printing,"
+    "Professional Training & Coaching,Program Development,Public Policy,"
+    "Public Relations & Communications,Public Safety,Publishing,Railroad Manufacture,"
+    "Ranching,Real Estate,Recreational Facilities & Services,Religious Institutions,"
+    "Renewables & Environment,Research,Restaurants,Retail,Security & Investigations,"
+    "Semiconductors,Shipbuilding,Sporting Goods,Sports,Staffing & Recruiting,Supermarkets,"
+    "Telecommunications,Textiles,Think Tanks,Tobacco,Translation & Localization,"
+    "Transportation/Trucking/Railroad,Utilities,Venture Capital & Private Equity,Veterinary,"
+    "Warehousing,Wholesale,Wine & Spirits,Wireless,Writing & Editing"
+)
+
 
 def _openrouter_headers(settings: Settings) -> dict[str, str]:
     headers = {"Content-Type": "application/json", "X-Title": settings.openrouter_app_title}
@@ -41,8 +79,10 @@ class CompanyEnrichment:
     linkedin_url: str = ""
     size: str = ""
     country: str = ""
+    sector: str = ""
     tech_stack: list[str] = field(default_factory=list)
     crm_status: str = ""
+    logo_url: str = ""
     source: str = ""
 
 
@@ -79,6 +119,9 @@ async def _apollo_person(name: str, company: str, api_key: str) -> PersonEnrichm
         return None
 
 
+_VALID_SIZES = {"1-10", "11-50", "51-200", "201-500", "501-2000", "2001-10000", "10000+"}
+
+
 def _employees_to_size(n: int) -> str:
     if n <= 0:
         return ""
@@ -95,6 +138,21 @@ def _employees_to_size(n: int) -> str:
     if n <= 10000:
         return "2001-10000"
     return "10000+"
+
+
+def _normalize_size(raw: str) -> str:
+    """Map any LLM size variant to a valid Notion select option."""
+    if not raw:
+        return ""
+    if raw in _VALID_SIZES:
+        return raw
+    # Strip commas and spaces then try again (e.g. "10,001+" → "10001+")
+    cleaned = raw.replace(",", "").replace(" ", "")
+    # Extract leading number to bucket
+    digits = re.sub(r"[^\d]", "", cleaned.split("-")[0].split("+")[0])
+    if digits:
+        return _employees_to_size(int(digits))
+    return ""
 
 
 async def _apollo_company(name: str, api_key: str, domain: str = "") -> CompanyEnrichment | None:
@@ -116,11 +174,12 @@ async def _apollo_company(name: str, api_key: str, domain: str = "") -> CompanyE
         website = org.get("website_url", "")
         country = org.get("country", "")
         tech_stack = [t.get("name", "") for t in (org.get("technology_names") or []) if t.get("name")]
+        logo_url = org.get("logo_url", "")
         if not any([linkedin, website, size, country]):
             return None
         return CompanyEnrichment(
             website=website, linkedin_url=linkedin, size=size,
-            country=country, tech_stack=tech_stack, source="apollo",
+            country=country, tech_stack=tech_stack, logo_url=logo_url, source="apollo",
         )
     except Exception:  # noqa: BLE001
         return None
@@ -225,10 +284,13 @@ async def _perplexity_company(
 ) -> CompanyEnrichment | None:
     api_key = settings.openrouter_api_key.get_secret_value()  # type: ignore[union-attr]
     prompt = (
-        f"Find details for the company {name}. "
-        "Return JSON with keys: website, linkedin_url, size (e.g. '11-50'), "
-        "country (ISO alpha-2), tech_stack (list), crm_status. "
-        "Use empty string for unknown fields."
+        f"Find details for the company '{name}'. "
+        "Return JSON with keys: website (string), linkedin_url (string), "
+        "size (one of: '1-10','11-50','51-200','201-500','501-2000','2001-10000','10000+' or ''), "
+        "country (ISO alpha-2 or ''), "
+        f"sector (one exact value from this list or '': {LINKEDIN_INDUSTRIES}), "
+        "tech_stack (list of strings). "
+        "Use empty string or empty list for unknown fields."
     )
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
@@ -245,8 +307,9 @@ async def _perplexity_company(
         return CompanyEnrichment(
             website=data.get("website", ""),
             linkedin_url=data.get("linkedin_url", ""),
-            size=data.get("size", ""),
+            size=_normalize_size(data.get("size", "")),
             country=data.get("country", ""),
+            sector=data.get("sector", ""),
             tech_stack=data.get("tech_stack") or [],
             source="perplexity",
         )
@@ -302,7 +365,9 @@ async def _llm_company_infer(
         f"Provide details for the company named '{name}'. "
         "Return JSON with keys: website (string), linkedin_url (string), "
         "size (one of: '1-10','11-50','51-200','201-500','501-2000','2001-10000','10000+' or ''), "
-        "country (ISO alpha-2 or ''), tech_stack (list of strings). "
+        "country (ISO alpha-2 or ''), "
+        f"sector (one exact value from this list or '': {LINKEDIN_INDUSTRIES}), "
+        "tech_stack (list of strings). "
         "Use empty string or empty list for unknown fields."
     )
     try:
@@ -324,13 +389,34 @@ async def _llm_company_infer(
         return CompanyEnrichment(
             website=data.get("website", ""),
             linkedin_url=data.get("linkedin_url", ""),
-            size=data.get("size", ""),
+            size=_normalize_size(data.get("size", "")),
             country=data.get("country", ""),
+            sector=data.get("sector", ""),
             tech_stack=data.get("tech_stack") or [],
             source="llm",
         )
     except Exception:  # noqa: BLE001
         return None
+
+
+# ── Logo ──────────────────────────────────────────────────────────────────────
+
+
+def _domain_from_url(url: str) -> str:
+    return url.split("//")[-1].split("/")[0].removeprefix("www.") if url else ""
+
+
+async def _logo_for_domain(domain: str) -> str:
+    """Return a logo URL for the given domain via icon.horse, else empty."""
+    if not domain:
+        return ""
+    url = f"https://icon.horse/icon/{domain}"
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0), follow_redirects=True) as client:
+            resp = await client.head(url)
+        return url if resp.status_code == 200 else ""
+    except Exception:  # noqa: BLE001
+        return ""
 
 
 # ── Merge helpers ─────────────────────────────────────────────────────────────
@@ -354,8 +440,10 @@ def _merge_company(base: CompanyEnrichment, add: CompanyEnrichment) -> CompanyEn
         linkedin_url=base.linkedin_url or add.linkedin_url,
         size=base.size or add.size,
         country=base.country or add.country,
+        sector=base.sector or add.sector,
         tech_stack=base.tech_stack or add.tech_stack,
         crm_status=base.crm_status or add.crm_status,
+        logo_url=base.logo_url or add.logo_url,
         source=base.source or add.source,
     )
 
@@ -444,5 +532,11 @@ async def enrich_company(
         llm = await _llm_company_infer(name, settings)
         if llm:
             result = _merge_company(result, llm)
+
+    # Logo: icon.horse from domain (Apollo may already have set logo_url)
+    if not result.logo_url:
+        resolved_domain = domain or _domain_from_url(result.website)
+        if resolved_domain:
+            result.logo_url = await _logo_for_domain(resolved_domain)
 
     return result
