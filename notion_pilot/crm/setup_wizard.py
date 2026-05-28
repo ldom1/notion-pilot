@@ -18,9 +18,13 @@ _MAX_TOKEN_ATTEMPTS = 3
 _NOTION_VERSION = "2026-03-11"
 
 _SCOPE_ALIASES = {
-    "crm": "crm", "1": "crm",
-    "inbox": "inbox", "knowledge": "inbox", "2": "inbox",
-    "both": "both", "3": "both",
+    "crm": "crm",
+    "1": "crm",
+    "inbox": "inbox",
+    "knowledge": "inbox",
+    "2": "inbox",
+    "both": "both",
+    "3": "both",
 }
 
 
@@ -42,9 +46,13 @@ async def _validate_notion_token(token: str) -> bool:
 async def start_setup(chat_id: int, settings: Settings) -> tuple[ConvState, str]:
     """Initiate /setup. Returns the initial ConvState and the first message to send."""
     if settings.notion_token:
-        state = ConvState(chat_id=chat_id, command="setup", collected={}, pending_field=SETUP_STATE_ASK_SCOPE)
+        state = ConvState(
+            chat_id=chat_id, command="setup", collected={}, pending_field=SETUP_STATE_ASK_SCOPE
+        )
         return state, "What do you want to set up?\nReply with: crm, inbox, or both"
-    state = ConvState(chat_id=chat_id, command="setup", collected={}, pending_field=SETUP_STATE_ASK_TOKEN)
+    state = ConvState(
+        chat_id=chat_id, command="setup", collected={}, pending_field=SETUP_STATE_ASK_TOKEN
+    )
     return state, (
         "Please paste your Notion integration token.\n"
         "(Create one at notion.so → Settings → Connections → New integration)"
@@ -66,11 +74,17 @@ async def advance_setup(
             if attempts >= _MAX_TOKEN_ATTEMPTS:
                 return None, "❌ Too many failed attempts. /setup aborted."
             state.collected["attempts"] = str(attempts)
-            return state, f"❌ Invalid token (attempt {attempts}/{_MAX_TOKEN_ATTEMPTS}). Please try again:"
+            return (
+                state,
+                f"❌ Invalid token (attempt {attempts}/{_MAX_TOKEN_ATTEMPTS}). Please try again:",
+            )
         state.collected["token"] = user_text
         state.collected.pop("attempts", None)
         state.pending_field = SETUP_STATE_ASK_SCOPE
-        return state, "✅ Token valid!\n\nWhat do you want to set up?\nReply with: crm, inbox, or both"
+        return (
+            state,
+            "✅ Token valid!\n\nWhat do you want to set up?\nReply with: crm, inbox, or both",
+        )
 
     if pending == SETUP_STATE_ASK_SCOPE:
         scope = _SCOPE_ALIASES.get(user_text.strip().lower())

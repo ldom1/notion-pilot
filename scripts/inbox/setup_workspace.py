@@ -59,7 +59,9 @@ async def main(parent_id: str, page_title: str) -> None:
 if __name__ == "__main__":
     _parent = _arg("--parent-id")
     if not _parent:
-        logger.error("Usage: uv run python scripts/inbox/setup_workspace.py --parent-id <PAGE_ID_OR_URL>")
+        logger.error(
+            "Usage: uv run python scripts/inbox/setup_workspace.py --parent-id <PAGE_ID_OR_URL>"
+        )
         sys.exit(1)
     _title = _arg("--page-title") or "Knowledge"
     asyncio.run(main(page_id_from_url(_parent), _title))

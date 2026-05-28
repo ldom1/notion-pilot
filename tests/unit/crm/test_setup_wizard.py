@@ -39,7 +39,9 @@ async def test_start_setup_asks_token_if_missing():
 
 @pytest.mark.asyncio
 async def test_advance_token_step_valid():
-    state = ConvState(chat_id=42, command="setup", collected={}, pending_field=SETUP_STATE_ASK_TOKEN)
+    state = ConvState(
+        chat_id=42, command="setup", collected={}, pending_field=SETUP_STATE_ASK_TOKEN
+    )
     with patch("notion_pilot.crm.setup_wizard._validate_notion_token", return_value=True):
         new_state, msg = await advance_setup(state, "secret_valid", _settings(has_token=False))
     assert new_state is not None
@@ -48,7 +50,12 @@ async def test_advance_token_step_valid():
 
 @pytest.mark.asyncio
 async def test_advance_token_step_invalid_increments_attempts():
-    state = ConvState(chat_id=42, command="setup", collected={"attempts": "1"}, pending_field=SETUP_STATE_ASK_TOKEN)
+    state = ConvState(
+        chat_id=42,
+        command="setup",
+        collected={"attempts": "1"},
+        pending_field=SETUP_STATE_ASK_TOKEN,
+    )
     with patch("notion_pilot.crm.setup_wizard._validate_notion_token", return_value=False):
         new_state, msg = await advance_setup(state, "bad_token", _settings(has_token=False))
     assert new_state is not None
@@ -58,7 +65,12 @@ async def test_advance_token_step_invalid_increments_attempts():
 
 @pytest.mark.asyncio
 async def test_advance_token_step_max_retries_aborts():
-    state = ConvState(chat_id=42, command="setup", collected={"attempts": "3"}, pending_field=SETUP_STATE_ASK_TOKEN)
+    state = ConvState(
+        chat_id=42,
+        command="setup",
+        collected={"attempts": "3"},
+        pending_field=SETUP_STATE_ASK_TOKEN,
+    )
     with patch("notion_pilot.crm.setup_wizard._validate_notion_token", return_value=False):
         new_state, msg = await advance_setup(state, "bad_token", _settings(has_token=False))
     assert new_state is None
@@ -66,7 +78,9 @@ async def test_advance_token_step_max_retries_aborts():
 
 @pytest.mark.asyncio
 async def test_advance_scope_step():
-    state = ConvState(chat_id=42, command="setup", collected={}, pending_field=SETUP_STATE_ASK_SCOPE)
+    state = ConvState(
+        chat_id=42, command="setup", collected={}, pending_field=SETUP_STATE_ASK_SCOPE
+    )
     new_state, msg = await advance_setup(state, "both", _settings())
     assert new_state is not None
     assert new_state.collected.get("scope") == "both"
@@ -75,7 +89,9 @@ async def test_advance_scope_step():
 
 @pytest.mark.asyncio
 async def test_advance_scope_invalid():
-    state = ConvState(chat_id=42, command="setup", collected={}, pending_field=SETUP_STATE_ASK_SCOPE)
+    state = ConvState(
+        chat_id=42, command="setup", collected={}, pending_field=SETUP_STATE_ASK_SCOPE
+    )
     new_state, msg = await advance_setup(state, "foobar", _settings())
     assert new_state is not None
     assert new_state.pending_field == SETUP_STATE_ASK_SCOPE
@@ -84,12 +100,19 @@ async def test_advance_scope_invalid():
 @pytest.mark.asyncio
 async def test_advance_parent_triggers_creation():
     state = ConvState(
-        chat_id=42, command="setup",
+        chat_id=42,
+        command="setup",
         collected={"scope": "crm", "token": "secret_test"},
         pending_field=SETUP_STATE_ASK_PARENT,
     )
     mock_crm = MagicMock(companies_id="c1", people_id="p1", deals_id="d1", crm_page_id="pg1")
-    with patch("notion_pilot.crm.setup_wizard.create_crm_workspace", new_callable=AsyncMock, return_value=mock_crm):
-        new_state, msg = await advance_setup(state, "https://notion.so/My-Page-550e8400e29b41d4a716446655440000", _settings())
+    with patch(
+        "notion_pilot.crm.setup_wizard.create_crm_workspace",
+        new_callable=AsyncMock,
+        return_value=mock_crm,
+    ):
+        new_state, msg = await advance_setup(
+            state, "https://notion.so/My-Page-550e8400e29b41d4a716446655440000", _settings()
+        )
     assert new_state is None
     assert any(s in msg for s in ["NOTION_COMPANIES", "✅"])
