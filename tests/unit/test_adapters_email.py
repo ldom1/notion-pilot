@@ -5,7 +5,7 @@ import email as email_lib
 import pytest
 
 pytest.importorskip("imapclient")
-from telegram_to_notion.adapters.email import _decode_str, _plain_body, _sender_allowed
+from notion_pilot.shared.adapters.email import _decode_str, _plain_body, _sender_allowed
 
 
 class TestSenderAllowed:

@@ -1,7 +1,7 @@
 [project]
-name = "telegram-to-notion"
+name = "notion-pilot"
 dynamic = ["version"]
-description = "Self-hosted Telegram → Notion bridge via long polling"
+description = "Self-hosted Notion automation platform — CRM and knowledge inbox, piloted by Telegram"
 requires-python = ">=3.12"
 license = { file = "LICENSE" }
 authors = [{ name = "Louis Giron", email = "louis@giron-dom.eu" }]
@@ -36,7 +36,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["telegram_to_notion"]
+packages = ["notion_pilot"]
 
 # Version comes from the latest git tag (e.g. `v0.3.0` → `0.3.0`).
 # Between tags hatch-vcs emits a PEP 440 post-release string.
@@ -44,7 +44,7 @@ packages = ["telegram_to_notion"]
 source = "vcs"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "telegram_to_notion/_version.py"
+version-file = "notion_pilot/shared/_version.py"
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
@@ -59,6 +59,7 @@ markers = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+exclude = ["notion_pilot/shared/_version.py"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -74,8 +75,9 @@ module = ["imapclient", "imapclient.imapclient"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "discord"
+module = ["discord", "notion_pilot.shared.adapters.discord"]
 ignore_missing_imports = true
+warn_unused_ignores = false
 
 [tool.pylint.master]
 # Optional dependencies not installed in the CI environment

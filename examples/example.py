@@ -10,10 +10,10 @@ from datetime import datetime, timezone
 from loguru import logger
 from notion_client import AsyncClient as NotionClient
 
-from telegram_to_notion.config import load_settings
-from telegram_to_notion.llm.openrouter import interpret_message
-from telegram_to_notion.models import IncomingMessage, MediaType
-from telegram_to_notion.notion import NotionDatabaseWriter
+from notion_pilot.shared.config import load_settings
+from notion_pilot.shared.llm.openrouter import interpret_message
+from notion_pilot.shared.models import IncomingMessage, MediaType
+from notion_pilot.shared.notion import NotionDatabaseWriter
 
 
 async def main() -> None:

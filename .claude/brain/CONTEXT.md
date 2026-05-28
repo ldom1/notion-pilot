@@ -1,28 +1,38 @@
 # Context
 
-<!-- Current state snapshot. Update at session end. -->
-
 ## What's Done
 
 - v1.0.0 shipped: core Telegram → Notion pipeline, CI, LICENSE, CONTRIBUTING, CHANGELOG
 - Full enrichment pipeline: text, photos, documents, video, GIFs, voice notes (faster-whisper)
 - LLM enrichment via OpenRouter (heuristics fallback if no key)
+- Multi-adapter architecture: Telegram, Email (IMAP), Discord
+- CRM module fully functional on `feat/refactor`:
+  - Telegram commands: `/lead`, `/people`, `/company`, `/deal`, `/enrich`, `/knowledge`
+  - LLM field extraction from free-form messages
+  - Conversation state machine (SQLite)
+  - NotionPeopleSyncer, NotionCompanySyncer, NotionDealsSyncer
+  - Apollo.io enrichment, Brave Search fallback
+  - `scripts/crm_setup_workspace.py`: bootstraps Companies + People + Deals in Notion
 - Deployed on devbox as systemd user service
-- Notion agent (external, Notion-native) post-processes DB entries into structured meta-pages across 4 knowledge databases
 
-## In Progress
+## Current Branch
 
-- `feat/mail-management`: email as a second source adapter (design TBD)
-- Brain init (this session): documenting project context
+`feat/refactor` — CRM pipeline complete. Phase 0 refactoring (rename to notion-pilot) is the next step.
 
-## Open Questions
+## Open Decisions
 
-- Adapter abstraction: what interface should source adapters expose? `bot.py` is the reference but no formal contract yet
-- Product direction: keep as personal tool vs. build sellable enrichment platform (deep research, customer DB, contacts, invoices)
-- Project rename/rebranding: `telegram-to-notion` name is too narrow for multi-source vision
+- Config unification: `notion_people_database_id` vs `notion_people_data_source_id` — two IDs for same table, to be merged
+- Notion OAuth approach for deploy wizard (Phase 4): internal integration vs public OAuth app
 
 ## Next Steps
 
-- Design the source adapter abstraction (interface/protocol) before adding email
-- Decide: evolve this repo vs. create a new `notion-inbox` / platform repo
-- Architect the deep research / enrichment layer (separate service vs. embedded)
+1. Phase 0: rename repo + package → `notion-pilot` / `notion_pilot`, reorganize into `crm/` `inbox/` `shared/`
+2. Phase 1: setup wizard for Knowledge DBs (`scripts/inbox/setup_workspace.py`)
+3. Phase 2: email "à relire" pipeline
+
+## Product Vision (validated 2026-05-28)
+
+**Notion Pilot** — two products, one mono-repo:
+- `notion-crm`: small sales teams (2-10 people), People/Companies/Deals + Telegram commands
+- `notion-inbox`: personal knowledge management, multi-source capture + LLM enrichment
+- Website: landing + Notion OAuth deploy wizard + chatbot

@@ -3,7 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
 
-from telegram_to_notion.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
+from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
 
 
 def _make_company_page(page_id: str, name: str) -> dict:

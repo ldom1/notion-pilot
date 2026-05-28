@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 
-from telegram_to_notion.crm.deals import DealRecord, NotionDealsSyncer
+from notion_pilot.crm.deals import DealRecord, NotionDealsSyncer
 
 
 def _mock_client(create_id: str = "new-deal-id", snapshot_results: list | None = None):

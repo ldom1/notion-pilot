@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from telegram_to_notion.config import Settings
-from telegram_to_notion.models import IncomingMessage, MediaType, NotionDatabaseProperties
-from telegram_to_notion.pipelines.knowledge import process_message
+from notion_pilot.shared.config import Settings
+from notion_pilot.shared.models import IncomingMessage, MediaType, NotionDatabaseProperties
+from notion_pilot.inbox.knowledge import process_message
 
 
 def _make_incoming() -> IncomingMessage:
@@ -30,7 +30,7 @@ async def test_process_message_returns_page_id():
     mock_writer.create_page.return_value = "page-abc"
 
     with patch(
-        "telegram_to_notion.pipelines.knowledge.interpret_message",
+        "notion_pilot.inbox.knowledge.interpret_message",
         new_callable=AsyncMock,
         return_value=props,
     ):

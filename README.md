@@ -1,12 +1,12 @@
-# telegram-to-notion
+# Notion Pilot
 
-[![CI](https://github.com/ldom1/telegram-to-notion/actions/workflows/ci.yml/badge.svg)](https://github.com/ldom1/telegram-to-notion/actions/workflows/ci.yml)
-[![Latest tag](https://img.shields.io/github/v/tag/ldom1/telegram-to-notion?label=tag&sort=semver)](https://github.com/ldom1/telegram-to-notion/tags)
+[![CI](https://github.com/ldom1/notion-pilot/actions/workflows/ci.yml/badge.svg)](https://github.com/ldom1/notion-pilot/actions/workflows/ci.yml)
+[![Latest tag](https://img.shields.io/github/v/tag/ldom1/notion-pilot?label=tag&sort=semver)](https://github.com/ldom1/notion-pilot/tags)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 
-**Your Telegram bot is now your Notion inbox.** Send a link, a photo, or a voice note — it lands in your Notion database, fully structured, in seconds.
+**Self-hosted Notion automation platform — CRM and knowledge inbox, piloted by Telegram.** Send a link, a photo, or a voice note — it lands in your Notion database, fully structured, in seconds.
 
 No webhooks. No third-party SaaS. No data leaving your server.
 
@@ -19,23 +19,23 @@ No webhooks. No third-party SaaS. No data leaving your server.
 
 ## What goes in, what comes out
 
-You send: `J'ai trouvé un outil sympa: https://github.com/ldom1/telegram-to-notion`
+You send: `J'ai trouvé un outil sympa: https://github.com/ldom1/notion-pilot`
 
 Notion receives:
 
 | Name | Label | Type | Source | Link | Description | Interest |
 |---|---|---|---|---|---|---|
-| Telegram-to-Notion bridge | `[tool, dev, python]` | link | GitHub | github.com/… | Self-hosted pipeline from Telegram to Notion. | High |
+| Notion Pilot | `[tool, dev, python]` | link | GitHub | github.com/… | Self-hosted Notion automation platform. | High |
 
 Voice notes? Same thing — transcribed first, then enriched.
 
 ## Setup (2 minutes)
 
 ```bash
-git clone https://github.com/ldom1/telegram-to-notion && cd telegram-to-notion
+git clone https://github.com/ldom1/notion-pilot && cd notion-pilot
 cp .env.example .env   # fill in TELEGRAM_BOT_TOKEN, NOTION_TOKEN, NOTION_DATABASE_ID
 uv sync
-uv run python -m telegram_to_notion
+uv run python -m notion_pilot
 ```
 
 Send your bot a message on Telegram. Send `/ping` to confirm it's alive.
@@ -67,8 +67,8 @@ Builds a fake `IncomingMessage`, runs it through the same enrichment pipeline, w
 ## Deploy (systemd user service)
 
 ```bash
-ssh <your-server> 'cd ~/Lab/dom-telegram-to-notion && git pull && uv sync && systemctl --user restart telegram-to-notion.service'
-ssh <your-server> 'journalctl --user -u telegram-to-notion.service -f'
+ssh <your-server> 'cd ~/Lab/notion-pilot && git pull && uv sync && systemctl --user restart notion-pilot.service'
+ssh <your-server> 'journalctl --user -u notion-pilot.service -f'
 ```
 
 ## Develop
@@ -76,27 +76,38 @@ ssh <your-server> 'journalctl --user -u telegram-to-notion.service -f'
 ```bash
 uv run pytest tests/unit -v              # fast, no network
 uv run pytest tests/integration -v       # hits real Notion + OpenRouter + Whisper
-uv run ruff check . && uv run mypy telegram_to_notion
+uv run ruff check . && uv run mypy notion_pilot
 ```
 
 ## Under the hood
 
+Two verticals, one platform:
+
+- **Knowledge inbox** — captures anything you send (links, photos, voice notes) into a structured Notion database.
+- **CRM** — syncs people, companies, and deals into Notion; enriches contacts via Apollo/Brave Search.
+
 ```
-telegram_to_notion/
-├── adapters/
-│   ├── __init__.py    # SourceAdapter + SinkAdapter protocols
-│   ├── telegram.py    # Telegram long-polling source
-│   ├── email.py       # IMAP polling source (optional: uv sync --extra email)
-│   └── discord.py     # Discord source + notification sink (optional: uv sync --extra discord)
-├── bot.py             # Runner: activates adapters from env, asyncio.gather
-├── config.py          # Pydantic settings from .env
-├── models.py          # IncomingMessage + NotionDatabaseProperties
-├── notion.py          # NotionDatabaseWriter
-├── pipeline.py        # Shared: interpret_message → create_page
-├── llm/
-│   ├── openrouter.py  # Structured JSON extraction via chat completions
-│   ├── prompt.py      # System prompt built from the Pydantic model
-│   └── source_hints.py
+notion_pilot/
+├── shared/            # Core shared across verticals
+│   ├── adapters/
+│   │   ├── __init__.py    # SourceAdapter + SinkAdapter protocols
+│   │   ├── telegram.py    # Telegram long-polling source
+│   │   ├── email.py       # IMAP polling source (optional: uv sync --extra email)
+│   │   └── discord.py     # Discord source + notification sink (optional: uv sync --extra discord)
+│   ├── config.py          # Pydantic settings from .env
+│   ├── models.py          # IncomingMessage + NotionDatabaseProperties
+│   └── notion.py          # NotionDatabaseWriter
+├── inbox/             # Knowledge inbox vertical (formerly pipelines/)
+│   ├── bot.py         # Runner: activates adapters from env, asyncio.gather
+│   ├── pipeline.py    # interpret_message → create_page
+│   └── llm/
+│       ├── openrouter.py  # Structured JSON extraction via chat completions
+│       ├── prompt.py      # System prompt built from the Pydantic model
+│       └── source_hints.py
+├── crm/               # CRM vertical
+│   ├── people.py      # NotionPeopleSyncer
+│   ├── companies.py   # NotionCompanySyncer
+│   └── deals.py       # Deal tracking
 └── media/             # Photo + voice download, on-device transcription
 ```
 
