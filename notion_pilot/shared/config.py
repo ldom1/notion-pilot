@@ -109,6 +109,32 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         description="Notion database ID for the Deals database (standard databases API, not data_sources).",
     )
 
+    # ── Knowledge Inbox DBs (optional) ──────────────────────────────────────
+    notion_ideas_database_id: str | None = Field(
+        default=None,
+        description="Notion database ID for the Ideas database.",
+    )
+    notion_tools_database_id: str | None = Field(
+        default=None,
+        description="Notion database ID for the Tools database.",
+    )
+    notion_data_tech_database_id: str | None = Field(
+        default=None,
+        description="Notion database ID for the Data & Technology database.",
+    )
+
+    # ── Web server (optional) ────────────────────────────────────────────────
+    web_admin_username: str = Field(default="admin", description="Web UI admin username.")
+    web_admin_password: SecretStr | None = Field(
+        default=None,
+        description="Web UI admin password. Required to start the web server.",
+    )
+    web_secret_key: SecretStr | None = Field(
+        default=None,
+        description="JWT signing secret for the web server.",
+    )
+    web_token_expire_minutes: int = Field(default=60, description="JWT token TTL in minutes.")
+
     # ── CRM conversation state ───────────────────────────────────────────────
     conv_state_db: str = Field(
         default="data/conv_state.db",
