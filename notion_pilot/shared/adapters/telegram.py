@@ -20,6 +20,7 @@ from telegram.ext import (
 from notion_pilot.shared.adapters import MessageHandler as PipelineHandler
 from notion_pilot.shared.config import Settings
 from notion_pilot.crm.commands import COMMANDS, extract_fields_from_text, get_next_prompt
+from notion_pilot.crm.setup_wizard import advance_setup, start_setup
 from notion_pilot.crm.conv_state import ConvState, ConvStateStore
 from notion_pilot.shared.media import extract_photo, extract_voice
 from notion_pilot.shared.media.transcribe_voice import transcribe_file
@@ -176,8 +177,17 @@ class TelegramAdapter:
                     msg.from_user.id if msg.from_user else None,
                 )
 
-                # Priority 1: active conversation state → fill pending field
+                # Priority 1: active conversation state → route by command type
                 state = state_store.get(chat_id)
+                if state is not None and state.command == "setup":
+                    new_state, reply = await advance_setup(state, text, settings)
+                    if new_state is None:
+                        state_store.clear(chat_id)
+                    else:
+                        state_store.set(new_state)
+                    await _send_reply(msg, reply)
+                    return
+
                 if state is not None:
                     await _fill_field(msg, state, text)
                     return
@@ -187,6 +197,12 @@ class TelegramAdapter:
                     parts = text.lstrip("/").split()
                     if parts:
                         cmd_name = parts[0].lower()
+                        if cmd_name == "setup":
+                            new_state, reply = await start_setup(chat_id, settings)
+                            state_store.set(new_state)
+                            await _send_reply(msg, reply)
+                            return
+
                         if cmd_name in COMMANDS:
                             await _dispatch_crm(msg, cmd_name, text)
                             return
