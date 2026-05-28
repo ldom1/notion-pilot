@@ -3,7 +3,7 @@
 import httpx
 from telegram import Bot
 
-from telegram_to_notion.models import MediaPayload
+from notion_pilot.models import MediaPayload
 
 
 async def download_telegram_file(

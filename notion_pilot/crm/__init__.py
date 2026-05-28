@@ -1,7 +1,7 @@
 """CRM utilities — people/company syncing, dedup, enrichment."""
 
-from telegram_to_notion.utils.dedup import CandidateRecord, DedupStatus, MatchResult, find_match
-from telegram_to_notion.crm.syncer import (
+from notion_pilot.utils.dedup import CandidateRecord, DedupStatus, MatchResult, find_match
+from notion_pilot.crm.syncer import (
     NotionCompanySyncer,
     NotionPeopleSyncer,
     PersonRecord,

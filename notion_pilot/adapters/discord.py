@@ -5,9 +5,9 @@ from datetime import timezone
 import discord
 from loguru import logger
 
-from telegram_to_notion.adapters import MessageHandler
-from telegram_to_notion.config import Settings
-from telegram_to_notion.models import IncomingMessage, MediaType
+from notion_pilot.adapters import MessageHandler
+from notion_pilot.config import Settings
+from notion_pilot.models import IncomingMessage, MediaType
 
 
 class DiscordAdapter:

@@ -2,8 +2,8 @@
 
 from telegram import Message
 
-from telegram_to_notion.media.base import download_telegram_file
-from telegram_to_notion.models import MediaPayload
+from notion_pilot.media.base import download_telegram_file
+from notion_pilot.models import MediaPayload
 
 
 async def extract_voice(message: Message) -> MediaPayload:

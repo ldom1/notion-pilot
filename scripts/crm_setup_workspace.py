@@ -22,7 +22,7 @@ from typing import Any
 import httpx
 from loguru import logger
 
-from telegram_to_notion.config import load_settings
+from notion_pilot.config import load_settings
 
 NOTION_VERSION = "2026-03-11"
 NOTION_API = "https://api.notion.com/v1"

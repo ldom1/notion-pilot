@@ -18,10 +18,10 @@ from pathlib import Path
 from loguru import logger
 from notion_client import AsyncClient
 
-from telegram_to_notion.config import load_settings
-from telegram_to_notion.utils.dedup import DedupStatus, find_match
-from telegram_to_notion.utils.enrichment import enrich_person
-from telegram_to_notion.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
+from notion_pilot.config import load_settings
+from notion_pilot.utils.dedup import DedupStatus, find_match
+from notion_pilot.utils.enrichment import enrich_person
+from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
 
 _DEFAULT_CSV = Path("data/Basic_LinkedInDataExport_05-20-2026.zip/Connections.csv")
 _REVIEW_CSV = Path("data/import-review.csv")

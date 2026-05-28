@@ -3,7 +3,7 @@
 from collections.abc import Awaitable, Callable
 from typing import Protocol, runtime_checkable
 
-from telegram_to_notion.models import IncomingMessage
+from notion_pilot.models import IncomingMessage
 
 MessageHandler = Callable[[IncomingMessage], Awaitable[str | None]]
 

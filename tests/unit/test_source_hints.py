@@ -2,7 +2,7 @@
 
 import pytest
 
-from telegram_to_notion.llm.source_hints import (
+from notion_pilot.llm.source_hints import (
     format_source_hint_for_prompt,
     infer_source_label,
 )

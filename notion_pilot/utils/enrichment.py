@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 
-from telegram_to_notion.config import Settings
+from notion_pilot.config import Settings
 
 _EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
 _LINKEDIN_IN_RE = re.compile(r"https?://(?:www\.)?linkedin\.com/in/[a-zA-Z0-9\-_%]+/?")

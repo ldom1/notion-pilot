@@ -6,10 +6,10 @@ from loguru import logger
 from notion_client import APIResponseError
 from notion_client import AsyncClient as NotionClient
 
-from telegram_to_notion.adapters import MessageHandler
-from telegram_to_notion.config import Settings
-from telegram_to_notion.models import IncomingMessage
-from telegram_to_notion.notion import NotionDatabaseWriter
+from notion_pilot.adapters import MessageHandler
+from notion_pilot.config import Settings
+from notion_pilot.models import IncomingMessage
+from notion_pilot.notion import NotionDatabaseWriter
 
 Extract = Callable[[Settings, NotionDatabaseWriter, IncomingMessage], Awaitable[str]]
 

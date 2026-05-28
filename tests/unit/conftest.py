@@ -20,7 +20,7 @@ _ENV_KEYS_TO_CLEAR = [
 @pytest.fixture(autouse=True)
 def _clear_optional_env(monkeypatch):
     """Remove optional secrets from env and disable .env file loading for unit tests."""
-    import telegram_to_notion.config as cfg_module
+    import notion_pilot.config as cfg_module
 
     # Prevent pydantic-settings from reading the .env file during unit tests.
     monkeypatch.setattr(

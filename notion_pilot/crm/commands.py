@@ -9,8 +9,8 @@ from typing import Awaitable, Callable
 import httpx
 from loguru import logger
 
-from telegram_to_notion.config import Settings
-from telegram_to_notion.crm.conv_state import ConvState
+from notion_pilot.config import Settings
+from notion_pilot.crm.conv_state import ConvState
 
 
 @dataclass
@@ -35,7 +35,7 @@ class CommandDef:
 async def _handle_people(collected: dict[str, str], settings: Settings) -> str:
     from notion_client import AsyncClient
 
-    from telegram_to_notion.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
+    from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
 
     token = settings.notion_token.get_secret_value()
     client = AsyncClient(auth=token)
@@ -61,7 +61,7 @@ async def _handle_people(collected: dict[str, str], settings: Settings) -> str:
 async def _handle_company(collected: dict[str, str], settings: Settings) -> str:
     from notion_client import AsyncClient
 
-    from telegram_to_notion.crm.syncer import NotionCompanySyncer
+    from notion_pilot.crm.syncer import NotionCompanySyncer
 
     client = AsyncClient(auth=settings.notion_token.get_secret_value())
     syncer = NotionCompanySyncer(client, settings.notion_companies_data_source_id or "")
@@ -73,7 +73,7 @@ async def _handle_company(collected: dict[str, str], settings: Settings) -> str:
 async def _handle_deal(collected: dict[str, str], settings: Settings) -> str:
     import httpx as _httpx
 
-    from telegram_to_notion.crm.deals import DealRecord, NotionDealsSyncer
+    from notion_pilot.crm.deals import DealRecord, NotionDealsSyncer
 
     if not settings.notion_deals_database_id:
         return "⚠ NOTION_DEALS_DATABASE_ID not set — cannot create deal."
@@ -106,7 +106,7 @@ async def _handle_lead(collected: dict[str, str], settings: Settings) -> str:
 
 
 async def _handle_enrich(collected: dict[str, str], settings: Settings) -> str:
-    from telegram_to_notion.utils.enrichment import enrich_person
+    from notion_pilot.utils.enrichment import enrich_person
 
     enrichment = await enrich_person(collected["name"], collected.get("company", ""), settings)
     parts = []

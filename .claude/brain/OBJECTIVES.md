@@ -2,28 +2,31 @@
 
 ## Goal
 
-Self-hosted messaging → Notion bridge: capture messages, media, and voice notes from Telegram (and future messaging apps) into a structured Notion database with optional LLM enrichment.
+**Notion Pilot** — a self-hosted platform that turns Notion into an active business brain, piloted by Telegram (and future channels). Two independent products sharing a common core:
+
+- **notion-crm**: CRM for small sales teams (2-10 people) — people, companies, deals, enrichment
+- **notion-inbox**: Personal knowledge management — capture from Telegram/email/Discord, LLM enrichment
 
 ## Success Criteria
 
+- Small sales teams can deploy a full Notion CRM in < 5 minutes via setup wizard
 - Daily personal use for knowledge management without friction
-- Sellable/distributable on the Notion ecosystem (clean setup, good docs, MIT license)
-- Reliable enrichment pipeline: title, tags, type, source, description, interest level auto-filled
+- Distributable: installable via pip, deployable via website wizard
+- Reliable enrichment pipeline: Apollo, Brave Search, OpenRouter
 
 ## Scope
 
-- Telegram as first-class input source
-- Text, photos, documents, video, GIFs, voice notes (with on-device transcription)
+- Telegram as primary interaction channel (long polling only)
+- Email (IMAP) and Discord as secondary sources
 - Notion as the sole output target
-- Optional LLM enrichment via OpenRouter (heuristics fallback if no key)
-- Long-polling only (no webhook server)
-- Single-user, self-hosted deployment (systemd user service)
+- Optional LLM enrichment via OpenRouter
+- Single-user and small-team self-hosted deployment
+- Website: landing page + Notion OAuth deploy wizard + chatbot
 
 ## Non-Goals
 
 - Building or hosting an LLM
 - Webhook server / always-on HTTP endpoint
-- Multi-user SaaS
-- Storing media long-term outside Notion
-- Supporting other knowledge bases (100% Notion-focused output)
-- Other messaging apps *now* — but the architecture should not preclude adding them later
+- Supporting knowledge bases other than Notion
+- Multi-tenant SaaS before single-user experience is solid
+- Splitting into two repos (mono-repo until team requires it)

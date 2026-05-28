@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from pydantic import SecretStr
 
-from telegram_to_notion.config import Settings
-from telegram_to_notion.llm.openrouter import interpret_message
-from telegram_to_notion.models import IncomingMessage, MediaType
+from notion_pilot.config import Settings
+from notion_pilot.llm.openrouter import interpret_message
+from notion_pilot.models import IncomingMessage, MediaType
 
 
 def _settings(api_key: str | None = "sk-test") -> Settings:
@@ -50,7 +50,7 @@ class TestInterpretMessage:
     @pytest.mark.asyncio
     async def test_http_error_falls_back_to_heuristics(self):
         settings = _settings()
-        with patch("telegram_to_notion.llm.openrouter.httpx.AsyncClient") as mock_client:
+        with patch("notion_pilot.llm.openrouter.httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(
                 side_effect=RuntimeError("boom")
             )
@@ -74,7 +74,7 @@ class TestInterpretMessage:
         mock_resp = AsyncMock()
         mock_resp.raise_for_status = AsyncMock()
         mock_resp.json = lambda: fake_response_body
-        with patch("telegram_to_notion.llm.openrouter.httpx.AsyncClient") as mock_client:
+        with patch("notion_pilot.llm.openrouter.httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(
                 return_value=mock_resp
             )

@@ -17,9 +17,9 @@ import sys
 
 from loguru import logger
 
-from telegram_to_notion.adapters.email import EmailAdapter, _sender_allowed
-from telegram_to_notion.config import load_settings
-from telegram_to_notion.pipelines import build_knowledge_pipeline, build_people_pipeline
+from notion_pilot.adapters.email import EmailAdapter, _sender_allowed
+from notion_pilot.config import load_settings
+from notion_pilot.pipelines import build_knowledge_pipeline, build_people_pipeline
 
 
 async def dry_run(adapter: EmailAdapter, folder: str | None = None) -> None:

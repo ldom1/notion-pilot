@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from telegram_to_notion.models import (
+from notion_pilot.models import (
     IncomingMessage,
     MediaType,
     NotionDatabaseProperties,

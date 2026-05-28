@@ -3,8 +3,8 @@
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from telegram_to_notion.config import Settings
-from telegram_to_notion.crm.prospection import rank_contacts
+from notion_pilot.config import Settings
+from notion_pilot.crm.prospection import rank_contacts
 
 _SETTINGS = dict(notion_token="t", notion_database_id="d", openrouter_api_key="ok")
 
@@ -51,7 +51,7 @@ async def test_ranks_and_sorts_by_score():
     mock_client.__aexit__ = AsyncMock(return_value=None)
     mock_client.post = AsyncMock(return_value=mock_resp)
 
-    with patch("telegram_to_notion.crm.prospection.httpx.AsyncClient", return_value=mock_client):
+    with patch("notion_pilot.crm.prospection.httpx.AsyncClient", return_value=mock_client):
         result = await rank_contacts("sell HPC", _CANDIDATES, s)
 
     assert len(result) == 2
@@ -79,7 +79,7 @@ async def test_rank_respects_top_k():
     mock_client.__aexit__ = AsyncMock(return_value=None)
     mock_client.post = AsyncMock(return_value=mock_resp)
 
-    with patch("telegram_to_notion.crm.prospection.httpx.AsyncClient", return_value=mock_client):
+    with patch("notion_pilot.crm.prospection.httpx.AsyncClient", return_value=mock_client):
         result = await rank_contacts("sell HPC", _CANDIDATES, s, top_k=1)
 
     assert len(result) == 1

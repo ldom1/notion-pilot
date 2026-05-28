@@ -1,11 +1,11 @@
 """LLM-enriched pipeline → main Notion knowledge database."""
 
-from telegram_to_notion.adapters import MessageHandler
-from telegram_to_notion.config import Settings
-from telegram_to_notion.llm.openrouter import interpret_message
-from telegram_to_notion.models import IncomingMessage
-from telegram_to_notion.notion import NotionDatabaseWriter
-from telegram_to_notion.pipelines.pipeline import build_pipeline
+from notion_pilot.adapters import MessageHandler
+from notion_pilot.config import Settings
+from notion_pilot.llm.openrouter import interpret_message
+from notion_pilot.models import IncomingMessage
+from notion_pilot.notion import NotionDatabaseWriter
+from notion_pilot.pipelines.pipeline import build_pipeline
 
 
 async def process_message(

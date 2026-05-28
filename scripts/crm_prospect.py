@@ -12,9 +12,9 @@ import asyncio
 from loguru import logger
 from notion_client import AsyncClient
 
-from telegram_to_notion.config import load_settings
-from telegram_to_notion.crm.prospection import rank_contacts
-from telegram_to_notion.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer
+from notion_pilot.config import load_settings
+from notion_pilot.crm.prospection import rank_contacts
+from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer
 
 
 async def run(pitch: str, top_k: int) -> None:

@@ -1,10 +1,10 @@
 """Contact pipeline → Notion people database."""
 
-from telegram_to_notion.adapters import MessageHandler
-from telegram_to_notion.config import Settings
-from telegram_to_notion.models import IncomingMessage, PersonContactProperties
-from telegram_to_notion.notion import NotionDatabaseWriter
-from telegram_to_notion.pipelines.pipeline import build_pipeline
+from notion_pilot.adapters import MessageHandler
+from notion_pilot.config import Settings
+from notion_pilot.models import IncomingMessage, PersonContactProperties
+from notion_pilot.notion import NotionDatabaseWriter
+from notion_pilot.pipelines.pipeline import build_pipeline
 
 
 async def _write_contact(

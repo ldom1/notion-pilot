@@ -3,14 +3,14 @@
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from telegram_to_notion.config import Settings
-from telegram_to_notion.crm.commands import (
+from notion_pilot.config import Settings
+from notion_pilot.crm.commands import (
     COMMANDS,
     CommandDef,
     extract_fields_from_text,
     get_next_prompt,
 )
-from telegram_to_notion.crm.conv_state import ConvState
+from notion_pilot.crm.conv_state import ConvState
 
 _SETTINGS = dict(notion_token="t", notion_database_id="d", openrouter_api_key="ok")
 
@@ -48,7 +48,7 @@ async def test_extract_fields_from_text_parses_llm_response():
     mock_client.__aexit__ = AsyncMock(return_value=None)
     mock_client.post = AsyncMock(return_value=mock_resp)
 
-    with patch("telegram_to_notion.crm.commands.httpx.AsyncClient", return_value=mock_client):
+    with patch("notion_pilot.crm.commands.httpx.AsyncClient", return_value=mock_client):
         result = await extract_fields_from_text("Alice Martin from EDF, VP", cmd, s)
 
     assert result.get("name") == "Alice Martin"

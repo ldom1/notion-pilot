@@ -1,46 +1,55 @@
 # Roadmap
 
-## Now
+## Phase 0 — Refactoring (current priority)
 
-- `feat/mail-management` (this PR): source adapter abstraction + IMAP email + Discord (source+sink)
-  - `SourceAdapter` / `SinkAdapter` protocols in `adapters/`
-  - IMAP polling with sender allowlist + archive-after-ingest
-  - `pipeline.py` extracted; `bot.py` becomes thin multi-adapter runner
+Rename and reorganize before adding features. No new behavior, just structural clarity.
 
-## Next
+- [ ] Rename repo: `telegram-to-notion` → `notion-pilot`
+- [ ] Rename Python package: `telegram_to_notion` → `notion_pilot`
+- [ ] Reorganize into verticals: `crm/`, `inbox/` (from `pipelines/`), `shared/` (adapters, llm, utils, notion.py, config.py, models.py)
+- [ ] Organize scripts: `scripts/crm/` + `scripts/inbox/`
+- [ ] Unify config: merge `notion_people_database_id` + `notion_people_data_source_id` into single coherent IDs
+- [ ] Update README, CHANGELOG, brain vault note path
 
-- **Deep research / enrichment agent** (spec: `2026-05-19-source-adapter-design.md`, layer 2)
-  - Embed the Notion triage agent logic in the pipeline: identify subject entity → find/create meta-page → mark analyzed
-  - This is the core differentiator vs. raw Telegram bots
-- **Project rename / rebranding** — `telegram-to-notion` is too narrow; target name TBD (`notion-inbox`, `source-to-notion`, etc.)
-- **Streamlined Notion onboarding** — shareable DB template, one-command setup, `/setup` wizard via Telegram
+## Phase 1 — Setup Wizard (CLI)
 
-## Later (sellable product milestones)
+One-command bootstrap on virgin Notion for both products.
 
-### Product layer
+- [ ] `scripts/inbox/setup_workspace.py` — create Knowledge DBs (Notions, Ideas, Tools, Data & Technology)
+- [ ] Extend `scripts/crm/setup_workspace.py` to optionally create all 4 DBs in one shot
+- [ ] `/setup` Telegram command — guided onboarding wizard that sets up the workspace and outputs `.env` values
 
-- **Notion ecosystem listing** — publish on Notion marketplace with a template DB users can duplicate
-- **Multi-user packaging** — per-user `.env` or config file, systemd template units, simple install script
-- **SaaS option** — hosted version with auth, per-user billing (Stripe), managed infra
+## Phase 2 — Email "à relire"
 
-### Sellable use cases (vertical adapters)
+- [ ] Email pipeline: scan inbox → classify (newsletter / contact / transactional) via LLM
+- [ ] Auto-tag newsletters and unread knowledge as `À relire` in Knowledge DB
+- [ ] Skip already-processed messages (idempotent)
 
-| Use case | Source | Sink | Notes |
-|----------|--------|------|-------|
-| Knowledge management | Telegram, Email, Discord | Notion (4 DBs: Notions, Ideas, Tools, Data & Technology) | Personal — already built |
-| Customer DB enrichment | CSV / CRM import | Notion CRM DB | Enrich contacts via LLM + web search |
-| Prospection contacts | LinkedIn / email | Notion People DB | Build and enrich contact lists |
-| Invoice management | Email (invoice parser) | Telegram / Discord alerts | Flag overdue invoices, remind by message |
+## Phase 3 — Telegram Recap Commands
 
-### Additional sources
+- [ ] `/recap` — daily/weekly summary: active deals, unread knowledge items, upcoming next actions
+- [ ] `/leads` — list open deals with stage
+- [ ] `/inbox` — list Knowledge items tagged `À relire`
+- [ ] Scheduled recap (cron or Telegram command)
 
-- WhatsApp (via unofficial API or Baileys bridge)
-- Web clipper (browser extension → adapter)
+## Phase 4 — Website
+
+- [ ] Landing page (Astro or Next.js): pitch for notion-crm + notion-inbox, screenshots, CTAs
+- [ ] "Deploy to Notion" wizard: Notion OAuth → auto-create DBs → display `.env` values
+- [ ] Chatbot endpoint (FastAPI): receive text → query Notion DBs → structured response
+- [ ] Chatbot UI: embeddable on landing page
+
+## Phase 5 — Enrichment & Prospection Polish
+
+- [ ] Company enrichment: Apollo domain search + Brave fallback
+- [ ] People enrichment: Apollo person search by name + company
+- [ ] Prospection pipeline: batch enrich a list from CSV/LinkedIn export
+- [ ] Dedup: merge duplicate People/Companies via LLM similarity
+
+## Later / Won't Do Now
+
+- WhatsApp adapter
+- Web clipper (browser extension)
 - RSS feeds
-
-## Won't Do
-
-- Build or host an LLM
-- Webhook server / always-on HTTP endpoint
-- Support knowledge bases other than Notion (for now)
-- Multi-tenant SaaS before the single-user experience is solid
+- Multi-tenant SaaS billing
+- Support for knowledge bases other than Notion

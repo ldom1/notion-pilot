@@ -7,8 +7,8 @@ from dataclasses import dataclass, field
 
 import httpx
 
-from telegram_to_notion.config import Settings
-from telegram_to_notion.utils.dedup import CandidateRecord
+from notion_pilot.config import Settings
+from notion_pilot.utils.dedup import CandidateRecord
 
 
 @dataclass
