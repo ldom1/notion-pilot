@@ -53,5 +53,6 @@ echo ""
 
 cd "$SCRIPT_DIR"
 exec uv run uvicorn web.server:app_factory --factory \
+  --reload \
   --host 0.0.0.0 \
   --port "$PORT"

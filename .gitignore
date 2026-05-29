@@ -69,3 +69,6 @@ logs/
 
 # --- Data files ---
 data/
+
+# --- Claude ---
+.superpowers
