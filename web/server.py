@@ -38,7 +38,7 @@ class SetupResponse(BaseModel):
 def create_app(settings: Settings) -> FastAPI:
     app = FastAPI(title="Notion Pilot Setup", docs_url=None, redoc_url=None)
 
-    def _verify_token_dep(token: Annotated[str, Depends(_oauth2_scheme)]) -> str:  # type: ignore[misc]
+    def _verify_token_dep(token: Annotated[str, Depends(_oauth2_scheme)]) -> str:
         secret = settings.web_secret_key
         if not secret:
             raise HTTPException(status_code=500, detail="Web secret key not configured")
@@ -53,11 +53,11 @@ def create_app(settings: Settings) -> FastAPI:
         return token
 
     @app.get("/health")
-    async def health() -> dict:  # type: ignore[misc]
+    async def health() -> dict[str, str]:
         return {"status": "ok"}
 
     @app.post("/auth/token")
-    async def login(form: Annotated[OAuth2PasswordRequestForm, Depends()]) -> dict:  # type: ignore[misc]
+    async def login(form: Annotated[OAuth2PasswordRequestForm, Depends()]) -> dict[str, str]:
         if not settings.web_admin_password or not settings.web_secret_key:
             raise HTTPException(status_code=500, detail="Web auth not configured")
         if form.username != settings.web_admin_username or form.password != settings.web_admin_password.get_secret_value():
@@ -74,7 +74,7 @@ def create_app(settings: Settings) -> FastAPI:
         return {"access_token": token, "token_type": "bearer"}
 
     @app.post("/api/setup")
-    async def run_setup(  # type: ignore[misc]
+    async def run_setup(
         req: SetupRequest,
         _token: Annotated[str, Depends(_verify_token_dep)],
     ) -> SetupResponse:
@@ -115,7 +115,7 @@ def create_app(settings: Settings) -> FastAPI:
         app.mount("/static", StaticFiles(directory=str(_static)), name="static")
 
         @app.get("/", response_class=HTMLResponse)
-        async def index() -> HTMLResponse:  # type: ignore[misc]
+        async def index() -> HTMLResponse:
             return HTMLResponse((_static / "index.html").read_text())
 
     return app
