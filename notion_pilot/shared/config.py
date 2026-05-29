@@ -14,8 +14,11 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         extra="ignore",
     )
 
-    # ── Notion (required) ────────────────────────────────────────────────────
-    notion_token: SecretStr
+    # ── Notion (optional when using OAuth) ──────────────────────────────────
+    notion_token: SecretStr | None = Field(
+        default=None,
+        description="Notion integration token. Not required when using the OAuth deploy wizard.",
+    )
     notion_database_id: str
     notion_title_property: str = Field(
         default="Name",
@@ -134,6 +137,24 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         description="JWT signing secret for the web server.",
     )
     web_token_expire_minutes: int = Field(default=60, description="JWT token TTL in minutes.")
+
+    # ── Notion OAuth (for deploy wizard) ────────────────────────────────────
+    notion_oauth_client_id: str | None = Field(
+        default=None,
+        description="Notion public integration client_id for the deploy wizard OAuth flow.",
+    )
+    notion_oauth_client_secret: SecretStr | None = Field(
+        default=None,
+        description="Notion public integration client_secret for the deploy wizard OAuth flow.",
+    )
+    notion_oauth_redirect_uri: str = Field(
+        default="http://localhost:8080/auth/notion/callback",
+        description="OAuth redirect URI. Must match what is registered in the Notion integration.",
+    )
+    web_session_secret: SecretStr | None = Field(
+        default=None,
+        description="Secret key for signing session cookies (deploy wizard). Required when NOTION_OAUTH_CLIENT_ID is set.",
+    )
 
     # ── CRM conversation state ───────────────────────────────────────────────
     conv_state_db: str = Field(
