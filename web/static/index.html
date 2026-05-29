@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notion Pilot — Setup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .card { background: #fff; border-radius: 12px; box-shadow: 0 2px 16px rgba(0,0,0,.08); padding: 2rem; width: 100%; max-width: 480px; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+  .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 1.5rem; }
+  label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; margin-top: 1rem; }
+  input, select { width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; }
+  input:focus, select:focus { outline: none; border-color: #6e56cf; }
+  button { width: 100%; margin-top: 1.25rem; padding: 0.7rem; background: #6e56cf; color: #fff; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; }
+  button:hover { background: #5a45b0; }
+  button:disabled { background: #bbb; cursor: default; }
+  .msg { margin-top: 1rem; padding: 0.75rem; border-radius: 6px; font-size: 0.9rem; white-space: pre-wrap; font-family: monospace; }
+  .msg.error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+  .msg.success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🚀 Notion Pilot Setup</h1>
+  <p class="subtitle">Bootstrap your Notion workspace in one click.</p>
+
+  <!-- Login form -->
+  <div id="login-section">
+    <label for="username">Username</label>
+    <input id="username" type="text" value="admin" autocomplete="username">
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password">
+    <button id="login-btn" onclick="doLogin()">Sign in</button>
+    <div id="login-msg" class="msg hidden"></div>
+  </div>
+
+  <!-- Setup form (shown after login) -->
+  <div id="setup-section" class="hidden">
+    <label for="scope">What to set up</label>
+    <select id="scope">
+      <option value="both">CRM + Knowledge Inbox</option>
+      <option value="crm">CRM only (People, Companies, Deals)</option>
+      <option value="inbox">Knowledge Inbox only (Notions, Ideas, Tools, Data & Tech)</option>
+    </select>
+    <label for="parent-page">Notion parent page URL or ID</label>
+    <input id="parent-page" type="text" placeholder="https://notion.so/My-Page-...">
+    <label for="notion-token">Notion integration token (optional override)</label>
+    <input id="notion-token" type="password" placeholder="secret_... (leave blank to use server config)">
+    <button id="setup-btn" onclick="doSetup()">Create workspace</button>
+    <div id="setup-msg" class="msg hidden"></div>
+  </div>
+</div>
+
+<script>
+function showMsg(id, text, type) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'msg ' + type;
+}
+
+async function doLogin() {
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+  const body = new URLSearchParams({
+    username: document.getElementById('username').value,
+    password: document.getElementById('password').value,
+  });
+  try {
+    const r = await fetch('/auth/token', { method: 'POST', body });
+    if (!r.ok) {
+      showMsg('login-msg', '❌ Invalid credentials.', 'error');
+      return;
+    }
+    const { access_token } = await r.json();
+    sessionStorage.setItem('token', access_token);
+    document.getElementById('login-section').classList.add('hidden');
+    document.getElementById('setup-section').classList.remove('hidden');
+  } catch(e) {
+    showMsg('login-msg', '❌ Network error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sign in';
+  }
+}
+
+async function doSetup() {
+  const btn = document.getElementById('setup-btn');
+  btn.disabled = true;
+  btn.textContent = 'Creating databases…';
+  const token = sessionStorage.getItem('token');
+  const body = {
+    scope: document.getElementById('scope').value,
+    parent_page: document.getElementById('parent-page').value.trim(),
+  };
+  const notionToken = document.getElementById('notion-token').value.trim();
+  if (notionToken) body.notion_token = notionToken;
+
+  try {
+    const r = await fetch('/api/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(body),
+    });
+    if (r.status === 401) {
+      showMsg('setup-msg', '❌ Session expired. Please reload and sign in again.', 'error');
+      return;
+    }
+    if (!r.ok) {
+      const err = await r.json();
+      showMsg('setup-msg', '❌ ' + (err.detail || 'Setup failed.'), 'error');
+      return;
+    }
+    const data = await r.json();
+    const lines = ['✅ Workspace created! Add to your .env:\n'];
+    for (const [k, v] of Object.entries(data)) {
+      if (v) lines.push(k + '=' + v);
+    }
+    showMsg('setup-msg', lines.join('\n'), 'success');
+  } catch(e) {
+    showMsg('setup-msg', '❌ Network error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create workspace';
+  }
+}
+</script>
+</body>
+</html>
