@@ -12,6 +12,21 @@ NOTION_VERSION = "2026-03-11"
 NOTION_API = "https://api.notion.com/v1"
 
 
+async def create_workspace_root_page(client: httpx.AsyncClient, name: str) -> str:
+    """Create a top-level page in the user's Notion workspace. Returns the page ID."""
+    r = await client.post(
+        f"{NOTION_API}/pages",
+        json={
+            "parent": {"workspace": True},
+            "properties": {
+                "title": {"title": [{"type": "text", "text": {"content": name}}]}
+            },
+        },
+    )
+    r.raise_for_status()
+    return str(r.json()["id"])
+
+
 @dataclass
 class CRMWorkspaceResult:
     crm_page_id: str

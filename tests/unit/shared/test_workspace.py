@@ -1,13 +1,17 @@
 # tests/unit/shared/test_workspace.py
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
+import respx
 
 from notion_pilot.shared.workspace import (
+    NOTION_API,
     CRMWorkspaceResult,
     InboxWorkspaceResult,
     create_crm_workspace,
     create_inbox_workspace,
+    create_workspace_root_page,
 )
 
 
@@ -70,3 +74,20 @@ async def test_create_inbox_workspace_returns_ids():
     assert result.ideas_id == "ideas-db"
     assert result.tools_id == "tools-db"
     assert result.data_tech_id == "data-tech-db"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_create_workspace_root_page():
+    page_id = "abcd1234efgh5678abcd1234efgh5678"
+    respx.post(f"{NOTION_API}/pages").mock(
+        return_value=httpx.Response(200, json={"id": page_id})
+    )
+    async with httpx.AsyncClient(headers={"Authorization": "Bearer token"}) as client:
+        result = await create_workspace_root_page(client, "My Workspace")
+    assert result == page_id
+    request_body = respx.calls[0].request
+    import json
+    body = json.loads(request_body.content)
+    assert body["parent"] == {"workspace": True}
+    assert body["properties"]["title"]["title"][0]["text"]["content"] == "My Workspace"
