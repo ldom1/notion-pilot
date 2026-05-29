@@ -7,20 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- Renamed project to **Notion Pilot** (`notion-pilot` / `notion_pilot`)
-- Reorganized package structure: `shared/` core, `inbox/` (formerly `pipelines/`), `crm/`, `scripts/crm/`
-- GitHub repo renamed from `telegram-to-notion` to `notion-pilot`
-
 ### Added
+- Landing page: full marketing page with hero, CRM pipeline examples, two-product section, and how-it-works
+- Notion OAuth deploy wizard: 3-step wizard (Connect → Choose scope → Name workspace) accessed from "Deploy to Notion" button
+- `create_workspace_root_page` in `workspace.py`: creates a named page at Notion workspace root
+- New config fields: `NOTION_OAUTH_CLIENT_ID`, `NOTION_OAUTH_CLIENT_SECRET`, `NOTION_OAUTH_REDIRECT_URI`, `WEB_SESSION_SECRET`
 - **Setup wizard** — bootstrap a full Notion workspace (CRM + Knowledge inbox) in 3 ways:
   - CLI: `scripts/crm/crm_setup_workspace.py --with-inbox` or `scripts/inbox/setup_workspace.py`
   - Telegram: `/setup` command — guided multi-turn wizard (token → scope → parent page → `.env` output)
-  - Web UI: FastAPI server (`web/`) with JWT auth + single-page HTML form at `http://your-server:8080`
-- `launch_webserver.sh` — start the web UI; reads `WEB_ADMIN_PASSWORD` and `WEB_SECRET_KEY` from `.env`
+  - Web UI: FastAPI server (`web/`) with Notion OAuth (3-step wizard) at `http://your-server:8080`
+- `launch_webserver.sh` — start the web UI; reads `NOTION_OAUTH_CLIENT_ID`, `NOTION_OAUTH_CLIENT_SECRET`, `NOTION_OAUTH_REDIRECT_URI`, `WEB_SESSION_SECRET` from `.env`
 - `notion_pilot/shared/workspace.py` — shared workspace creation module (CRM + 4 Knowledge DBs)
-- `web/server.py`, `web/auth.py`, `web/static/index.html` — FastAPI setup server with bcrypt+JWT auth
-- Config: `NOTION_IDEAS_DATABASE_ID`, `NOTION_TOOLS_DATABASE_ID`, `NOTION_DATA_TECH_DATABASE_ID`, `WEB_ADMIN_USERNAME`, `WEB_ADMIN_PASSWORD`, `WEB_SECRET_KEY`, `WEB_TOKEN_EXPIRE_MINUTES`
+- `web/server.py`, `web/auth.py`, `web/static/index.html` — FastAPI setup server with Notion OAuth
+- Config: `NOTION_IDEAS_DATABASE_ID`, `NOTION_TOOLS_DATABASE_ID`, `NOTION_DATA_TECH_DATABASE_ID`
 - README `🚀 Quick Start` section covering all three setup options
 - `crm/` package: `NotionPeopleSyncer`, `NotionCompanySyncer`, fuzzy dedup (`rapidfuzz`), Brave Search email enrichment
 - `scripts/import_linkedin.py`: batch import of LinkedIn `Connections.csv` into Notion People database
@@ -37,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional dep extras: `uv sync --extra email`, `uv sync --extra discord`
 
 ### Changed
+- `NOTION_TOKEN` is now optional (only required when running the Telegram bot, not the deploy wizard)
+- `/api/setup` now accepts `workspace_name` instead of `parent_page` URL/ID
+- `/api/setup` returns `{notion_page_url}` instead of a list of env var IDs
+- Removed JWT admin login from the deploy wizard flow; OAuth replaces it
+- Renamed project to **Notion Pilot** (`notion-pilot` / `notion_pilot`)
+- Reorganized package structure: `shared/` core, `inbox/` (formerly `pipelines/`), `crm/`, `scripts/crm/`
+- GitHub repo renamed from `telegram-to-notion` to `notion-pilot`
 - `TELEGRAM_BOT_TOKEN` is now optional — bot starts with any configured adapter
 - `IncomingMessage` has a new required field `source_adapter` (label in Notion reflects the source)
 

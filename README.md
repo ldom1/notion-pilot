@@ -37,23 +37,27 @@ Copy the printed IDs into your `.env` file.
 Start the bot with at least `NOTION_TOKEN` set in `.env`, then send `/setup` to your bot.
 The wizard walks you through token validation, scope selection, and parent page — then prints the `.env` values.
 
-### Option C — Web UI
+### Option C — Web UI (deploy wizard)
 
-Add to your `.env`:
+Register a public Notion integration at [notion.so/my-integrations](https://www.notion.so/profile/integrations), then add to your `.env`:
+
 ```env
-WEB_ADMIN_USERNAME=admin          # optional, defaults to "admin"
-WEB_ADMIN_PASSWORD=yourpassword   # required
-WEB_SECRET_KEY=a-long-random-key  # required — used to sign JWT tokens
+NOTION_OAUTH_CLIENT_ID=your_client_id
+NOTION_OAUTH_CLIENT_SECRET=your_client_secret
+NOTION_OAUTH_REDIRECT_URI=https://yourhost/auth/notion/callback
+WEB_SESSION_SECRET=a-long-random-key
 ```
 
 Then launch:
+
 ```bash
 uv sync --group web
-./launch_webserver.sh             # reads .env automatically, default port 8080
-PORT=9000 ./launch_webserver.sh   # custom port
+./launch_webserver.sh
 ```
 
-Open `http://localhost:8080`, sign in, fill the form. Run behind nginx/HTTPS in production.
+Open `http://localhost:8080`, click **Deploy to Notion**, authorize with your Notion account, choose your scope, and name your workspace. Done.
+
+**Advanced / self-hosted without OAuth:** Click "Have an integration token?" in the wizard and paste a `secret_...` token from [notion.so/my-integrations](https://www.notion.so/profile/integrations). The integration must have workspace-level create permissions.
 
 ### Generated `.env` variables
 
