@@ -402,7 +402,10 @@ async function doSetup() {
       return;
     }
     document.getElementById('notion-open-link').href = data.notion_page_url;
-    nextStep('success');
+    ['step1','step2','step3'].forEach(id => {
+      document.getElementById(id).style.display = 'none';
+    });
+    document.getElementById('step-success').style.display = 'block';
   } catch (e) {
     showSetupError('Network error: ' + e.message);
   } finally {
