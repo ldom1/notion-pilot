@@ -1305,8 +1305,8 @@ email = [
     { name = "imapclient" },
 ]
 web = [
+    { name = "bcrypt" },
     { name = "fastapi" },
-    { name = "passlib", extra = ["bcrypt"] },
     { name = "python-jose", extra = ["cryptography"] },
     { name = "python-multipart" },
     { name = "uvicorn", extra = ["standard"] },
@@ -1314,11 +1314,11 @@ web = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "bcrypt" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "ipykernel" },
     { name = "mypy" },
-    { name = "passlib", extra = ["bcrypt"] },
     { name = "pylint" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1329,6 +1329,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "bcrypt", marker = "extra == 'web'", specifier = ">=5.0.0" },
     { name = "discord-py", marker = "extra == 'discord'", specifier = ">=2.3" },
     { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.115.0" },
     { name = "faster-whisper", specifier = ">=1.2.1" },
@@ -1336,7 +1337,6 @@ requires-dist = [
     { name = "imapclient", marker = "extra == 'email'", specifier = ">=3.1.0" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "notion-client", specifier = ">=2.2.1" },
-    { name = "passlib", extras = ["bcrypt"], marker = "extra == 'web'", specifier = ">=1.7.4" },
     { name = "pydantic-settings", specifier = ">=2.5.0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "python-jose", extras = ["cryptography"], marker = "extra == 'web'", specifier = ">=3.3.0" },
@@ -1349,11 +1349,11 @@ provides-extras = ["discord", "email", "web"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "bcrypt", specifier = ">=5.0.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "ipykernel", specifier = ">=7.2.0" },
     { name = "mypy", specifier = ">=1.11" },
-    { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4" },
     { name = "pylint", specifier = ">=4.0.5" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
@@ -1472,20 +1472,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/81/76/a1e769043c0c0c9fe391b702539d594731a4362334cdf4dc25d0c09761e7/parso-0.8.6.tar.gz", hash = "sha256:2b9a0332696df97d454fa67b81618fd69c35a7b90327cbe6ba5c92d2c68a7bfd", size = 401621, upload-time = "2026-02-09T15:45:24.425Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b6/61/fae042894f4296ec49e3f193aff5d7c18440da9e48102c3315e1bc4519a7/parso-0.8.6-py2.py3-none-any.whl", hash = "sha256:2c549f800b70a5c4952197248825584cb00f033b29c692671d3bf08bf380baff", size = 106894, upload-time = "2026-02-09T15:45:21.391Z" },
-]
-
-[[package]]
-name = "passlib"
-version = "1.7.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b6/06/9da9ee59a67fae7761aab3ccc84fa4f3f33f125b370f1ccdb915bf967c11/passlib-1.7.4.tar.gz", hash = "sha256:defd50f72b65c5402ab2c573830a6978e5f202ad0d984793c8dde2c4152ebe04", size = 689844, upload-time = "2020-10-08T19:00:52.121Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3b/a4/ab6b7589382ca3df236e03faa71deac88cae040af60c071a78d254a62172/passlib-1.7.4-py2.py3-none-any.whl", hash = "sha256:aa6bca462b8d8bda89c70b382f0c298a20b5560af6cbfa2dce410c0a2fb669f1", size = 525554, upload-time = "2020-10-08T19:00:49.856Z" },
-]
-
-[package.optional-dependencies]
-bcrypt = [
-    { name = "bcrypt" },
 ]
 
 [[package]]
