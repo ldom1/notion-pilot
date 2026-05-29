@@ -60,7 +60,10 @@ def create_app(settings: Settings) -> FastAPI:
     async def login(form: Annotated[OAuth2PasswordRequestForm, Depends()]) -> dict[str, str]:
         if not settings.web_admin_password or not settings.web_secret_key:
             raise HTTPException(status_code=500, detail="Web auth not configured")
-        if form.username != settings.web_admin_username or form.password != settings.web_admin_password.get_secret_value():
+        if (
+            form.username != settings.web_admin_username
+            or form.password != settings.web_admin_password.get_secret_value()
+        ):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password",
@@ -124,4 +127,5 @@ def create_app(settings: Settings) -> FastAPI:
 def app_factory() -> FastAPI:
     """Factory for uvicorn --factory mode. Avoids import-time load_settings() call."""
     from notion_pilot.shared.config import load_settings
+
     return create_app(load_settings())
