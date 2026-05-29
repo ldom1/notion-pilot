@@ -1,93 +1,87 @@
 # tests/unit/web/test_server.py
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 
-def _make_settings(username="admin", password="secret", secret_key="testkey"):
+def _make_settings(session_secret="sessionsecret"):
     s = MagicMock()
-    s.web_admin_username = username
-    s.web_admin_password = MagicMock()
-    s.web_admin_password.get_secret_value.return_value = password
-    s.web_secret_key = MagicMock()
-    s.web_secret_key.get_secret_value.return_value = secret_key
-    s.web_token_expire_minutes = 60
-    s.notion_token = MagicMock()
-    s.notion_token.get_secret_value.return_value = "secret_test"
+    s.notion_token = None
+    s.notion_oauth_client_id = "test_client_id"
+    s.notion_oauth_client_secret = MagicMock()
+    s.notion_oauth_client_secret.get_secret_value.return_value = "test_client_secret"
+    s.notion_oauth_redirect_uri = "http://localhost:8080/auth/notion/callback"
+    s.web_session_secret = MagicMock()
+    s.web_session_secret.get_secret_value.return_value = session_secret
     return s
 
 
-def _get_token(client, password="secret"):
-    r = client.post("/auth/token", data={"username": "admin", "password": password})
-    return r.json()["access_token"]
+def _make_settings_no_oauth():
+    s = MagicMock()
+    s.notion_token = None
+    s.notion_oauth_client_id = None
+    s.notion_oauth_client_secret = None
+    s.web_session_secret = None
+    return s
 
 
 def test_health():
-    settings = _make_settings()
     from web.server import create_app
-
-    client = TestClient(create_app(settings))
+    client = TestClient(create_app(_make_settings()))
     r = client.get("/health")
     assert r.status_code == 200
     assert r.json() == {"status": "ok"}
 
 
-def test_login_success():
-    settings = _make_settings()
+def test_auth_notion_redirect():
     from web.server import create_app
+    client = TestClient(create_app(_make_settings()), follow_redirects=False)
+    r = client.get("/auth/notion")
+    assert r.status_code in (302, 307)
+    assert "api.notion.com/v1/oauth/authorize" in r.headers["location"]
+    assert "client_id=test_client_id" in r.headers["location"]
 
-    client = TestClient(create_app(settings))
-    r = client.post("/auth/token", data={"username": "admin", "password": "secret"})
+
+def test_auth_notion_redirect_missing_oauth_config():
+    from web.server import create_app
+    client = TestClient(create_app(_make_settings_no_oauth()), follow_redirects=False)
+    r = client.get("/auth/notion")
+    assert r.status_code == 500
+
+
+def test_setup_with_manual_token():
+    from web.server import create_app
+    mock_crm = MagicMock(companies_id="c1", people_id="p1", deals_id="d1", crm_page_id="pg1")
+    mock_page_id = "root_page_id"
+    client = TestClient(create_app(_make_settings()))
+    with (
+        patch("web.server.create_workspace_root_page", new_callable=AsyncMock, return_value=mock_page_id),
+        patch("web.server.create_crm_workspace", new_callable=AsyncMock, return_value=mock_crm),
+    ):
+        r = client.post(
+            "/api/setup",
+            json={"scope": "crm", "workspace_name": "My CRM", "notion_token": "secret_manual"},
+        )
     assert r.status_code == 200
-    assert "access_token" in r.json()
+    assert r.json()["notion_page_url"].startswith("https://notion.so/")
 
 
-def test_login_wrong_password():
-    settings = _make_settings()
+def test_setup_no_token_returns_401():
     from web.server import create_app
-
-    client = TestClient(create_app(settings))
-    r = client.post("/auth/token", data={"username": "admin", "password": "wrong"})
-    assert r.status_code == 401
-
-
-def test_setup_endpoint_requires_auth():
-    settings = _make_settings()
-    from web.server import create_app
-
-    client = TestClient(create_app(settings))
+    client = TestClient(create_app(_make_settings()))
     r = client.post(
-        "/api/setup", json={"scope": "crm", "parent_page": "550e8400e29b41d4a716446655440000"}
+        "/api/setup",
+        json={"scope": "crm", "workspace_name": "My CRM"},
     )
     assert r.status_code == 401
 
 
-def test_setup_endpoint_crm_with_valid_token():
-    settings = _make_settings()
-    mock_crm = MagicMock(companies_id="c1", people_id="p1", deals_id="d1", crm_page_id="pg1")
+def test_setup_invalid_scope_returns_422():
     from web.server import create_app
-
-    client = TestClient(create_app(settings))
-    token = _get_token(client)
-    with patch("web.server.create_crm_workspace", new_callable=AsyncMock, return_value=mock_crm):
-        r = client.post(
-            "/api/setup",
-            json={"scope": "crm", "parent_page": "550e8400e29b41d4a716446655440000"},
-            headers={"Authorization": f"Bearer {token}"},
-        )
-    assert r.status_code == 200
-    assert r.json()["NOTION_COMPANIES_DATA_SOURCE_ID"] == "c1"
-
-
-def test_setup_endpoint_invalid_scope():
-    settings = _make_settings()
-    from web.server import create_app
-
-    client = TestClient(create_app(settings))
-    token = _get_token(client)
+    client = TestClient(create_app(_make_settings()))
     r = client.post(
         "/api/setup",
-        json={"scope": "invalid", "parent_page": "550e8400e29b41d4a716446655440000"},
-        headers={"Authorization": f"Bearer {token}"},
+        json={"scope": "invalid", "workspace_name": "My CRM", "notion_token": "secret_x"},
     )
     assert r.status_code == 422
