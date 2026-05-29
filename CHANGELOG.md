@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub repo renamed from `telegram-to-notion` to `notion-pilot`
 
 ### Added
+- **Setup wizard** — bootstrap a full Notion workspace (CRM + Knowledge inbox) in 3 ways:
+  - CLI: `scripts/crm/crm_setup_workspace.py --with-inbox` or `scripts/inbox/setup_workspace.py`
+  - Telegram: `/setup` command — guided multi-turn wizard (token → scope → parent page → `.env` output)
+  - Web UI: FastAPI server (`web/`) with JWT auth + single-page HTML form at `http://your-server:8080`
+- `launch_webserver.sh` — start the web UI; reads `WEB_ADMIN_PASSWORD` and `WEB_SECRET_KEY` from `.env`
+- `notion_pilot/shared/workspace.py` — shared workspace creation module (CRM + 4 Knowledge DBs)
+- `web/server.py`, `web/auth.py`, `web/static/index.html` — FastAPI setup server with bcrypt+JWT auth
+- Config: `NOTION_IDEAS_DATABASE_ID`, `NOTION_TOOLS_DATABASE_ID`, `NOTION_DATA_TECH_DATABASE_ID`, `WEB_ADMIN_USERNAME`, `WEB_ADMIN_PASSWORD`, `WEB_SECRET_KEY`, `WEB_TOKEN_EXPIRE_MINUTES`
+- README `🚀 Quick Start` section covering all three setup options
 - `crm/` package: `NotionPeopleSyncer`, `NotionCompanySyncer`, fuzzy dedup (`rapidfuzz`), Brave Search email enrichment
 - `scripts/import_linkedin.py`: batch import of LinkedIn `Connections.csv` into Notion People database
   - Fuzzy dedup on Name+Company (skip ≥ 85, review 75–84, create < 75)

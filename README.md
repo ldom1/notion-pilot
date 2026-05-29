@@ -39,9 +39,18 @@ The wizard walks you through token validation, scope selection, and parent page 
 
 ### Option C — Web UI
 
+Add to your `.env`:
+```env
+WEB_ADMIN_USERNAME=admin          # optional, defaults to "admin"
+WEB_ADMIN_PASSWORD=yourpassword   # required
+WEB_SECRET_KEY=a-long-random-key  # required — used to sign JWT tokens
+```
+
+Then launch:
 ```bash
 uv sync --group web
-WEB_ADMIN_PASSWORD=yourpassword WEB_SECRET_KEY=changeme uv run uvicorn web.server:app_factory --factory --port 8080
+./launch_webserver.sh             # reads .env automatically, default port 8080
+PORT=9000 ./launch_webserver.sh   # custom port
 ```
 
 Open `http://localhost:8080`, sign in, fill the form. Run behind nginx/HTTPS in production.
