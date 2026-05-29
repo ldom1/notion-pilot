@@ -98,18 +98,25 @@ def create_app(settings: Settings) -> FastAPI:
             "Content-Type": "application/json",
         }
         result = SetupResponse()
-        async with httpx.AsyncClient(headers=headers, timeout=60) as client:
-            if req.scope in ("crm", "both"):
-                crm = await create_crm_workspace(client, parent_id)
-                result.NOTION_COMPANIES_DATA_SOURCE_ID = crm.companies_id
-                result.NOTION_PEOPLE_DATA_SOURCE_ID = crm.people_id
-                result.NOTION_DEALS_DATABASE_ID = crm.deals_id
-            if req.scope in ("inbox", "both"):
-                inbox = await create_inbox_workspace(client, parent_id)
-                result.NOTION_DATABASE_ID = inbox.notions_id
-                result.NOTION_IDEAS_DATABASE_ID = inbox.ideas_id
-                result.NOTION_TOOLS_DATABASE_ID = inbox.tools_id
-                result.NOTION_DATA_TECH_DATABASE_ID = inbox.data_tech_id
+        try:
+            async with httpx.AsyncClient(headers=headers, timeout=60) as client:
+                if req.scope in ("crm", "both"):
+                    crm = await create_crm_workspace(client, parent_id)
+                    result.NOTION_COMPANIES_DATA_SOURCE_ID = crm.companies_id
+                    result.NOTION_PEOPLE_DATA_SOURCE_ID = crm.people_id
+                    result.NOTION_DEALS_DATABASE_ID = crm.deals_id
+                if req.scope in ("inbox", "both"):
+                    inbox = await create_inbox_workspace(client, parent_id)
+                    result.NOTION_DATABASE_ID = inbox.notions_id
+                    result.NOTION_IDEAS_DATABASE_ID = inbox.ideas_id
+                    result.NOTION_TOOLS_DATABASE_ID = inbox.tools_id
+                    result.NOTION_DATA_TECH_DATABASE_ID = inbox.data_tech_id
+        except httpx.HTTPStatusError as exc:
+            notion_msg = exc.response.text
+            raise HTTPException(
+                status_code=400,
+                detail=f"Notion API error {exc.response.status_code}: {notion_msg}",
+            )
         return result
 
     # Mount static files if directory exists
