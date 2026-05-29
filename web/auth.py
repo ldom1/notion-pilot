@@ -4,20 +4,21 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 from jose import jwt
-from passlib.context import CryptContext
 
-# Use pbkdf2_sha256 for testing compatibility; bcrypt can be expensive in test environments
-_PWD_CONTEXT = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 _ALGORITHM = "HS256"
 
 
 def hash_password(password: str) -> str:
-    return _PWD_CONTEXT.hash(password)
+    """Hash a password using bcrypt."""
+    salt = bcrypt.gensalt(rounds=12)
+    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return _PWD_CONTEXT.verify(plain, hashed)
+    """Verify a plain password against a bcrypt hash."""
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
 
 def create_access_token(data: dict, *, secret_key: str, expire_minutes: int) -> str:
