@@ -10,6 +10,68 @@
 
 No webhooks. No third-party SaaS. No data leaving your server.
 
+## 🚀 Quick Start
+
+### Prerequisites
+- Python 3.12+, [uv](https://docs.astral.sh/uv/)
+- A Notion account with an [integration token](https://www.notion.so/my-integrations) (`secret_...`)
+- A Notion page where the integration has access (open the page → ··· → Connections → add your integration)
+
+### Option A — CLI (one command)
+
+```bash
+# CRM + Knowledge inbox in one shot:
+uv run python scripts/crm/crm_setup_workspace.py --parent-id <YOUR_PAGE_URL> --with-inbox
+
+# CRM only:
+uv run python scripts/crm/crm_setup_workspace.py --parent-id <YOUR_PAGE_URL>
+
+# Knowledge inbox only:
+uv run python scripts/inbox/setup_workspace.py --parent-id <YOUR_PAGE_URL>
+```
+
+Copy the printed IDs into your `.env` file.
+
+### Option B — Telegram `/setup` wizard
+
+Start the bot with at least `NOTION_TOKEN` set in `.env`, then send `/setup` to your bot.
+The wizard walks you through token validation, scope selection, and parent page — then prints the `.env` values.
+
+### Option C — Web UI (deploy wizard)
+
+Register a public Notion integration at [notion.so/my-integrations](https://www.notion.so/profile/integrations), then add to your `.env`:
+
+```env
+NOTION_OAUTH_CLIENT_ID=your_client_id
+NOTION_OAUTH_CLIENT_SECRET=your_client_secret
+NOTION_OAUTH_REDIRECT_URI=https://yourhost/auth/notion/callback
+WEB_SESSION_SECRET=a-long-random-key
+```
+
+Then launch:
+
+```bash
+uv sync --group web
+./launch_webserver.sh
+```
+
+Open `http://localhost:8080`, click **Deploy to Notion**, authorize with your Notion account, choose your scope, and name your workspace. Done.
+
+**Advanced / self-hosted without OAuth:** Click "Have an integration token?" in the wizard and paste a `secret_...` token from [notion.so/my-integrations](https://www.notion.so/profile/integrations). The integration must have workspace-level create permissions.
+
+### Generated `.env` variables
+
+| Variable | Description |
+|----------|-------------|
+| `NOTION_TOKEN` | Your Notion integration token |
+| `NOTION_DATABASE_ID` | Notions (knowledge) database |
+| `NOTION_IDEAS_DATABASE_ID` | Ideas database |
+| `NOTION_TOOLS_DATABASE_ID` | Tools database |
+| `NOTION_DATA_TECH_DATABASE_ID` | Data & Technology database |
+| `NOTION_COMPANIES_DATA_SOURCE_ID` | Companies CRM database |
+| `NOTION_PEOPLE_DATA_SOURCE_ID` | People CRM database |
+| `NOTION_DEALS_DATABASE_ID` | Deals CRM database |
+
 ## Why you'll like it
 
 - **Voice-to-Notion, offline.** Dictate an idea, get a transcribed, titled, categorized page. All on-device via [faster-whisper](https://github.com/SYSTRAN/faster-whisper).

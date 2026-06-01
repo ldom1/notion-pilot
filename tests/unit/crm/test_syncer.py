@@ -2,7 +2,6 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
-
 from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
 
 
@@ -17,8 +16,12 @@ def _mock_ds_query(pages: list[dict]):
     mock = AsyncMock()
     mock.data_sources = MagicMock()
     mock.data_sources.query = AsyncMock(return_value={"results": pages, "has_more": False})
+    mock.databases = MagicMock()
+    mock.databases.retrieve = AsyncMock(side_effect=Exception("data_source db"))
     mock.pages = MagicMock()
     mock.pages.create = AsyncMock(return_value={"id": "new-company-id"})
+    mock.options = MagicMock()
+    mock.options.auth = "fake-token"
     return mock
 
 
@@ -83,7 +86,7 @@ def _make_people_page(page_id: str, name: str, company_page_ids: list[str] | Non
         "id": page_id,
         "properties": {
             "Nom": {"type": "title", "title": [{"plain_text": name}]},
-            "Entreprise": {
+            "Company": {
                 "type": "relation",
                 "relation": [{"id": cid} for cid in (company_page_ids or [])],
             },
@@ -102,8 +105,12 @@ def _mock_people_client(people_pages: list[dict], company_pages: list[dict]):
         return {"results": people_pages, "has_more": False}
 
     mock.data_sources.query = _query
+    mock.databases = MagicMock()
+    mock.databases.retrieve = AsyncMock(side_effect=Exception("data_source db"))
     mock.pages = MagicMock()
     mock.pages.create = AsyncMock(return_value={"id": "new-person-id"})
+    mock.options = MagicMock()
+    mock.options.auth = "fake-token"
     return mock
 
 
@@ -163,13 +170,13 @@ class TestNotionPeopleSyncer:
         )
         props = client.pages.create.call_args.kwargs["properties"]
         assert props["Linkedin"]["url"] == "https://linkedin.com/in/newperson"
-        assert props["E-mail pro"]["email"] == "new@newcorp.com"
+        assert props["Email - pro"]["email"] == "new@newcorp.com"
 
     async def test_upsert_sets_dans_mon_reseau(self):
         syncer, client = await self._make_syncer([], [])
         await syncer.upsert(PersonRecord(name="X", company="Y"))
         props = client.pages.create.call_args.kwargs["properties"]
-        assert props["Dans mon réseau ?"]["select"]["name"] == "Yes"
+        assert props["In my network"]["select"]["name"] == "Yes"
 
     async def test_upsert_sets_phone_seniority_role_type(self):
         syncer, client = await TestNotionPeopleSyncer._make_syncer(TestNotionPeopleSyncer, [], [])
@@ -196,8 +203,8 @@ async def test_load_snapshot_reads_optional_fields():
                 "id": "p1",
                 "properties": {
                     "Nom": {"title": [{"plain_text": "Alice Martin"}]},
-                    "Entreprise": {"relation": []},
-                    "Fonction": {"rich_text": [{"plain_text": "VP Engineering"}]},
+                    "Company": {"relation": []},
+                    "Position": {"rich_text": [{"plain_text": "VP Engineering"}]},
                     "Seniority": {"select": {"name": "vp"}},
                     "Role Type": {"multi_select": [{"name": "engineering"}]},
                     "Linkedin": {"url": "https://linkedin.com/in/alice"},

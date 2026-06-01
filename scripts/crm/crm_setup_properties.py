@@ -14,7 +14,7 @@ from loguru import logger
 
 from notion_pilot.shared.config import load_settings
 
-_NOTION_VERSION = "2026-03-11"
+_NOTION_VERSION = "2022-06-28"
 _NOTION_BASE = "https://api.notion.com/v1"
 
 _PEOPLE_NEW_PROPS = {

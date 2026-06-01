@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notion Pilot — Landing Page Mockup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #fff; color: #1a1a1a; }
+
+  /* NAV */
+  nav { display: flex; justify-content: space-between; align-items: center; padding: 1rem 2.5rem; border-bottom: 1px solid #f0f0f0; position: sticky; top: 0; background: #fff; z-index: 100; }
+  .nav-logo { font-weight: 800; font-size: 1.05rem; color: #6e56cf; letter-spacing: -0.3px; }
+  .nav-deploy { background: #6e56cf; color: #fff; border: none; padding: 0.5rem 1.25rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+  .nav-deploy:hover { background: #5a45b0; }
+
+  /* HERO */
+  .hero { max-width: 720px; margin: 0 auto; padding: 3rem 2rem 3.5rem; text-align: center; }
+  .hero-badge { display: inline-block; background: #f0eeff; color: #6e56cf; padding: 0.3rem 0.9rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; margin-bottom: 1.25rem; letter-spacing: 0.2px; }
+  .hero h1 { font-size: 3rem; font-weight: 900; line-height: 1.1; letter-spacing: -1.5px; margin-bottom: 1.25rem; }
+  .hero h1 span { color: #6e56cf; }
+  .hero p { font-size: 1.1rem; color: #555; max-width: 520px; margin: 0 auto 2rem; line-height: 1.65; }
+  .hero-cta { display: inline-block; background: #6e56cf; color: #fff; padding: 0.85rem 2.25rem; border-radius: 8px; font-size: 1rem; font-weight: 700; text-decoration: none; box-shadow: 0 4px 16px rgba(110,86,207,.25); }
+  .hero-cta:hover { background: #5a45b0; }
+
+  /* SECTIONS */
+  .section { max-width: 800px; margin: 0 auto; padding: 4rem 2rem; }
+  .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #6e56cf; margin-bottom: 0.5rem; }
+  .section h2 { font-size: 1.9rem; font-weight: 800; margin-bottom: 0.75rem; letter-spacing: -0.5px; }
+  .section .lead { font-size: 0.98rem; color: #666; margin-bottom: 2.5rem; line-height: 1.65; max-width: 600px; }
+
+  /* EXAMPLES */
+  .examples { display: flex; flex-direction: column; gap: 0.85rem; }
+  .example { background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 1.1rem 1.4rem; display: flex; align-items: flex-start; gap: 1.25rem; }
+  .example-in { flex: 1; }
+  .example-arrow { font-size: 1rem; padding-top: 0.15rem; flex-shrink: 0; color: #bbb; font-weight: 300; }
+  .example-out { flex: 1; }
+  .example-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #bbb; margin-bottom: 0.3rem; }
+  .tg-msg { background: #fff; border: 1px solid #e8e4ff; border-radius: 7px; padding: 0.55rem 0.8rem; font-size: 0.88rem; color: #333; }
+  .notion-row { background: #fff; border: 1px solid #e5e5e5; border-radius: 7px; padding: 0.55rem 0.8rem; font-size: 0.85rem; }
+  .notion-row .row-title { font-weight: 700; margin-bottom: 0.3rem; color: #1a1a1a; }
+  .notion-row .tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .tag { background: #f0eeff; color: #6e56cf; padding: 0.12rem 0.5rem; border-radius: 999px; font-size: 0.7rem; }
+  .tag.green { background: #e8f8f0; color: #1a7a4a; }
+
+  /* PRODUCTS */
+  .products-bg { background: #fafafa; border-top: 1px solid #f0f0f0; border-bottom: 1px solid #f0f0f0; }
+  .products { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 2rem; }
+  .product-card { background: #fff; border: 1px solid #e8e4ff; border-radius: 12px; padding: 1.75rem; }
+  .product-card h3 { font-size: 1.1rem; font-weight: 800; margin-bottom: 0.4rem; color: #6e56cf; }
+  .product-card p { font-size: 0.88rem; color: #555; line-height: 1.65; margin-bottom: 1rem; }
+  .product-features { list-style: none; }
+  .product-features li { font-size: 0.84rem; color: #333; padding: 0.2rem 0; display: flex; gap: 0.5rem; }
+  .product-features li::before { content: "—"; color: #6e56cf; font-weight: 700; flex-shrink: 0; }
+
+  /* HOW IT WORKS */
+  .steps { display: flex; gap: 1.5rem; margin-top: 2rem; align-items: flex-start; }
+  .step { flex: 1; }
+  .step-num { width: 32px; height: 32px; border-radius: 50%; background: #6e56cf; color: #fff; font-weight: 800; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; margin-bottom: 0.75rem; }
+  .step h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.3rem; }
+  .step p { font-size: 0.84rem; color: #666; line-height: 1.55; }
+  .step-arrow { color: #ddd; font-size: 1.2rem; padding-top: 0.6rem; flex-shrink: 0; }
+
+  /* PRIVACY */
+  .privacy-bg { background: #1a1a1a; color: #fff; }
+  .privacy { max-width: 800px; margin: 0 auto; padding: 4rem 2rem; text-align: center; }
+  .privacy h2 { font-size: 1.9rem; font-weight: 800; margin-bottom: 0.75rem; }
+  .privacy p { color: #999; font-size: 0.98rem; margin-bottom: 2rem; line-height: 1.65; max-width: 560px; margin-left: auto; margin-right: auto; }
+  .privacy-pills { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem; }
+  .pill { background: #2a2a2a; border: 1px solid #333; padding: 0.4rem 1rem; border-radius: 999px; font-size: 0.82rem; color: #ccc; }
+
+  /* FINAL CTA */
+  .final-cta { max-width: 580px; margin: 0 auto; padding: 5rem 2rem; text-align: center; }
+  .final-cta h2 { font-size: 2rem; font-weight: 900; margin-bottom: 0.75rem; letter-spacing: -0.5px; }
+  .final-cta p { color: #666; margin-bottom: 2rem; line-height: 1.65; font-size: 0.98rem; }
+  .final-sub { font-size: 0.78rem; color: #bbb; margin-top: 0.75rem; }
+  .final-sub a { color: #6e56cf; text-decoration: none; }
+
+  /* WIZARD */
+  .wizard-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: center; justify-content: center; }
+  .wizard-overlay.active { display: flex; }
+  .wizard-card { background: #fff; border-radius: 14px; padding: 2.5rem; width: 100%; max-width: 600px; box-shadow: 0 20px 60px rgba(0,0,0,.18); }
+  .wizard-header { margin-bottom: 1.5rem; }
+  .wizard-header h2 { font-size: 1.25rem; font-weight: 800; }
+  .wizard-header p { font-size: 0.83rem; color: #888; margin-top: 0.25rem; line-height: 1.5; }
+  .progress { display: flex; gap: 0.4rem; margin-bottom: 1.5rem; }
+  .progress-step { flex: 1; height: 3px; background: #eee; border-radius: 999px; }
+  .progress-step.done { background: #6e56cf; }
+  .progress-step.active { background: #b3a0e8; }
+
+  /* Step 1 */
+  .notion-btn { width: 100%; padding: 0.75rem; background: #000; color: #fff; border: none; border-radius: 8px; font-size: 0.92rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.6rem; margin-bottom: 1rem; }
+  .notion-btn:hover { background: #222; }
+  .notion-n { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background: #fff; border-radius: 3px; color: #000; font-weight: 900; font-size: 0.85rem; font-family: serif; line-height: 1; }
+  .advanced-toggle { font-size: 0.78rem; color: #bbb; cursor: pointer; text-align: center; }
+  .advanced-toggle:hover { color: #888; }
+  .advanced-section { margin-top: 0.75rem; display: none; border-top: 1px solid #f0f0f0; padding-top: 0.75rem; }
+  .advanced-section.open { display: block; }
+  .adv-label { font-size: 0.75rem; font-weight: 600; color: #888; margin-bottom: 0.3rem; display: block; }
+  .adv-input { width: 100%; border: 1px solid #ddd; border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.84rem; font-family: monospace; outline: none; }
+  .adv-input:focus { border-color: #6e56cf; }
+  .adv-hint { font-size: 0.7rem; color: #bbb; margin-top: 0.3rem; line-height: 1.5; }
+  .adv-hint a { color: #6e56cf; }
+
+  /* Step 2 */
+  .scope-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-bottom: 1.25rem; }
+  .scope-card { border: 1.5px solid #eee; border-radius: 8px; padding: 0.85rem 0.5rem; text-align: center; cursor: pointer; transition: border-color .12s; }
+  .scope-card:hover { border-color: #b3a0e8; }
+  .scope-card.selected { border-color: #6e56cf; background: #f8f6ff; }
+  .scope-card h4 { font-size: 0.88rem; font-weight: 700; margin-bottom: 0.2rem; }
+  .scope-card p { font-size: 0.68rem; color: #999; line-height: 1.4; }
+
+  /* Step 3 */
+  .wiz-label { font-size: 0.8rem; font-weight: 600; margin-bottom: 0.3rem; display: block; color: #333; }
+  .wiz-input { width: 100%; border: 1.5px solid #ddd; border-radius: 7px; padding: 0.65rem 0.9rem; font-size: 0.95rem; outline: none; }
+  .wiz-input:focus { border-color: #6e56cf; }
+  .wiz-hint { font-size: 0.73rem; color: #bbb; margin-top: 0.3rem; line-height: 1.5; }
+  .wiz-btn { width: 100%; padding: 0.72rem; background: #6e56cf; color: #fff; border: none; border-radius: 7px; font-size: 0.92rem; font-weight: 700; cursor: pointer; margin-top: 1rem; }
+  .wiz-btn:hover { background: #5a45b0; }
+  .wiz-back { background: none; border: none; color: #bbb; font-size: 0.78rem; cursor: pointer; margin-top: 0.6rem; display: block; text-align: center; }
+  .wiz-back:hover { color: #888; }
+
+  /* Success */
+  .success-screen { text-align: center; padding: 0.5rem 0; }
+  .success-screen h2 { font-size: 1.25rem; font-weight: 800; margin-bottom: 0.5rem; }
+  .success-screen p { color: #666; font-size: 0.88rem; margin-bottom: 1.5rem; line-height: 1.6; }
+  .notion-link-btn { display: inline-block; background: #6e56cf; color: #fff; padding: 0.7rem 1.5rem; border-radius: 7px; font-size: 0.92rem; font-weight: 700; text-decoration: none; }
+  .env-note { font-size: 0.73rem; color: #bbb; margin-top: 1rem; }
+  .env-note a { color: #6e56cf; }
+
+  /* Log panel */
+  .log-panel { margin-top: 1.25rem; background: #fafafa; border: 1px solid #eee; border-radius: 8px; padding: 0.85rem 1rem; max-height: 200px; overflow-y: auto; display: none; }
+  .log-panel.active { display: block; }
+  .log-panel-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #bbb; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.4rem; }
+  .log-spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid #d4caff; border-top-color: #6e56cf; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .log-item { font-size: 0.78rem; color: #666; padding: 0.15rem 0; font-family: monospace; line-height: 1.5; }
+  .log-item.done { color: #16a34a; }
+  .log-item.sub { color: #999; padding-left: 0.5rem; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Notion Pilot</div>
+  <button class="nav-deploy" onclick="openWizard()">Deploy to Notion</button>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">Telegram-powered · Self-hosted · MIT</div>
+  <h1>Identify a new lead,<br><span>send a message.</span></h1>
+  <p>Notion Pilot turns Telegram into a command center for your Notion workspace — leads, customers, contacts, ideas. Captured, enriched, and structured in seconds.</p>
+  <a href="#" class="hero-cta" onclick="openWizard(); return false;">Deploy to Notion</a>
+</div>
+
+<!-- LIVE EXAMPLES -->
+<div class="section">
+  <div class="section-label">See it in action</div>
+  <h2>Your CRM pipeline, enhanced with Telegram.</h2>
+  <p class="lead">Spot a lead at a conference, send a message — the contact lands in Notion, enriched and ready to work. No copy-paste, no manual data entry, no context switch.</p>
+
+  <div class="examples">
+    <div class="example">
+      <div class="example-in">
+        <div class="example-label">You send on Telegram</div>
+        <div class="tg-msg">/lead Jane Doe, CTO at Acme Corp — met at SaaStr</div>
+      </div>
+      <div class="example-arrow">→</div>
+      <div class="example-out">
+        <div class="example-label">People database in Notion</div>
+        <div class="notion-row">
+          <div class="row-title">Jane Doe — CTO, Acme Corp</div>
+          <div class="tags">
+            <span class="tag green">Apollo enriched</span><span class="tag">New Lead</span><span class="tag">SaaStr</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="example">
+      <div class="example-in">
+        <div class="example-label">You send on Telegram</div>
+        <div class="tg-msg">/company Acme Corp — Series B, 80 people, logistics software</div>
+      </div>
+      <div class="example-arrow">→</div>
+      <div class="example-out">
+        <div class="example-label">Companies database in Notion</div>
+        <div class="notion-row">
+          <div class="row-title">Acme Corp</div>
+          <div class="tags">
+            <span class="tag">Series B</span><span class="tag">Logistics</span><span class="tag green">80 employees</span><span class="tag">Prospect</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="example">
+      <div class="example-in">
+        <div class="example-label">You send on Telegram</div>
+        <div class="tg-msg">/deal Acme Corp — pilot 10 seats, Q3 close, €12k ARR</div>
+      </div>
+      <div class="example-arrow">→</div>
+      <div class="example-out">
+        <div class="example-label">Deals database in Notion</div>
+        <div class="notion-row">
+          <div class="row-title">Acme Corp — Pilot</div>
+          <div class="tags">
+            <span class="tag">€12k ARR</span><span class="tag">Q3 Close</span><span class="tag green">Qualified</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRODUCTS -->
+<div class="products-bg">
+  <div class="section">
+    <div class="section-label">Two products, one workspace</div>
+    <h2>Built for sales teams and knowledge workers.</h2>
+    <p class="lead">Notion Pilot deploys two independent products in your Notion. Use them from Telegram or directly in Notion — whichever fits your workflow.</p>
+    <div class="products">
+      <div class="product-card">
+        <h3>notion-crm</h3>
+        <p>A lightweight CRM for small sales teams (2–10 people). Manage your pipeline directly in Notion, or capture new contacts and deals on the go via Telegram commands.</p>
+        <ul class="product-features">
+          <li>People, Companies, Deals databases</li>
+          <li>Telegram: /lead /deal /company /enrich</li>
+          <li>Apollo.io + Brave Search enrichment</li>
+          <li>LLM field extraction from free-form messages</li>
+        </ul>
+      </div>
+      <div class="product-card">
+        <h3>notion-inbox</h3>
+        <p>A personal knowledge inbox. Manage your knowledge base in Notion, or send links, voice notes, and ideas from Telegram — they land structured and tagged automatically.</p>
+        <ul class="product-features">
+          <li>Knowledge, Ideas, Tools, Data &amp; Tech databases</li>
+          <li>Auto-detects GitHub, YouTube, arXiv, podcasts…</li>
+          <li>Voice-to-text via faster-whisper (on-device)</li>
+          <li>LLM enrichment via OpenRouter (optional)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<div class="section">
+  <div class="section-label">How it works</div>
+  <h2>Up and running in 3 steps.</h2>
+  <p class="lead">No webhooks, no cloud accounts, no third-party subscriptions. Connect Notion once and start working.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h4>Connect Notion</h4>
+      <p>Authorize once with your Notion account. We create all your databases inside a new workspace page.</p>
+    </div>
+    <div class="step-arrow">→</div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h4>Work in Notion</h4>
+      <p>Your CRM and knowledge base are live in Notion. Use them as you would any Notion database.</p>
+    </div>
+    <div class="step-arrow">→</div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h4>Capture via Telegram</h4>
+      <p>Optionally connect the Telegram bot to capture leads, ideas, and links on the go — without leaving your phone.</p>
+    </div>
+  </div>
+</div>
+
+<!-- WIZARD -->
+<div class="wizard-overlay" id="wizard" onclick="if(event.target===this) closeWizard()">
+  <div class="wizard-card">
+
+    <!-- Step 1: Connect Notion -->
+    <div id="step1">
+      <div class="progress">
+        <div class="progress-step active"></div>
+        <div class="progress-step"></div>
+        <div class="progress-step"></div>
+      </div>
+      <div class="wizard-header">
+        <h2>Connect your Notion</h2>
+        <p>Authorize Notion Pilot to create databases in your workspace. You'll be redirected to Notion to approve access.</p>
+      </div>
+      <button class="notion-btn" onclick="startOAuth()">
+        <span class="notion-n">N</span>
+        Connect with Notion
+      </button>
+      <div class="advanced-toggle" onclick="toggleAdvanced()">Already have an integration token? Use it instead</div>
+      <div class="advanced-section" id="advanced-section">
+        <label class="adv-label">Notion integration token</label>
+        <input class="adv-input" id="manual-token" type="password" placeholder="secret_...">
+        <div class="adv-hint">Create one at <a href="#">notion.so/my-integrations</a> — New integration → Internal → copy the token.</div>
+        <button class="wiz-btn" onclick="nextStep(2)" style="margin-top:0.75rem">Continue</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Choose scope -->
+    <div id="step2" style="display:none">
+      <div class="progress">
+        <div class="progress-step done"></div>
+        <div class="progress-step active"></div>
+        <div class="progress-step"></div>
+      </div>
+      <div class="wizard-header">
+        <h2>What do you want to deploy?</h2>
+        <p>You can always add the other product later.</p>
+      </div>
+      <div class="scope-cards">
+        <div class="scope-card selected" data-scope="both" onclick="selectScope(this)">
+          <h4>Full suite</h4>
+          <p>CRM + Knowledge Inbox</p>
+        </div>
+        <div class="scope-card" data-scope="crm" onclick="selectScope(this)">
+          <h4>CRM only</h4>
+          <p>People, Companies, Deals</p>
+        </div>
+        <div class="scope-card" data-scope="inbox" onclick="selectScope(this)">
+          <h4>Inbox only</h4>
+          <p>Links, Voice, Ideas</p>
+        </div>
+      </div>
+      <button class="wiz-btn" onclick="nextStep(3)">Continue</button>
+      <button class="wiz-back" onclick="nextStep(1)">← Back</button>
+    </div>
+
+    <!-- Step 3: Name workspace -->
+    <div id="step3" style="display:none">
+      <div class="progress">
+        <div class="progress-step done"></div>
+        <div class="progress-step done"></div>
+        <div class="progress-step active"></div>
+      </div>
+      <div class="wizard-header">
+        <h2>Name your workspace</h2>
+        <p>We'll create a Notion page with this name and set everything up inside it.</p>
+      </div>
+      <div id="step3-form">
+        <label class="wiz-label">Workspace name</label>
+        <input class="wiz-input" id="workspace-name" type="text" value="Notion Pilot" placeholder="e.g. My Team Workspace">
+        <div class="wiz-hint">A new page will be created in your Notion. You can rename it anytime.</div>
+        <button class="wiz-btn" id="setup-btn" onclick="doSetup()">Create workspace</button>
+        <button class="wiz-back" onclick="nextStep(2)">← Back</button>
+      </div>
+      <div id="log-panel" class="log-panel">
+        <div class="log-panel-title"><span class="log-spinner" id="log-spinner"></span> Setting up your workspace…</div>
+        <div id="log-list"></div>
+      </div>
+    </div>
+
+    <!-- Success -->
+    <div id="step-success" style="display:none">
+      <div class="success-screen">
+        <h2>Your workspace is ready.</h2>
+        <p>Your Notion databases have been created. Open your workspace to get started.</p>
+        <a href="#" id="notion-open-link" class="notion-link-btn">Open in Notion</a>
+        <div class="env-note">Want to set up the Telegram bot? See the <a href="#">setup guide</a>.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function openWizard() { document.getElementById('wizard').classList.add('active'); }
+function closeWizard() { document.getElementById('wizard').classList.remove('active'); }
+
+function nextStep(n) {
+  ['step1','step2','step3','step-success'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+  document.getElementById('step' + n).style.display = 'block';
+}
+
+function toggleAdvanced() {
+  document.getElementById('advanced-section').classList.toggle('open');
+}
+
+function selectScope(el) {
+  document.querySelectorAll('.scope-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function startOAuth() {
+  sessionStorage.setItem('wizardPending', '1');
+  window.location.href = '/auth/notion';
+}
+
+function getSelectedScope() {
+  const selected = document.querySelector('.scope-card.selected');
+  return selected ? selected.dataset.scope : 'both';
+}
+
+function appendLog(message) {
+  const list = document.getElementById('log-list');
+  const item = document.createElement('div');
+  item.className = 'log-item' + (message.startsWith('✓') ? ' done' : message.startsWith('  →') ? ' sub' : '');
+  item.textContent = message;
+  list.appendChild(item);
+  list.scrollTop = list.scrollHeight;
+}
+
+function showLogPanel() {
+  document.getElementById('step3-form').style.display = 'none';
+  document.getElementById('log-panel').classList.add('active');
+}
+
+function hideLogSpinner() {
+  const s = document.getElementById('log-spinner');
+  if (s) s.style.display = 'none';
+}
+
+async function doSetup() {
+  const workspaceName = document.getElementById('workspace-name').value.trim() || 'Notion Pilot';
+  const scope = getSelectedScope();
+  const manualToken = document.getElementById('manual-token')?.value.trim();
+  const body = { scope, workspace_name: workspaceName };
+  if (manualToken) body.notion_token = manualToken;
+
+  showLogPanel();
+  document.getElementById('log-list').innerHTML = '';
+
+  try {
+    const r = await fetch('/api/setup/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      hideLogSpinner();
+      showSetupError(data.detail || 'Setup failed.');
+      document.getElementById('step3-form').style.display = 'block';
+      document.getElementById('log-panel').classList.remove('active');
+      return;
+    }
+
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const chunks = buffer.split('\n\n');
+      buffer = chunks.pop();
+      for (const chunk of chunks) {
+        const line = chunk.trim();
+        if (!line.startsWith('data: ')) continue;
+        let event;
+        try { event = JSON.parse(line.slice(6)); } catch { continue; }
+        if (event.type === 'log') {
+          appendLog(event.message);
+        } else if (event.type === 'done') {
+          hideLogSpinner();
+          appendLog('✓ All done!');
+          document.getElementById('notion-open-link').href = event.url;
+          setTimeout(() => {
+            ['step1','step2','step3'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+            document.getElementById('step-success').style.display = 'block';
+          }, 600);
+          return;
+        } else if (event.type === 'error') {
+          hideLogSpinner();
+          appendLog('✗ ' + event.message);
+          showSetupError(event.message);
+          setTimeout(() => {
+            document.getElementById('step3-form').style.display = 'block';
+            document.getElementById('log-panel').classList.remove('active');
+          }, 2000);
+          return;
+        }
+      }
+    }
+  } catch (e) {
+    hideLogSpinner();
+    showSetupError('Network error: ' + e.message);
+    document.getElementById('step3-form').style.display = 'block';
+    document.getElementById('log-panel').classList.remove('active');
+  }
+}
+
+function showSetupError(msg) {
+  let el = document.getElementById('setup-error');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'setup-error';
+    el.style.cssText = 'margin-top:0.75rem;padding:0.6rem 0.8rem;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;font-size:0.82rem;';
+    document.getElementById('step3-form').appendChild(el);
+  }
+  el.textContent = msg;
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('connected') === '1' || sessionStorage.getItem('wizardPending') === '1') {
+    sessionStorage.removeItem('wizardPending');
+    openWizard();
+    nextStep(2);
+    history.replaceState({}, '', '/');
+  }
+});
+</script>
+</body>
+</html>

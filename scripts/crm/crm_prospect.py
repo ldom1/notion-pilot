@@ -12,9 +12,9 @@ import asyncio
 from loguru import logger
 from notion_client import AsyncClient
 
-from notion_pilot.shared.config import load_settings
 from notion_pilot.crm.prospection import rank_contacts
 from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer
+from notion_pilot.shared.config import load_settings
 
 
 async def run(pitch: str, top_k: int) -> None:
