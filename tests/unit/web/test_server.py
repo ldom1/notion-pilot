@@ -1,7 +1,6 @@
 # tests/unit/web/test_server.py
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 
