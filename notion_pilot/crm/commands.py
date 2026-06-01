@@ -29,6 +29,12 @@ class CommandDef:
     handler: Callable[[dict[str, str], Settings], Awaitable[str]]
 
 
+def _notion_token(settings: Settings) -> str:
+    if settings.notion_token is None:
+        raise ValueError("NOTION_TOKEN is required for CRM commands")
+    return settings.notion_token.get_secret_value()
+
+
 # ── Handlers ──────────────────────────────────────────────────────────────────
 
 
@@ -37,8 +43,7 @@ async def _handle_people(collected: dict[str, str], settings: Settings) -> str:
 
     from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
 
-    token = settings.notion_token.get_secret_value()
-    client = AsyncClient(auth=token)
+    client = AsyncClient(auth=_notion_token(settings))
     company_syncer = NotionCompanySyncer(client, settings.notion_companies_data_source_id or "")
     people_syncer = NotionPeopleSyncer(
         client, settings.notion_people_data_source_id or "", company_syncer
@@ -63,7 +68,7 @@ async def _handle_company(collected: dict[str, str], settings: Settings) -> str:
 
     from notion_pilot.crm.syncer import NotionCompanySyncer
 
-    client = AsyncClient(auth=settings.notion_token.get_secret_value())
+    client = AsyncClient(auth=_notion_token(settings))
     syncer = NotionCompanySyncer(client, settings.notion_companies_data_source_id or "")
     await syncer.load_snapshot()
     page_id = await syncer.get_or_create(collected["name"])
@@ -79,9 +84,7 @@ async def _handle_deal(collected: dict[str, str], settings: Settings) -> str:
         return "⚠ NOTION_DEALS_DATABASE_ID not set — cannot create deal."
 
     async with _httpx.AsyncClient() as http:
-        syncer = NotionDealsSyncer(
-            http, settings.notion_token.get_secret_value(), settings.notion_deals_database_id
-        )
+        syncer = NotionDealsSyncer(http, _notion_token(settings), settings.notion_deals_database_id)
         deal = DealRecord(
             title=collected["title"],
             stage=collected.get("stage", "Prospect"),

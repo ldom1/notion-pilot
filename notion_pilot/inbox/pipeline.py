@@ -21,6 +21,8 @@ def build_pipeline(
     log_label: str,
 ) -> MessageHandler:
     """Return a MessageHandler that writes to ``database_id`` using ``extract``."""
+    if settings.notion_token is None:
+        raise ValueError("NOTION_TOKEN is required for Notion writes")
     notion_client = NotionClient(auth=settings.notion_token.get_secret_value())
     writer = NotionDatabaseWriter(client=notion_client, database_id=database_id)
 

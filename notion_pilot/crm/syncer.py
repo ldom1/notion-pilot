@@ -1,7 +1,7 @@
 """Notion People and Company syncers with fuzzy dedup."""
 
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal, cast
 
 import httpx
 from loguru import logger
@@ -58,7 +58,7 @@ class NotionCompanySyncer:
     async def _detect_api(self) -> None:
         """Probe once to determine whether to use standard databases or data_sources API."""
         try:
-            await self._client.databases.retrieve(self._ds_id)  # type: ignore[arg-type]
+            await self._client.databases.retrieve(self._ds_id)
             self._standard_api = True
             logger.debug("Companies {}: using standard databases API", self._ds_id[:8])
         except Exception:  # noqa: BLE001
@@ -72,7 +72,7 @@ class NotionCompanySyncer:
             "Content-Type": "application/json",
         }
 
-    async def _query_page(self, cursor: str | None) -> dict:
+    async def _query_page(self, cursor: str | None) -> dict[str, Any]:
         if self._standard_api:
             body: dict[str, object] = {"page_size": 100}
             if cursor:
@@ -82,11 +82,11 @@ class NotionCompanySyncer:
                     f"https://api.notion.com/v1/databases/{self._ds_id}/query", json=body
                 )
                 r.raise_for_status()
-                return r.json()  # type: ignore[return-value]
-        kw: dict[str, object] = {"data_source_id": self._ds_id, "page_size": 100}
+                return cast(dict[str, Any], r.json())
+        kw: dict[str, Any] = {"page_size": 100}
         if cursor:
             kw["start_cursor"] = cursor
-        return await self._client.data_sources.query(**kw)  # type: ignore[return-value]
+        return cast(dict[str, Any], await self._client.data_sources.query(self._ds_id, **kw))
 
     async def load_snapshot(self) -> None:
         if self._standard_api is None:
@@ -169,7 +169,7 @@ class NotionPeopleSyncer:
     def _standard_api(self) -> bool:
         return bool(self._company_syncer._standard_api)
 
-    async def _query_page(self, cursor: str | None) -> dict:
+    async def _query_page(self, cursor: str | None) -> dict[str, Any]:
         if self._standard_api:
             body: dict[str, object] = {"page_size": 100}
             if cursor:
@@ -181,11 +181,11 @@ class NotionPeopleSyncer:
                     f"https://api.notion.com/v1/databases/{self._ds_id}/query", json=body
                 )
                 r.raise_for_status()
-                return r.json()  # type: ignore[return-value]
-        kw: dict[str, object] = {"data_source_id": self._ds_id, "page_size": 100}
+                return cast(dict[str, Any], r.json())
+        kw: dict[str, Any] = {"page_size": 100}
         if cursor:
             kw["start_cursor"] = cursor
-        return await self._client.data_sources.query(**kw)  # type: ignore[return-value]
+        return cast(dict[str, Any], await self._client.data_sources.query(self._ds_id, **kw))
 
     async def load_snapshot(self) -> None:
         """Load all existing people into memory. Call after company_syncer.load_snapshot()."""

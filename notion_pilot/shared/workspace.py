@@ -10,24 +10,25 @@ from loguru import logger
 
 NOTION_VERSION = "2022-06-28"
 NOTION_API = "https://api.notion.com/v1"
+type JsonDict = dict[str, Any]
 
 
 # --- block helpers ---
 
 
-def _rt(content: str) -> list[dict]:
+def _rt(content: str) -> list[JsonDict]:
     return [{"type": "text", "text": {"content": content}}]
 
 
-def _paragraph(content: str) -> dict:
+def _paragraph(content: str) -> JsonDict:
     return {"object": "block", "type": "paragraph", "paragraph": {"rich_text": _rt(content)}}
 
 
-def _h2(content: str) -> dict:
+def _h2(content: str) -> JsonDict:
     return {"object": "block", "type": "heading_2", "heading_2": {"rich_text": _rt(content)}}
 
 
-def _callout(content: str, emoji: str = "💡") -> dict:
+def _callout(content: str, emoji: str = "💡") -> JsonDict:
     return {
         "object": "block",
         "type": "callout",
@@ -38,7 +39,7 @@ def _callout(content: str, emoji: str = "💡") -> dict:
     }
 
 
-def _bullet(content: str) -> dict:
+def _bullet(content: str) -> JsonDict:
     return {
         "object": "block",
         "type": "bulleted_list_item",
@@ -46,7 +47,7 @@ def _bullet(content: str) -> dict:
     }
 
 
-def _numbered(content: str) -> dict:
+def _numbered(content: str) -> JsonDict:
     return {
         "object": "block",
         "type": "numbered_list_item",
@@ -56,7 +57,7 @@ def _numbered(content: str) -> dict:
 
 # --- page content blocks ---
 
-_ROOT_CHILDREN = [
+_ROOT_CHILDREN: list[JsonDict] = [
     _paragraph("Your Notion business brain, piloted by Telegram."),
     _callout(
         "👋 First time? Try: /lead TechCorp — Notion Pilot will create a company and ask you for the details.",
@@ -73,7 +74,7 @@ _ROOT_CHILDREN = [
     _bullet("/knowledge — Search your knowledge base"),
 ]
 
-_CRM_CHILDREN = [
+_CRM_CHILDREN: list[JsonDict] = [
     _callout(
         "Start with a Company → add People → track Deals → /enrich to auto-fill details.",
         "🏢",
@@ -89,7 +90,7 @@ _CRM_CHILDREN = [
     ),
 ]
 
-_KNOWLEDGE_CHILDREN = [
+_KNOWLEDGE_CHILDREN: list[JsonDict] = [
     _callout(
         "Forward any message to the bot, or use /notion to save a link, /idea to capture a thought.",
         "📚",
@@ -104,7 +105,7 @@ _KNOWLEDGE_CHILDREN = [
 
 # --- demo data ---
 
-_DEMO_COMPANIES = [
+_DEMO_COMPANIES: list[JsonDict] = [
     {
         "name": "TechCorp",
         "sector": "Software",
@@ -182,7 +183,7 @@ _DEMO_COMPANIES = [
     },
 ]
 
-_DEMO_PEOPLE = [
+_DEMO_PEOPLE: list[JsonDict] = [
     {
         "name": "Alice Martin",
         "company": "TechCorp",
@@ -290,7 +291,7 @@ _DEMO_PEOPLE = [
     },
 ]
 
-_DEMO_DEALS = [
+_DEMO_DEALS: list[JsonDict] = [
     {
         "name": "ERP Integration — TechCorp",
         "company": "TechCorp",
@@ -363,7 +364,7 @@ _DEMO_DEALS = [
     },
 ]
 
-_DEMO_NOTIONS = [
+_DEMO_NOTIONS: list[JsonDict] = [
     {
         "name": "The future of AI agents in enterprise software",
         "url": "https://a16z.com/ai-agents-enterprise",
@@ -411,7 +412,7 @@ _DEMO_NOTIONS = [
     },
 ]
 
-_DEMO_IDEAS = [
+_DEMO_IDEAS: list[JsonDict] = [
     {
         "name": "Weekly AI digest bot — auto-curate from Telegram & email",
         "description": "Monitor key channels and compile a weekly digest with LLM summaries",
@@ -442,7 +443,7 @@ _DEMO_IDEAS = [
     },
 ]
 
-_DEMO_TOOLS = [
+_DEMO_TOOLS: list[JsonDict] = [
     {
         "name": "Apollo.io",
         "url": "https://apollo.io",
@@ -485,7 +486,7 @@ _DEMO_TOOLS = [
     },
 ]
 
-_DEMO_DATA_TECH = [
+_DEMO_DATA_TECH: list[JsonDict] = [
     {
         "name": "LLM-based entity extraction from unstructured text",
         "url": "https://arxiv.org/abs/2305.07975",
@@ -556,7 +557,7 @@ async def _create_page(
     parent_page_id: str,
     title: str,
     emoji: str,
-    children: list[dict] | None = None,
+    children: list[JsonDict] | None = None,
 ) -> str:
     body: dict[str, Any] = {
         "parent": {"type": "page_id", "page_id": parent_page_id},
