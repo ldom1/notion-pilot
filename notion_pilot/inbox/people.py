@@ -1,10 +1,10 @@
 """Contact pipeline → Notion people database."""
 
+from notion_pilot.inbox.pipeline import build_pipeline
 from notion_pilot.shared.adapters import MessageHandler
 from notion_pilot.shared.config import Settings
 from notion_pilot.shared.models import IncomingMessage, PersonContactProperties
 from notion_pilot.shared.notion import NotionDatabaseWriter
-from notion_pilot.inbox.pipeline import build_pipeline
 
 
 async def _write_contact(

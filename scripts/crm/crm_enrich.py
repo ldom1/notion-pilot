@@ -16,8 +16,8 @@ from pathlib import Path
 from loguru import logger
 from notion_client import AsyncClient
 
-from notion_pilot.shared.config import load_settings
 from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer
+from notion_pilot.shared.config import load_settings
 from notion_pilot.shared.utils.enrichment import enrich_company, enrich_person
 
 _RATE_LIMIT_S = 0.4  # seconds between Notion writes to stay under rate limit
@@ -176,7 +176,7 @@ async def enrich_people(limit: int, dry_run: bool, report_dir: Path) -> None:
 
         props: dict[str, object] = {}
         if enrichment.email and not candidate.get("email"):
-            props["E-mail pro"] = {"email": enrichment.email}
+            props["Email - pro"] = {"email": enrichment.email}
         if enrichment.phone and not candidate.get("phone"):
             props["Phone"] = {"phone_number": enrichment.phone}
         if enrichment.seniority and not candidate.get("seniority"):

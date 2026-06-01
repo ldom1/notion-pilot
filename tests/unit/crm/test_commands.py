@@ -3,7 +3,6 @@
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from notion_pilot.shared.config import Settings
 from notion_pilot.crm.commands import (
     COMMANDS,
     CommandDef,
@@ -11,6 +10,7 @@ from notion_pilot.crm.commands import (
     get_next_prompt,
 )
 from notion_pilot.crm.conv_state import ConvState
+from notion_pilot.shared.config import Settings
 
 _SETTINGS = dict(notion_token="t", notion_database_id="d", openrouter_api_key="ok")
 
