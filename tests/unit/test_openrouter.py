@@ -15,7 +15,7 @@ def _settings(api_key: str | None = "sk-test") -> Settings:
     return Settings(
         telegram_bot_token=SecretStr("tg-test"),
         notion_token=SecretStr("notion-test"),
-        notion_database_id="db-test",
+        notion_telegram_msg_database_id="db-test",
         openrouter_api_key=SecretStr(api_key) if api_key else None,
     )
 

@@ -3,7 +3,7 @@
 Required env vars (.env):
     IMAP_HOST, IMAP_USER, IMAP_PASSWORD
     IMAP_ALLOWED_SENDERS  (comma-separated, e.g. "alice@example.com,@mycompany.com")
-    NOTION_TOKEN, NOTION_DATABASE_ID
+    NOTION_TOKEN, NOTION_TELEGRAM_MSG_DATABASE_ID
     OPENROUTER_API_KEY
 
 Run with:

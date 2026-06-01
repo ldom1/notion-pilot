@@ -12,7 +12,7 @@ from notion_pilot.crm.commands import (
 from notion_pilot.crm.conv_state import ConvState
 from notion_pilot.shared.config import Settings
 
-_SETTINGS = dict(notion_token="t", notion_database_id="d", openrouter_api_key="ok")
+_SETTINGS = dict(notion_token="t", notion_telegram_msg_database_id="d", openrouter_api_key="ok")
 
 
 def test_all_commands_defined():

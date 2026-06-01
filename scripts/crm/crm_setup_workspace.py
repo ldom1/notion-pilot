@@ -60,7 +60,7 @@ async def main(parent_id: str, page_title: str, with_inbox: bool) -> None:
             inbox = await create_inbox_workspace(client, parent_id)
             logger.info("")
             logger.info("✅  Knowledge workspace ready — add to .env:")
-            logger.info("  NOTION_DATABASE_ID={}", inbox.notions_id)
+            logger.info("  NOTION_TELEGRAM_MSG_DATABASE_ID={}", inbox.notions_id)
             logger.info("  NOTION_IDEAS_DATABASE_ID={}", inbox.ideas_id)
             logger.info("  NOTION_TOOLS_DATABASE_ID={}", inbox.tools_id)
             logger.info("  NOTION_DATA_TECH_DATABASE_ID={}", inbox.data_tech_id)

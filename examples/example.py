@@ -36,7 +36,9 @@ async def main() -> None:
 
     # Step 3 — Write a page to the Notion database.
     client = NotionClient(auth=settings.notion_token.get_secret_value())
-    writer = NotionDatabaseWriter(client=client, database_id=settings.notion_database_id)
+    writer = NotionDatabaseWriter(
+        client=client, database_id=settings.notion_telegram_msg_database_id
+    )
     page_id = await writer.create_page(properties)
     logger.info(f"[3/3] Notion page created: {page_id}")
 

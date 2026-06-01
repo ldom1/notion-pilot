@@ -64,7 +64,7 @@ Open `http://localhost:8080`, click **Deploy to Notion**, authorize with your No
 | Variable | Description |
 |----------|-------------|
 | `NOTION_TOKEN` | Your Notion integration token |
-| `NOTION_DATABASE_ID` | Notions (knowledge) database |
+| `NOTION_TELEGRAM_MSG_DATABASE_ID` | DomTelegramBot / Notions (knowledge) database |
 | `NOTION_IDEAS_DATABASE_ID` | Ideas database |
 | `NOTION_TOOLS_DATABASE_ID` | Tools database |
 | `NOTION_DATA_TECH_DATABASE_ID` | Data & Technology database |
@@ -95,7 +95,7 @@ Voice notes? Same thing — transcribed first, then enriched.
 
 ```bash
 git clone https://github.com/ldom1/notion-pilot && cd notion-pilot
-cp .env.example .env   # fill in TELEGRAM_BOT_TOKEN, NOTION_TOKEN, NOTION_DATABASE_ID
+cp .env.example .env   # fill in TELEGRAM_BOT_TOKEN, NOTION_TOKEN, NOTION_TELEGRAM_MSG_DATABASE_ID
 uv sync
 uv run python -m notion_pilot
 ```

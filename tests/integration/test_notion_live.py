@@ -30,7 +30,9 @@ def settings():
 @pytest.fixture
 async def writer(settings):
     client = AsyncClient(auth=settings.notion_token.get_secret_value())
-    yield NotionDatabaseWriter(client=client, database_id=settings.notion_database_id)
+    yield NotionDatabaseWriter(
+        client=client, database_id=settings.notion_telegram_msg_database_id
+    )
     await client.aclose()
 
 
@@ -99,7 +101,9 @@ async def test_end_to_end_like_example(settings):
     Validates that the README's 3-step promise actually works end-to-end.
     """
     client = AsyncClient(auth=settings.notion_token.get_secret_value())
-    writer = NotionDatabaseWriter(client=client, database_id=settings.notion_database_id)
+    writer = NotionDatabaseWriter(
+        client=client, database_id=settings.notion_telegram_msg_database_id
+    )
     try:
         # Step 1 — same message as examples/example.py
         incoming = IncomingMessage(
@@ -154,7 +158,7 @@ async def test_audio_fixture_from_data(writer, settings):
         assert fetched["archived"] is False
         assert fetched["parent"]["database_id"].replace(
             "-", ""
-        ) == settings.notion_database_id.replace("-", "")
+        ) == settings.notion_telegram_msg_database_id.replace("-", "")
     finally:
         await writer.delete_page(page_id)
         archived = await writer.client.pages.retrieve(page_id)

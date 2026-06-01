@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `scripts/inbox/process_promotions.py` — batch Promotions folder → DomTelegramBot DB (dry-run, CSV review, dedup, `--from-csv`)
+- Config: `IMAP_PROMOTIONS_FOLDER`, `IMAP_SINCE_DAYS`; email bodies fall back to stripped HTML
+- Promotions review CSV: one-line summaries; `decision` = `Untouched` | `Treated and archived` | `Auto archived`
+- `IMAP_AUTO_ARCHIVE_SENDERS` — archive without Notion (defaults include Medium admin senders; add Vivino etc.)
+- Promotions live run: archive immediately after each Notion write (exact `IMAP_ARCHIVE` folder name)
+- `scripts/inbox/process_promotions.py --limit=N` — process only the N newest messages (smoke test)
 - Landing page: full marketing page with hero, CRM pipeline examples, two-product section, and how-it-works
 - Notion OAuth deploy wizard: 3-step wizard (Connect → Choose scope → Name workspace) accessed from "Deploy to Notion" button
 - `create_workspace_root_page` in `workspace.py`: creates a named page at Notion workspace root
@@ -20,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `notion_pilot/shared/workspace.py` — shared workspace creation module (CRM + 4 Knowledge DBs)
 - `web/server.py`, `web/auth.py`, `web/static/index.html` — FastAPI setup server with Notion OAuth
 - Config: `NOTION_IDEAS_DATABASE_ID`, `NOTION_TOOLS_DATABASE_ID`, `NOTION_DATA_TECH_DATABASE_ID`
+
+### Changed
+- `NOTION_DATABASE_ID` renamed to `NOTION_TELEGRAM_MSG_DATABASE_ID` (`NOTION_DATABASE_ID` still accepted)
 - README `🚀 Quick Start` section covering all three setup options
 - `crm/` package: `NotionPeopleSyncer`, `NotionCompanySyncer`, fuzzy dedup (`rapidfuzz`), Brave Search email enrichment
 - `scripts/import_linkedin.py`: batch import of LinkedIn `Connections.csv` into Notion People database
