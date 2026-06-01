@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from notion_pilot.inbox.knowledge import process_message
 from notion_pilot.shared.config import Settings
 from notion_pilot.shared.models import IncomingMessage, MediaType, NotionDatabaseProperties
-from notion_pilot.inbox.knowledge import process_message
 
 
 def _make_incoming() -> IncomingMessage:

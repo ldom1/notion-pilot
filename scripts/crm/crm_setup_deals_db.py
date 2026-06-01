@@ -14,7 +14,7 @@ from loguru import logger
 load_dotenv()
 
 DEALS_ID = "4890e1d6-178d-4a42-af06-7bbe0cef09fe"
-NOTION_VERSION = "2026-03-11"
+NOTION_VERSION = "2022-06-28"
 NOTION_API = "https://api.notion.com/v1"
 
 COMPANIES_ID = os.environ.get("NOTION_COMPANIES_DATA_SOURCE_ID", "")

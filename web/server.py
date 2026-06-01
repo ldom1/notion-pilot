@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import json as _json
 import pathlib
 import secrets
-from typing import Literal
+from typing import AsyncGenerator, Literal
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from loguru import logger
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -21,7 +23,7 @@ from notion_pilot.shared.workspace import (
 )
 from web.oauth import build_authorize_url, exchange_code_for_token
 
-_NOTION_VERSION = "2026-03-11"
+_NOTION_VERSION = "2022-06-28"
 
 
 class SetupRequest(BaseModel):
@@ -112,6 +114,63 @@ def create_app(settings: Settings) -> FastAPI:
             )
         return SetupResponse(notion_page_url=_notion_page_url(root_page_id))
 
+    @app.post("/api/setup/stream")
+    async def run_setup_stream(req: SetupRequest, request: Request) -> StreamingResponse:
+        token = req.notion_token or request.session.get("notion_token")
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not connected to Notion. Please authorize via /auth/notion first.",
+            )
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Notion-Version": _NOTION_VERSION,
+            "Content-Type": "application/json",
+        }
+
+        async def _generate() -> AsyncGenerator[str, None]:
+            def sse(msg_type: str, **kwargs: object) -> str:
+                return f"data: {_json.dumps({'type': msg_type, **kwargs})}\n\n"
+
+            try:
+                async with httpx.AsyncClient(headers=headers, timeout=120) as client:
+                    yield sse("log", message="Creating root page…")
+                    root_page_id = await create_workspace_root_page(client, req.workspace_name)
+                    yield sse("log", message="✓ Root page created")
+
+                    if req.scope in ("crm", "both"):
+                        yield sse("log", message="Creating CRM page…")
+                        yield sse("log", message="  → Companies database")
+                        yield sse("log", message="  → People database")
+                        yield sse("log", message="  → Deals database")
+                        await create_crm_workspace(client, root_page_id)
+                        yield sse("log", message="✓ CRM ready (with demo data)")
+
+                    if req.scope in ("inbox", "both"):
+                        yield sse("log", message="Creating Knowledge page…")
+                        yield sse("log", message="  → Notions database")
+                        yield sse("log", message="  → Ideas database")
+                        yield sse("log", message="  → Tools database")
+                        yield sse("log", message="  → Data & Technology database")
+                        await create_inbox_workspace(client, root_page_id)
+                        yield sse("log", message="✓ Knowledge ready (with demo data)")
+
+                    yield sse("done", url=_notion_page_url(root_page_id))
+            except httpx.HTTPStatusError as exc:
+                logger.error(
+                    "workspace setup failed: {} {}", exc.response.status_code, exc.response.text
+                )
+                yield sse("error", message=f"Notion API error: {exc.response.text}")
+            except Exception as exc:
+                logger.error("workspace setup failed: {}", exc)
+                yield sse("error", message=str(exc))
+
+        return StreamingResponse(
+            _generate(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
     _static = pathlib.Path(__file__).parent / "static"
     if _static.exists():
         app.mount("/static", StaticFiles(directory=str(_static)), name="static")
@@ -126,4 +185,5 @@ def create_app(settings: Settings) -> FastAPI:
 def app_factory() -> FastAPI:
     """Factory for uvicorn --factory mode."""
     from notion_pilot.shared.config import load_settings
+
     return create_app(load_settings())

@@ -79,7 +79,7 @@
   /* WIZARD */
   .wizard-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: center; justify-content: center; }
   .wizard-overlay.active { display: flex; }
-  .wizard-card { background: #fff; border-radius: 14px; padding: 2rem; width: 100%; max-width: 460px; box-shadow: 0 20px 60px rgba(0,0,0,.18); }
+  .wizard-card { background: #fff; border-radius: 14px; padding: 2.5rem; width: 100%; max-width: 600px; box-shadow: 0 20px 60px rgba(0,0,0,.18); }
   .wizard-header { margin-bottom: 1.5rem; }
   .wizard-header h2 { font-size: 1.25rem; font-weight: 800; }
   .wizard-header p { font-size: 0.83rem; color: #888; margin-top: 0.25rem; line-height: 1.5; }
@@ -127,6 +127,16 @@
   .notion-link-btn { display: inline-block; background: #6e56cf; color: #fff; padding: 0.7rem 1.5rem; border-radius: 7px; font-size: 0.92rem; font-weight: 700; text-decoration: none; }
   .env-note { font-size: 0.73rem; color: #bbb; margin-top: 1rem; }
   .env-note a { color: #6e56cf; }
+
+  /* Log panel */
+  .log-panel { margin-top: 1.25rem; background: #fafafa; border: 1px solid #eee; border-radius: 8px; padding: 0.85rem 1rem; max-height: 200px; overflow-y: auto; display: none; }
+  .log-panel.active { display: block; }
+  .log-panel-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #bbb; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.4rem; }
+  .log-spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid #d4caff; border-top-color: #6e56cf; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .log-item { font-size: 0.78rem; color: #666; padding: 0.15rem 0; font-family: monospace; line-height: 1.5; }
+  .log-item.done { color: #16a34a; }
+  .log-item.sub { color: #999; padding-left: 0.5rem; }
 </style>
 </head>
 <body>
@@ -330,11 +340,17 @@
         <h2>Name your workspace</h2>
         <p>We'll create a Notion page with this name and set everything up inside it.</p>
       </div>
-      <label class="wiz-label">Workspace name</label>
-      <input class="wiz-input" id="workspace-name" type="text" value="Notion Pilot" placeholder="e.g. My Team Workspace">
-      <div class="wiz-hint">A new page will be created in your Notion. You can rename it anytime.</div>
-      <button class="wiz-btn" id="setup-btn" onclick="doSetup()">Create workspace</button>
-      <button class="wiz-back" onclick="nextStep(2)">← Back</button>
+      <div id="step3-form">
+        <label class="wiz-label">Workspace name</label>
+        <input class="wiz-input" id="workspace-name" type="text" value="Notion Pilot" placeholder="e.g. My Team Workspace">
+        <div class="wiz-hint">A new page will be created in your Notion. You can rename it anytime.</div>
+        <button class="wiz-btn" id="setup-btn" onclick="doSetup()">Create workspace</button>
+        <button class="wiz-back" onclick="nextStep(2)">← Back</button>
+      </div>
+      <div id="log-panel" class="log-panel">
+        <div class="log-panel-title"><span class="log-spinner" id="log-spinner"></span> Setting up your workspace…</div>
+        <div id="log-list"></div>
+      </div>
     </div>
 
     <!-- Success -->
@@ -380,37 +396,94 @@ function getSelectedScope() {
   return selected ? selected.dataset.scope : 'both';
 }
 
+function appendLog(message) {
+  const list = document.getElementById('log-list');
+  const item = document.createElement('div');
+  item.className = 'log-item' + (message.startsWith('✓') ? ' done' : message.startsWith('  →') ? ' sub' : '');
+  item.textContent = message;
+  list.appendChild(item);
+  list.scrollTop = list.scrollHeight;
+}
+
+function showLogPanel() {
+  document.getElementById('step3-form').style.display = 'none';
+  document.getElementById('log-panel').classList.add('active');
+}
+
+function hideLogSpinner() {
+  const s = document.getElementById('log-spinner');
+  if (s) s.style.display = 'none';
+}
+
 async function doSetup() {
-  const btn = document.getElementById('setup-btn');
-  btn.disabled = true;
-  btn.textContent = 'Creating workspace…';
   const workspaceName = document.getElementById('workspace-name').value.trim() || 'Notion Pilot';
   const scope = getSelectedScope();
   const manualToken = document.getElementById('manual-token')?.value.trim();
   const body = { scope, workspace_name: workspaceName };
   if (manualToken) body.notion_token = manualToken;
 
+  showLogPanel();
+  document.getElementById('log-list').innerHTML = '';
+
   try {
-    const r = await fetch('/api/setup', {
+    const r = await fetch('/api/setup/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    const data = await r.json();
+
     if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      hideLogSpinner();
       showSetupError(data.detail || 'Setup failed.');
+      document.getElementById('step3-form').style.display = 'block';
+      document.getElementById('log-panel').classList.remove('active');
       return;
     }
-    document.getElementById('notion-open-link').href = data.notion_page_url;
-    ['step1','step2','step3'].forEach(id => {
-      document.getElementById(id).style.display = 'none';
-    });
-    document.getElementById('step-success').style.display = 'block';
+
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const chunks = buffer.split('\n\n');
+      buffer = chunks.pop();
+      for (const chunk of chunks) {
+        const line = chunk.trim();
+        if (!line.startsWith('data: ')) continue;
+        let event;
+        try { event = JSON.parse(line.slice(6)); } catch { continue; }
+        if (event.type === 'log') {
+          appendLog(event.message);
+        } else if (event.type === 'done') {
+          hideLogSpinner();
+          appendLog('✓ All done!');
+          document.getElementById('notion-open-link').href = event.url;
+          setTimeout(() => {
+            ['step1','step2','step3'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+            document.getElementById('step-success').style.display = 'block';
+          }, 600);
+          return;
+        } else if (event.type === 'error') {
+          hideLogSpinner();
+          appendLog('✗ ' + event.message);
+          showSetupError(event.message);
+          setTimeout(() => {
+            document.getElementById('step3-form').style.display = 'block';
+            document.getElementById('log-panel').classList.remove('active');
+          }, 2000);
+          return;
+        }
+      }
+    }
   } catch (e) {
+    hideLogSpinner();
     showSetupError('Network error: ' + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Create workspace';
+    document.getElementById('step3-form').style.display = 'block';
+    document.getElementById('log-panel').classList.remove('active');
   }
 }
 
@@ -420,7 +493,7 @@ function showSetupError(msg) {
     el = document.createElement('div');
     el.id = 'setup-error';
     el.style.cssText = 'margin-top:0.75rem;padding:0.6rem 0.8rem;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;font-size:0.82rem;';
-    document.getElementById('step3').appendChild(el);
+    document.getElementById('step3-form').appendChild(el);
   }
   el.textContent = msg;
 }

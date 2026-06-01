@@ -1,5 +1,6 @@
 # tests/unit/web/test_auth.py
 import pytest
+
 from web.auth import create_access_token, hash_password, verify_password, verify_token
 
 

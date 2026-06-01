@@ -9,8 +9,8 @@ from typing import Awaitable, Callable
 import httpx
 from loguru import logger
 
-from notion_pilot.shared.config import Settings
 from notion_pilot.crm.conv_state import ConvState
+from notion_pilot.shared.config import Settings
 
 
 @dataclass

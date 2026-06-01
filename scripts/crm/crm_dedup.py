@@ -18,8 +18,8 @@ from loguru import logger
 from notion_client import AsyncClient
 from rapidfuzz.fuzz import token_sort_ratio
 
-from notion_pilot.shared.config import load_settings
 from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer
+from notion_pilot.shared.config import load_settings
 from notion_pilot.shared.utils.dedup import normalize
 
 _DEFAULT_THRESHOLD = 85

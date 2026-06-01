@@ -17,11 +17,11 @@ from telegram.ext import (
     filters,
 )
 
+from notion_pilot.crm.commands import COMMANDS, extract_fields_from_text, get_next_prompt
+from notion_pilot.crm.conv_state import ConvState, ConvStateStore
+from notion_pilot.crm.setup_wizard import advance_setup, start_setup
 from notion_pilot.shared.adapters import MessageHandler as PipelineHandler
 from notion_pilot.shared.config import Settings
-from notion_pilot.crm.commands import COMMANDS, extract_fields_from_text, get_next_prompt
-from notion_pilot.crm.setup_wizard import advance_setup, start_setup
-from notion_pilot.crm.conv_state import ConvState, ConvStateStore
 from notion_pilot.shared.media import extract_photo, extract_voice
 from notion_pilot.shared.media.transcribe_voice import transcribe_file
 from notion_pilot.shared.models import IncomingMessage, MediaType

@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-_NOTION_VERSION = "2026-03-11"
+_NOTION_VERSION = "2022-06-28"
 _NOTION_BASE = "https://api.notion.com/v1"
 
 
@@ -63,9 +63,9 @@ class NotionDealsSyncer:
         if deal.notes:
             props["Notes"] = {"rich_text": [{"text": {"content": deal.notes}}]}
         if deal.people_ids:
-            props["People"] = {"relation": [{"id": pid} for pid in deal.people_ids]}
+            props["Contacts"] = {"relation": [{"id": pid} for pid in deal.people_ids]}
         if deal.company_ids:
-            props["Companies"] = {"relation": [{"id": cid} for cid in deal.company_ids]}
+            props["Client"] = {"relation": [{"id": cid} for cid in deal.company_ids]}
         return props
 
     async def create(self, deal: DealRecord) -> str:

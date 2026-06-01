@@ -1,6 +1,6 @@
 # tests/unit/web/test_oauth.py
-import pytest
 import httpx
+import pytest
 import respx
 
 from web.oauth import build_authorize_url, exchange_code_for_token

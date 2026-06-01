@@ -13,13 +13,15 @@ _NOTION_TOKEN_URL = "https://api.notion.com/v1/oauth/token"
 
 def build_authorize_url(*, client_id: str, redirect_uri: str, state: str) -> str:
     """Build the Notion OAuth authorization URL with required params."""
-    params = urlencode({
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "response_type": "code",
-        "owner": "user",
-        "state": state,
-    })
+    params = urlencode(
+        {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "owner": "user",
+            "state": state,
+        }
+    )
     return f"{_NOTION_AUTHORIZE_URL}?{params}"
 
 

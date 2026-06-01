@@ -23,7 +23,7 @@ from notion_pilot.shared.config import load_settings
 from notion_pilot.shared.utils.notion_urls import page_id_from_url
 from notion_pilot.shared.workspace import create_inbox_workspace
 
-NOTION_VERSION = "2026-03-11"
+NOTION_VERSION = "2022-06-28"
 
 
 def _arg(name: str) -> str | None:
