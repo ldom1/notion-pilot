@@ -172,7 +172,7 @@ def _add_auto_archive(patterns: list[str]) -> None:
                 insert_at = i + 1
             elif stripped and not line.startswith(" "):
                 break  # hit next top-level key
-    new_lines = [f"  - {p}" for p in new_patterns]
+    new_lines = [f'  - "{p}"' for p in new_patterns]
     result = lines[:insert_at] + new_lines + lines[insert_at:]
     _SENDER_CONFIG.write_text("\n".join(result) + "\n", encoding="utf-8")
     logger.info("Added {} pattern(s) to {} → {}", len(new_patterns), _SENDER_CONFIG, new_patterns)
