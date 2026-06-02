@@ -42,6 +42,12 @@
 **Rejected:** Single undifferentiated product  
 **Rationale:** CRM targets small sales teams (2-10 people); inbox targets personal knowledge management. Different setup, different enrichment, different Telegram commands. Separating concerns in code structure makes each product easier to document, sell, and onboard independently.
 
+### 2026-06-02 — pandas as the standard data manipulation library
+**Decision:** Use `pandas` for all CSV, JSON, and tabular data I/O across the codebase. No raw `csv` module, no hand-rolled delimiter sniffing.  
+**Rejected:** stdlib `csv`, `json.load` + list comprehensions for tabular data  
+**Rationale:** `pd.read_csv(sep=None, engine="python")` auto-detects delimiters (handles `,` vs `;` from Excel without hacks). `utf-8-sig` BOM ensures correct opening in French/European Excel. Uniform API across CSV, JSON, Parquet if needed. Eliminates the `_write_review_row` append-per-row anti-pattern in favour of collect-then-write.  
+**How to apply:** Any new script reading or writing tabular data must use pandas. Replace any remaining `import csv` found during refactors.
+
 ### 2026-05-28 — Website: landing + Notion OAuth deploy wizard + chatbot
 **Decision:** Build a website with three functions: (1) landing/marketing, (2) "Deploy to Notion" wizard using Notion OAuth, (3) chatbot interface to query/add to Notion DBs.  
 **Rejected:** CLI-only onboarding  

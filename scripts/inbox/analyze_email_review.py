@@ -5,10 +5,10 @@ Usage:
     uv run python scripts/inbox/analyze_email_review.py --csv path/to/file.csv
 """
 
-import csv
 import sys
-from collections import Counter
 from pathlib import Path
+
+import pandas as pd
 
 _DEFAULT_CSV = Path("data/email-import-review.csv")
 
@@ -25,15 +25,15 @@ def main(csv_path: Path) -> None:
         print(f"Missing file: {csv_path}")
         sys.exit(1)
 
-    rows = list(csv.DictReader(csv_path.open(encoding="utf-8")))
-    by_sender = Counter(r["sender"].strip() for r in rows if r.get("sender"))
+    df = pd.read_csv(csv_path, sep=None, engine="python", encoding="utf-8-sig", dtype=str).fillna("")
+    by_sender = df["sender"].str.strip().value_counts()
 
     print(f"File: {csv_path}")
-    print(f"Total rows: {len(rows)}")
+    print(f"Total rows: {len(df)}")
     print(f"Unique senders: {len(by_sender)}\n")
     print(f"{'count':>6}  sender")
     print("-" * 60)
-    for sender, count in by_sender.most_common():
+    for sender, count in by_sender.items():
         print(f"{count:>6}  {sender}")
 
 

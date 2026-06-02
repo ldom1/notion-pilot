@@ -10,11 +10,10 @@ Flags:
 """
 
 import asyncio
-import csv
-import io
 import sys
 from pathlib import Path
 
+import pandas as pd
 from loguru import logger
 from notion_client import AsyncClient
 
@@ -27,14 +26,19 @@ _DEFAULT_CSV = Path("data/Basic_LinkedInDataExport_05-20-2026.zip/Connections.cs
 _REVIEW_CSV = Path("data/import-review.csv")
 _SKIPED_CSV = Path("data/import-skiped.csv")
 
+_REVIEW_FIELDS = ["score", "input_name", "input_company", "matched_name", "matched_company", "linkedin_url"]
+
 
 def _parse_connections(csv_path: Path) -> list[PersonRecord]:
     text = csv_path.read_text(encoding="utf-8")
     lines = text.splitlines()
     header_idx = next(i for i, line in enumerate(lines) if line.startswith("First Name"))
-    reader = csv.DictReader(io.StringIO("\n".join(lines[header_idx:])))
+    df = pd.read_csv(
+        pd.io.common.StringIO("\n".join(lines[header_idx:])),
+        dtype=str,
+    ).fillna("")
     records = []
-    for row in reader:
+    for _, row in df.iterrows():
         name = f"{row['First Name'].strip()} {row['Last Name'].strip()}".strip()
         if not name:
             continue
@@ -48,44 +52,6 @@ def _parse_connections(csv_path: Path) -> list[PersonRecord]:
             )
         )
     return records
-
-
-def _write_review_row(row: dict[str, str]) -> None:
-    write_header = not _REVIEW_CSV.exists()
-    with _REVIEW_CSV.open("a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=[
-                "score",
-                "input_name",
-                "input_company",
-                "matched_name",
-                "matched_company",
-                "linkedin_url",
-            ],
-        )
-        if write_header:
-            writer.writeheader()
-        writer.writerow(row)
-
-
-def _write_skiped_row(row: dict[str, str]) -> None:
-    write_header = not _SKIPED_CSV.exists()
-    with _SKIPED_CSV.open("a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=[
-                "score",
-                "input_name",
-                "input_company",
-                "matched_name",
-                "matched_company",
-                "linkedin_url",
-            ],
-        )
-        if write_header:
-            writer.writeheader()
-        writer.writerow(row)
 
 
 _STATUS_MAP = {
@@ -119,6 +85,8 @@ async def run(dry_run: bool, enrich: bool, csv_path: Path) -> None:
     logger.info("Parsed {} connections from {}", len(records), csv_path)
 
     counts: dict[str, int] = {"created": 0, "skipped": 0, "review": 0, "error": 0}
+    review_rows: list[dict[str, str]] = []
+    skipped_rows: list[dict[str, str]] = []
 
     for i, person in enumerate(records):
         if dry_run:
@@ -126,16 +94,14 @@ async def run(dry_run: bool, enrich: bool, csv_path: Path) -> None:
             status = _STATUS_MAP[match.status]
             counts[status] += 1
             if match.status == DedupStatus.SKIP:
-                _write_skiped_row(
-                    {
-                        "score": f"{match.score:.1f}",
-                        "input_name": person.name,
-                        "input_company": person.company,
-                        "matched_name": match.matched_name,
-                        "matched_company": match.matched_company,
-                        "linkedin_url": person.linkedin_url,
-                    }
-                )
+                skipped_rows.append({
+                    "score": f"{match.score:.1f}",
+                    "input_name": person.name,
+                    "input_company": person.company,
+                    "matched_name": match.matched_name,
+                    "matched_company": match.matched_company,
+                    "linkedin_url": person.linkedin_url,
+                })
             continue
 
         try:
@@ -157,28 +123,18 @@ async def run(dry_run: bool, enrich: bool, csv_path: Path) -> None:
             )
             counts[result.status] += 1
 
+            row = {
+                "score": f"{result.score:.1f}",
+                "input_name": person.name,
+                "input_company": person.company,
+                "matched_name": result.matched_name,
+                "matched_company": result.matched_company,
+                "linkedin_url": person.linkedin_url,
+            }
             if result.status == "skipped":
-                _write_skiped_row(
-                    {
-                        "score": f"{result.score:.1f}",
-                        "input_name": person.name,
-                        "input_company": person.company,
-                        "matched_name": result.matched_name,
-                        "matched_company": result.matched_company,
-                        "linkedin_url": person.linkedin_url,
-                    }
-                )
-            if result.status == "review":
-                _write_review_row(
-                    {
-                        "score": f"{result.score:.1f}",
-                        "input_name": person.name,
-                        "input_company": person.company,
-                        "matched_name": result.matched_name,
-                        "matched_company": result.matched_company,
-                        "linkedin_url": person.linkedin_url,
-                    }
-                )
+                skipped_rows.append(row)
+            elif result.status == "review":
+                review_rows.append(row)
 
         except Exception:  # noqa: BLE001
             logger.exception("Failed to upsert {} @ {}", person.name, person.company)
@@ -186,6 +142,15 @@ async def run(dry_run: bool, enrich: bool, csv_path: Path) -> None:
 
         if (i + 1) % 50 == 0:
             logger.info("Progress: {}/{} — {}", i + 1, len(records), counts)
+
+    if review_rows:
+        _REVIEW_CSV.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(review_rows, columns=_REVIEW_FIELDS).to_csv(_REVIEW_CSV, sep=";", index=False, encoding="utf-8-sig")
+        logger.info("Review {} borderline match(es) in {}", len(review_rows), _REVIEW_CSV)
+
+    if skipped_rows:
+        _SKIPED_CSV.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(skipped_rows, columns=_REVIEW_FIELDS).to_csv(_SKIPED_CSV, sep=";", index=False, encoding="utf-8-sig")
 
     mode = "DRY RUN" if dry_run else "LIVE"
     logger.info(
@@ -196,8 +161,6 @@ async def run(dry_run: bool, enrich: bool, csv_path: Path) -> None:
         counts["review"],
         counts["error"],
     )
-    if counts.get("review") and not dry_run:
-        logger.info("Review {} borderline matches in {}", counts["review"], _REVIEW_CSV)
 
 
 def _flag(name: str) -> bool:
