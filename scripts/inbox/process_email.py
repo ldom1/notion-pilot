@@ -18,10 +18,12 @@ from pathlib import Path
 from loguru import logger
 from notion_client import AsyncClient
 
+from notion_pilot.crm.syncer import NotionPeopleSyncer, PersonRecord
 from notion_pilot.inbox import build_knowledge_pipeline
 from notion_pilot.shared.adapters.email import EmailAdapter, _sender_allowed
-from notion_pilot.shared.config import load_settings
+from notion_pilot.shared.config import Settings, load_settings
 from notion_pilot.shared.models import _first_url
+from notion_pilot.shared.utils.enrichment import enrich_person
 
 _REVIEW_CSV = Path("data/email-import-review.csv")
 _CSV_FIELDS = ["uid", "folder", "sender", "subject", "sent_at", "summary", "decision"]
@@ -136,6 +138,23 @@ def _write_people_csv(rows: list[dict[str, str]]) -> None:
         writer.writerows(rows)
 
 
+async def _build_people_syncer(settings: Settings, token: str) -> NotionPeopleSyncer | None:
+    """Return a ready NotionPeopleSyncer or None if not configured."""
+    ds_id = settings.notion_people_data_source_id
+    if not ds_id and settings.notion_people_database_id:
+        client_tmp = AsyncClient(auth=token)
+        try:
+            ds_id = await _data_source_id(client_tmp, settings.notion_people_database_id)
+        finally:
+            await client_tmp.aclose()
+    if not ds_id:
+        return None
+    client = AsyncClient(auth=token)
+    syncer = NotionPeopleSyncer(client, ds_id, company_syncer=None)
+    await syncer.load_snapshot()
+    return syncer
+
+
 async def _archive_uids(adapter: EmailAdapter, folder: str, uids: list[int], *, label: str) -> bool:
     if not uids:
         return True
@@ -231,6 +250,15 @@ async def run(
     logger.info("Notion index: {} titles, {} links", len(titles), len(urls))
 
     pipeline = build_knowledge_pipeline(settings)
+
+    people_syncer: NotionPeopleSyncer | None = None
+    if adapter._people and not dry_run:
+        people_syncer = await _build_people_syncer(settings, token)
+        if people_syncer is None:
+            logger.warning(
+                "IMAP_PEOPLE_SENDERS is set but neither NOTION_PEOPLE_DATA_SOURCE_ID nor "
+                "NOTION_PEOPLE_DATABASE_ID is configured — explicit people written to CSV only"
+            )
 
     csv_rows: list[dict[str, str]] = []
     pending_archive: list[tuple[int, str]] = []
@@ -375,26 +403,67 @@ async def run(
                 counts["skip"] += 1
                 logger.warning("FAIL  uid={} | {} | Notion write failed", raw.uid, _DECISION_UNTOUCHED)
 
-    # ── People CSV (no Notion upsert here — see Task 6 for enrichment) ─────
+    # ── People: enrich explicit list, write both to CSV ────────────────────
     people_rows: list[dict[str, str]] = []
     for raw, folder, in_people_list in people_candidates:
         domain = raw.sender.split("@")[-1] if "@" in raw.sender else ""
         display = raw.sender.split("@")[0].replace(".", " ").replace("_", " ").title()
+        enriched_flag = ""
+        linkedin = seniority = role_type_str = ""
+        dedup_status = dedup_score = matched_name = ""
+
+        if in_people_list and not dry_run and people_syncer:
+            enrichment = await enrich_person(display, domain, settings)
+            if enrichment.source:
+                enriched_flag = enrichment.source
+            linkedin = enrichment.linkedin_url
+            seniority = enrichment.seniority
+            role_type_str = ",".join(enrichment.role_type)
+            person = PersonRecord(
+                name=display,
+                company="",
+                email=raw.sender,
+                linkedin_url=linkedin,
+                seniority=seniority,
+                role_type=enrichment.role_type,
+            )
+            result = await people_syncer.upsert(person)
+            dedup_status = result.status
+            dedup_score = f"{result.score:.0f}" if result.score else ""
+            matched_name = result.matched_name
+
+        if in_people_list and dry_run:
+            dedup_status = "dry-run"
+
+        decision = (
+            _DECISION_TO_REVIEW
+            if not in_people_list
+            else (dedup_status or _DECISION_UNTOUCHED)
+        )
+
         people_rows.append({
             "email": raw.sender,
             "display_name": display,
             "domain": domain,
             "folder": folder,
             "people_list": "yes" if in_people_list else "no",
-            "enriched": "",
-            "linkedin": "",
-            "seniority": "",
-            "role_type": "",
-            "dedup_status": "",
-            "dedup_score": "",
-            "matched_name": "",
-            "decision": _DECISION_UNTOUCHED if in_people_list else _DECISION_TO_REVIEW,
+            "enriched": enriched_flag,
+            "linkedin": linkedin,
+            "seniority": seniority,
+            "role_type": role_type_str,
+            "dedup_status": dedup_status,
+            "dedup_score": dedup_score,
+            "matched_name": matched_name,
+            "decision": decision,
         })
+        logger.info(
+            "PEOPLE uid={} | list={} | enriched={} | dedup={} | from={}",
+            raw.uid,
+            "yes" if in_people_list else "no",
+            enriched_flag or "—",
+            dedup_status or "—",
+            raw.sender,
+        )
 
     if people_rows:
         _write_people_csv(people_rows)
