@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pandas as pd
 
-_DEFAULT_CSV = Path("data/email-import-review.csv")
+_DEFAULT_CSV = Path("data/inbox/email-import-review.csv")
 
 
 def _arg(name: str) -> str | None:

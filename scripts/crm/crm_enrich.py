@@ -358,7 +358,7 @@ def main() -> None:
         "--limit", type=int, default=9999, help="Max records to process (default: all)"
     )
     parser.add_argument("--dry-run", action="store_true", help="Print results without writing")
-    parser.add_argument("--report-dir", default="data", help="Directory for the markdown report")
+    parser.add_argument("--report-dir", default="data/crm", help="Directory for the markdown report")
     args = parser.parse_args()
 
     if not args.people and not args.companies:

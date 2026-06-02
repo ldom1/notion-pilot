@@ -7,34 +7,33 @@
 #
 # Version-controlled (non-sensitive). Commit changes when allowlists are updated.
 
-# ── Knowledge DB (Notion) ────────────────────────────────────────────────────
+# ── Allowed ────────────────────────────────────────────────────
+# Knowledge DB (Notion)
 # Emails routed here are parsed and stored as knowledge entries.
+
+# ── Auto-archive ─────────────────────────────────────────────────────────────
+# Silently archived — no Notion entry created.
+# To add entries from CLI: --add-auto-archive=@domain.com
+
+
 allowed:
   - "louis@giron-dom.eu"
   - "@medium.com"
   - "@tldrnewsletter.com"
   - "@a.strategies.fr"
   - "@parti-equinoxe.fr"
-
-# ── Auto-archive ─────────────────────────────────────────────────────────────
-# Silently archived — no Notion entry created.
-# To add entries from CLI: --add-auto-archive=@domain.com
   - "discover@news.statista.com"
   - "marion@lebigdata.fr"
   - "info@pollinis.org"
   - "noreply@theshifters.org"
+
+
 auto_archive:
-  # Medium transactional/partner mail (superseded by @medium.com in allowed)
   - "members@medium.com"
   - "partnerprogram@medium.com"
   - "writersupport@medium.com"
-  # Vivino marketing
   - "@e.vivinomail.com"
   - "@vivinomail.com"
-
-# ── People DB ────────────────────────────────────────────────────────────────
-# Routed to People DB with contact enrichment (env: IMAP_PEOPLE_SENDERS).
-# Typically personal/consumer email domains.
   - "annonce@amazon.fr"
   - "newsletter@highlandtitles.com"
   - "inspiration@mp1.tripadvisor.com"
@@ -76,12 +75,11 @@ auto_archive:
   - "store+79504048477@g.shopifyemail.com"
   - "contact@lagrandecourse.fr"
   - "support@apollo.io"
+
 people:
   # Google
   - "@gmail.com"
   - "@googlemail.com"
-
-  # Microsoft
   - "@hotmail.com"
   - "@hotmail.fr"
   - "@live.com"
@@ -89,19 +87,13 @@ people:
   - "@msn.com"
   - "@outlook.com"
   - "@outlook.fr"
-
-  # Apple
   - "@icloud.com"
   - "@me.com"
   - "@mac.com"
-
-  # Yahoo
   - "@yahoo.com"
   - "@yahoo.co.uk"
   - "@yahoo.fr"
   - "@ymail.com"
-
-  # French ISP / legacy
   - "@laposte.net"
   - "@orange.fr"
   - "@wanadoo.fr"
@@ -109,12 +101,9 @@ people:
   - "@sfr.fr"
   - "@bbox.fr"
   - "@numericable.fr"
-
-  # Other common
   - "@proton.me"
   - "@protonmail.com"
   - "@pm.me"
   - "@tutanota.com"
   - "@gmx.com"
   - "@gmx.fr"
-  - "pierre-louis.jeauffroy@edhec.com"

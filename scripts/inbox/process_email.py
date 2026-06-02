@@ -27,13 +27,13 @@ from notion_pilot.shared.models import _first_url
 from notion_pilot.shared.utils.enrichment import enrich_person
 
 _SENDER_CONFIG = Path("config/email-senders.yaml")
-_REVIEW_CSV = Path("data/email-import-review.csv")
+_REVIEW_CSV = Path("data/inbox/email-import-review.csv")
 _CSV_FIELDS = ["uid", "folder", "sender", "subject", "sent_at", "summary", "decision"]
 _DECISION_UNTOUCHED = "Untouched"
 _DECISION_TREATED = "Treated and archived"
 _DECISION_AUTO_ARCHIVED = "Auto archived"
 
-_PEOPLE_REVIEW_CSV = Path("data/email-import-people-review.csv")
+_PEOPLE_REVIEW_CSV = Path("data/inbox/email-import-people-review.csv")
 _PEOPLE_CSV_FIELDS = [
     "email", "display_name", "domain", "folder",
     "people_list", "enriched", "linkedin", "seniority", "role_type",
