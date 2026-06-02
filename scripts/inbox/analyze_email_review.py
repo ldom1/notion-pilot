@@ -1,8 +1,8 @@
-"""Summarize data/promotions-review.csv — senders and counts.
+"""Summarize data/email-import-review.csv — senders and counts.
 
 Usage:
-    uv run python scripts/inbox/analyze_promotions_review.py
-    uv run python scripts/inbox/analyze_promotions_review.py --csv path/to/file.csv
+    uv run python scripts/inbox/analyze_email_review.py
+    uv run python scripts/inbox/analyze_email_review.py --csv path/to/file.csv
 """
 
 import csv
@@ -10,7 +10,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-_DEFAULT_CSV = Path("data/promotions-review.csv")
+_DEFAULT_CSV = Path("data/email-import-review.csv")
 
 
 def _arg(name: str) -> str | None:

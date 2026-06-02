@@ -1,11 +1,14 @@
 """Unit tests for promotions CSV helpers."""
 
-from scripts.inbox.process_promotions import _csv_requests_process, _one_sentence
+from scripts.inbox.process_email import _csv_requests_process, _one_sentence
 
 
 def test_strips_css_and_prefers_subject():
     body = "@media only screen { .x { width: 1px; } } Short."
-    assert _one_sentence("Real subject line here for review", body) == "Real subject line here for review"
+    assert (
+        _one_sentence("Real subject line here for review", body)
+        == "Real subject line here for review"
+    )
 
 
 def test_picks_first_good_body_sentence():
