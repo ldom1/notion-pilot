@@ -24,7 +24,10 @@ def _decode_str(value: str) -> str:
     result = []
     for raw, enc in parts:
         if isinstance(raw, bytes):
-            result.append(raw.decode(enc or "utf-8", errors="replace"))
+            try:
+                result.append(raw.decode(enc or "utf-8", errors="replace"))
+            except LookupError:
+                result.append(raw.decode("utf-8", errors="replace"))
         else:
             result.append(raw)
     return "".join(result)
