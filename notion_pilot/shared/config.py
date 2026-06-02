@@ -27,7 +27,7 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
             "NOTION_DATABASE_ID",
         ),
     )
-    notion_title_property: str = Field(
+    notion_telegram_msg_database_title_property: str = Field(
         default="Name",
         description="Notion title column name (use Name if your DB uses the default title)",
     )
@@ -56,7 +56,7 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         description="HTTP-Referer header sent to OpenRouter for cost attribution",
     )
     openrouter_app_title: str = Field(
-        default="telegram-to-notion",
+        default="notion-pilot",
         description="X-Title header sent to OpenRouter for dashboard display",
     )
 
@@ -98,14 +98,8 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         default="",
         description=(
             "Comma-separated sender suffixes for personal contacts "
-            "(e.g. @gmail.com,@icloud.com). Routed to NOTION_PEOPLE_DATABASE_ID."
+            "(e.g. @gmail.com,@icloud.com). Routed through the CRM People syncer."
         ),
-    )
-
-    # ── Notion People DB (optional) ──────────────────────────────────────────
-    notion_people_database_id: str | None = Field(
-        default=None,
-        description="Notion database ID for the people / contacts database.",
     )
 
     # ── CRM / People import (optional) ──────────────────────────────────────
