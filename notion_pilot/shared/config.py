@@ -135,6 +135,10 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
     )
 
     # ── Knowledge Inbox DBs (optional) ──────────────────────────────────────
+    notion_notions_database_id: str | None = Field(
+        default=None,
+        description="Notion database ID for the Notions database (personal reflections, methodologies).",
+    )
     notion_ideas_database_id: str | None = Field(
         default=None,
         description="Notion database ID for the Ideas database.",
