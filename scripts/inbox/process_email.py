@@ -482,7 +482,7 @@ async def run(
             emails = await asyncio.to_thread(
                 adapter.fetch_messages,
                 folder,
-                all_messages=(dry_run and not is_inbox),
+                all_messages=dry_run,  # dry-run always scans ALL (UNSEEN only in live to avoid large inbox)
                 since_days=folder_since,
             )
             if limit > 0:
