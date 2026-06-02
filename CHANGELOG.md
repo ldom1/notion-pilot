@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Config: `NOTION_IDEAS_DATABASE_ID`, `NOTION_TOOLS_DATABASE_ID`, `NOTION_DATA_TECH_DATABASE_ID`
 
 ### Changed
+- Email People capture now uses the central CRM `NotionPeopleSyncer` with deduplication and company sync instead of the removed `PersonContactProperties` direct writer.
+- Removed the old `NOTION_PEOPLE_DATABASE_ID` config surface; use `NOTION_PEOPLE_DATA_SOURCE_ID` plus `NOTION_COMPANIES_DATA_SOURCE_ID`.
 - `NOTION_DATABASE_ID` renamed to `NOTION_TELEGRAM_MSG_DATABASE_ID` (`NOTION_DATABASE_ID` still accepted)
 - README `🚀 Quick Start` section covering all three setup options
 - `crm/` package: `NotionPeopleSyncer`, `NotionCompanySyncer`, fuzzy dedup (`rapidfuzz`), Brave Search email enrichment
@@ -51,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed JWT admin login from the deploy wizard flow; OAuth replaces it
 - Renamed project to **Notion Pilot** (`notion-pilot` / `notion_pilot`)
 - Reorganized package structure: `shared/` core, `inbox/` (formerly `pipelines/`), `crm/`, `scripts/crm/`
-- GitHub repo renamed from `telegram-to-notion` to `notion-pilot`
+- GitHub repo renamed from `notion-pilot` to `notion-pilot`
 - `TELEGRAM_BOT_TOKEN` is now optional — bot starts with any configured adapter
 - `IncomingMessage` has a new required field `source_adapter` (label in Notion reflects the source)
 

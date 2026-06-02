@@ -30,9 +30,7 @@ def settings():
 @pytest.fixture
 async def writer(settings):
     client = AsyncClient(auth=settings.notion_token.get_secret_value())
-    yield NotionDatabaseWriter(
-        client=client, database_id=settings.notion_telegram_msg_database_id
-    )
+    yield NotionDatabaseWriter(client=client, database_id=settings.notion_telegram_msg_database_id)
     await client.aclose()
 
 
@@ -44,13 +42,14 @@ def _incoming(text: str, media_type: MediaType = MediaType.TEXT) -> IncomingMess
         sent_at=datetime.now(timezone.utc),
         media_type=media_type,
         media=None,
+        source_adapter="telegram",
     )
 
 
 @pytest.mark.asyncio
 async def test_create_and_delete_text_page(writer, settings):
     """Text message → enriched properties → Notion page → archived in teardown."""
-    incoming = _incoming("Integration test text: https://github.com/ldom1/telegram-to-notion")
+    incoming = _incoming("Integration test text: https://github.com/ldom1/notion-pilot")
     properties = await interpret_message(settings, incoming)
     page_id = await writer.create_page(properties)
     try:
@@ -107,16 +106,17 @@ async def test_end_to_end_like_example(settings):
     try:
         # Step 1 — same message as examples/example.py
         incoming = IncomingMessage(
-            text="J'ai trouvé un nouvel outil hyper intéressant: https://github.com/ldom1/telegram-to-notion",
+            text="J'ai trouvé un nouvel outil hyper intéressant: https://github.com/ldom1/notion-pilot",
             caption=None,
             sender="example.py",
             sent_at=datetime.now(timezone.utc),
             media_type=MediaType.TEXT,
             media=None,
+            source_adapter="telegram",
         )
         # Step 2 — enrich
         properties = await interpret_message(settings, incoming)
-        assert properties.url == "https://github.com/ldom1/telegram-to-notion"
+        assert properties.url == "https://github.com/ldom1/notion-pilot"
         assert properties.source == "GitHub"
         # Step 3 — write then clean up
         page_id = await writer.create_page(properties)

@@ -69,9 +69,9 @@ class TestIncomingMessage:
 
 class TestNotionDatabasePropertiesFromIncoming:
     def test_detects_url_in_body(self):
-        msg = _msg(text="Check https://github.com/ldom1/telegram-to-notion")
+        msg = _msg(text="Check https://github.com/ldom1/notion-pilot")
         props = NotionDatabaseProperties.from_incoming(msg)
-        assert props.url == "https://github.com/ldom1/telegram-to-notion"
+        assert props.url == "https://github.com/ldom1/notion-pilot"
         assert props.source == "GitHub"
 
     def test_no_url_gives_none(self):

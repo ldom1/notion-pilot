@@ -21,12 +21,13 @@ async def main() -> None:
 
     # Step 1 — Build a normalized inbound message (what the bot produces from Telegram).
     incoming = IncomingMessage(
-        text="J'ai trouvé un nouvel outil hyper intéressant: https://github.com/ldom1/telegram-to-notion",
+        text="J'ai trouvé un nouvel outil hyper intéressant: https://github.com/ldom1/notion-pilot",
         caption=None,
         sender="example.py",
         sent_at=datetime.now(timezone.utc),
         media_type=MediaType.TEXT,
         media=None,
+        source_adapter="telegram",
     )
     logger.info(f"[1/3] Incoming message: {incoming.name!r}")
 

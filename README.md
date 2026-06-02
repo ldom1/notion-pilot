@@ -117,6 +117,8 @@ uv sync --extra discord   # Discord source + notifications
 ```
 
 Set the relevant env vars (see `.env.example`) — adapters activate automatically when their credentials are present.
+For email senders routed to People, set `NOTION_PEOPLE_DATA_SOURCE_ID` and `NOTION_COMPANIES_DATA_SOURCE_ID`;
+the adapter uses the central CRM syncer with deduplication instead of a separate contacts table.
 
 ## Try it without Telegram
 
