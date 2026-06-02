@@ -114,13 +114,20 @@ marion@lebigdata.fr,allowed      ← newsletter you want in Notion
 uv run python scripts/inbox/process_email.py --apply-review
 ```
 
-This reads `data/email-import-people-review.csv` and appends each decision to the appropriate section in `config/email-senders.yaml`. Comments in the YAML are preserved.
+This command does two things in sequence:
+
+**1. Updates `config/email-senders.yaml`** — appends each decision to the appropriate section. Comments are preserved.
+
+**2. Upserts `decision=people` rows to the Notion People DB** — for each individual address (not domain patterns like `@gmail.com`) tagged `people`, it runs enrichment (Apollo → Brave → LLM) and upserts the contact. This is the **only code path** that writes a new person from an email into Notion. No automated write ever happens without this explicit human-reviewed step.
 
 Output:
 ```
 INFO  auto_archive ← ['@amazon.fr', '@tripadvisor.com', '@glassdoor.com']
 INFO  people ← ['Alexandra.Atangana@paris.fr', 'pierre-louis.jeauffroy@edhec.com']
 INFO  Applied 5 routing decision(s) to config/email-senders.yaml
+INFO  Upserting 2 person(s) to Notion People DB...
+INFO    Alexandra.Atangana@paris.fr | Alexandra Atangana | dedup=new score=0
+INFO    pierre-louis.jeauffroy@edhec.com | Pierre-Louis Jeauffroy | dedup=new score=0
 ```
 
 Then commit the updated YAML:

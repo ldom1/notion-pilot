@@ -204,18 +204,18 @@ def _add_auto_archive(patterns: list[str]) -> None:
     logger.info("Added {} pattern(s) to auto_archive → {}", len(new_patterns), new_patterns)
 
 
-def _apply_review() -> None:
-    """Read email-import-people-review.csv and apply routing decisions to email-senders.yaml.
+async def _apply_review() -> None:
+    """Read email-import-people-review.csv, update email-senders.yaml, and upsert people to Notion.
 
     Edit the 'decision' column in the CSV before running this command:
       allowed      → add to allowed (knowledge DB)
       auto_archive → add to auto_archive (silent archive)
-      people       → add to people (People DB + enrichment)
-      ignore       → skip permanently
+      people       → add to people YAML section + immediately enrich & upsert to Notion People DB
+      ignore       → skip permanently (no YAML entry, no Notion write)
       To Review    → skip for now (process later)
 
     Edit the 'email' column to '@domain.com' to add a domain-level rule
-    instead of matching only that exact address.
+    instead of matching only that exact address (domain rules are never upserted as individuals).
     """
     if not _PEOPLE_REVIEW_CSV.exists():
         logger.error("{} not found — run --dry-run first", _PEOPLE_REVIEW_CSV)
@@ -239,6 +239,7 @@ def _apply_review() -> None:
         "people": "people",
     }
     to_add: dict[str, list[str]] = {"allowed": [], "auto_archive": [], "people": []}
+    people_to_upsert: list[dict[str, str]] = []
     skipped = 0
 
     import pandas as pd
@@ -256,6 +257,9 @@ def _apply_review() -> None:
         if dest and pattern not in existing[dest]:
             to_add[dest].append(pattern)
             existing[dest].add(pattern)
+        # Collect individual addresses tagged people (domain rules @… have no person to upsert)
+        if decision == "people" and pattern and not pattern.startswith("@"):
+            people_to_upsert.append(row)
 
     for section, patterns in to_add.items():
         if patterns:
@@ -271,6 +275,37 @@ def _apply_review() -> None:
             _PEOPLE_REVIEW_CSV,
         )
     logger.info("Skipped {} rows (To Review / ignore / no pattern)", skipped)
+
+    # ── Notion upsert for people rows ────────────────────────────────────────
+    if not people_to_upsert:
+        return
+    settings = load_settings()
+    token = settings.notion_token.get_secret_value()
+    people_syncer = await _build_people_syncer(settings, token)
+    if people_syncer is None:
+        logger.warning("NOTION_PEOPLE_DATA_SOURCE_ID not set — skipping Notion upsert")
+        return
+    logger.info("Upserting {} person(s) to Notion People DB...", len(people_to_upsert))
+    for row in people_to_upsert:
+        email = row.get("email", "").strip()
+        display = row.get("display_name", "").strip() or email
+        domain = row.get("domain", "").strip()
+        enrichment = await enrich_person(display, domain, settings)
+        person = PersonRecord(
+            name=display,
+            email=email,
+            company=domain,
+            linkedin_url=enrichment.linkedin_url or "",
+            position=",".join(enrichment.role_type) if enrichment.role_type else "",
+        )
+        result = await people_syncer.upsert(person)
+        logger.info(
+            "  {} | {} | dedup={} score={:.0f}",
+            email,
+            display,
+            result.status,
+            result.score,
+        )
 
 
 def _can_archive(folder: str, imap_inbox: str) -> bool:
@@ -671,7 +706,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if _flag("--apply-review"):
-        _apply_review()
+        asyncio.run(_apply_review())
         sys.exit(0)
 
     _since = _arg("--since-days")

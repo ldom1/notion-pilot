@@ -42,6 +42,11 @@
 **Rejected:** Single undifferentiated product  
 **Rationale:** CRM targets small sales teams (2-10 people); inbox targets personal knowledge management. Different setup, different enrichment, different Telegram commands. Separating concerns in code structure makes each product easier to document, sell, and onboard independently.
 
+### 2026-06-02 — Human review gate before any People DB write (email pipeline)
+**Decision:** No email sender is ever upserted into the Notion People DB without an explicit human decision in the review CSV. The full gate is: dry-run → human edits `email-import-people-review.csv` → `--apply-review` triggers YAML update + Notion upsert for `decision=people` rows.  
+**Rejected:** Heuristic auto-classification of senders (e.g. "is this a real person?") that bypasses human review  
+**Rationale:** False positives (automated senders, noreply addresses) would pollute the People DB silently. The CSV review step is cheap; a polluted CRM is expensive to clean up. The `--apply-review` command is the only code path that writes a new person from an email sender into Notion.
+
 ### 2026-06-02 — pandas as the standard data manipulation library
 **Decision:** Use `pandas` for all CSV, JSON, and tabular data I/O across the codebase. No raw `csv` module, no hand-rolled delimiter sniffing.  
 **Rejected:** stdlib `csv`, `json.load` + list comprehensions for tabular data  
