@@ -1,12 +1,13 @@
-"""Process Infomaniak Promotions mail → DomTelegramBot (NOTION_TELEGRAM_MSG_DATABASE_ID).
+"""Process IMAP mail → Notion knowledge DB + people review CSV.
 
 Usage:
-    uv sync --extra email
     uv run python scripts/inbox/process_email.py --dry-run
+    uv run python scripts/inbox/process_email.py --dry-run --inbox=Promotions,INBOX --limit=20
     uv run python scripts/inbox/process_email.py
     uv run python scripts/inbox/process_email.py --from-csv   # rows marked Treated and archived
     uv run python scripts/inbox/process_email.py --dry-run --since-days=14
     uv run python scripts/inbox/process_email.py --limit=10   # newest 10 only (smoke test)
+    uv run python scripts/inbox/process_email.py --add-auto-archive=@domain.com,sender@other.com
 """
 
 import asyncio
@@ -95,19 +96,6 @@ def _sentences(text: str) -> list[str]:
     return [c.strip() for c in chunks if c.strip()]
 
 
-_AUTOMATED_PATTERNS = frozenset({
-    "noreply", "no-reply", "donotreply", "do-not-reply",
-    "support", "info", "postmaster", "bounce", "mailer-daemon",
-    "notifications", "newsletter",
-})
-
-
-def _is_automated(sender: str) -> bool:
-    """Return True if the sender looks like an automated/noreply address."""
-    local = sender.lower().split("@")[0]
-    return any(p in local for p in _AUTOMATED_PATTERNS)
-
-
 def _parse_inbox_arg(raw: str) -> list[str]:
     """Split comma-separated folder names; strip whitespace; drop empty entries."""
     return [f.strip() for f in raw.split(",") if f.strip()]
@@ -138,15 +126,34 @@ def _write_people_csv(rows: list[dict[str, str]]) -> None:
         writer.writerows(rows)
 
 
+def _add_auto_archive(patterns: list[str]) -> None:
+    """Append patterns to IMAP_AUTO_ARCHIVE_SENDERS in .env (creates entry if missing)."""
+    env_path = Path(".env")
+    if not env_path.exists():
+        logger.error(".env not found — cannot update IMAP_AUTO_ARCHIVE_SENDERS")
+        return
+    text = env_path.read_text(encoding="utf-8")
+    import re as _re
+    m = _re.search(r"^(IMAP_AUTO_ARCHIVE_SENDERS\s*=\s*)(.*)$", text, _re.MULTILINE)
+    if m:
+        existing = [s.strip() for s in m.group(2).split(",") if s.strip()]
+        merged = existing + [p for p in patterns if p not in existing]
+        new_line = m.group(1) + ",".join(merged)
+        text = text[: m.start()] + new_line + text[m.end() :]
+    else:
+        text += f"\nIMAP_AUTO_ARCHIVE_SENDERS={','.join(patterns)}\n"
+    env_path.write_text(text, encoding="utf-8")
+    logger.info("Updated IMAP_AUTO_ARCHIVE_SENDERS with: {}", ", ".join(patterns))
+
+
+def _can_archive(folder: str, imap_inbox: str) -> bool:
+    """Return False for the main INBOX — those emails must never be archived."""
+    return folder.lower() != imap_inbox.lower()
+
+
 async def _build_people_syncer(settings: Settings, token: str) -> NotionPeopleSyncer | None:
     """Return a ready NotionPeopleSyncer or None if not configured."""
     ds_id = settings.notion_people_data_source_id
-    if not ds_id and settings.notion_people_database_id:
-        client_tmp = AsyncClient(auth=token)
-        try:
-            ds_id = await _data_source_id(client_tmp, settings.notion_people_database_id)
-        finally:
-            await client_tmp.aclose()
     if not ds_id:
         return None
     client = AsyncClient(auth=token)
@@ -284,11 +291,14 @@ async def run(
             )
             logger.info("--from-csv: {} message(s) to process from {}", len(emails), folder)
         else:
+            # For the main INBOX fetch ALL messages would be too slow; use UNSEEN only.
+            is_inbox = folder.lower() == settings.imap_inbox.lower()
+            folder_since = since_days if not is_inbox else max(since_days or 0, settings.imap_since_days)
             emails = await asyncio.to_thread(
                 adapter.fetch_messages,
                 folder,
-                all_messages=dry_run,
-                since_days=since_days,
+                all_messages=(dry_run and not is_inbox),
+                since_days=folder_since,
             )
             if limit > 0:
                 emails = sorted(emails, key=lambda e: e.sent_at, reverse=True)[:limit]
@@ -320,7 +330,7 @@ async def run(
             if not from_csv and auto_archive and _sender_allowed(raw.sender, auto_archive):
                 counts["auto_archive"] += 1
                 row["decision"] = _DECISION_AUTO_ARCHIVED
-                if not dry_run:
+                if not dry_run and _can_archive(folder, settings.imap_inbox):
                     ok = await _archive_uids(adapter, folder, [raw.uid], label="auto-archive")
                     if not ok:
                         counts["archive_fail"] += 1
@@ -337,12 +347,11 @@ async def run(
             if not from_csv and not _sender_allowed(raw.sender, allowed):
                 counts["review"] += 1
                 in_people_list = _sender_allowed(raw.sender, adapter._people)
-                if in_people_list or not _is_automated(raw.sender):
-                    people_candidates.append((raw, folder, in_people_list))
+                people_candidates.append((raw, folder, in_people_list))
                 logger.info(
                     "REVIEW uid={} | people={} | from={} | subject={!r}",
                     raw.uid,
-                    "yes" if in_people_list else ("candidate" if not _is_automated(raw.sender) else "automated"),
+                    "yes" if in_people_list else "review",
                     raw.sender,
                     raw.subject or "(no subject)",
                 )
@@ -351,7 +360,7 @@ async def run(
             if _is_duplicate(raw, titles, urls):
                 counts["dedup"] += 1
                 row["decision"] = _DECISION_TREATED
-                if not dry_run and _sender_allowed(raw.sender, allowed):
+                if not dry_run and _sender_allowed(raw.sender, allowed) and _can_archive(folder, settings.imap_inbox):
                     archived = await _archive_uids(adapter, folder, [raw.uid], label="dedup")
                     if not archived:
                         counts["archive_fail"] += 1
@@ -388,10 +397,13 @@ async def run(
                 url = _first_url(raw.body or "") or _first_url(raw.subject or "")
                 if url:
                     urls.add(url)
-                archived = await _archive_uids(adapter, folder, [raw.uid], label="notion")
-                if not archived:
-                    counts["archive_fail"] += 1
-                    pending_archive.append((raw.uid, folder))
+                if _can_archive(folder, settings.imap_inbox):
+                    archived = await _archive_uids(adapter, folder, [raw.uid], label="notion")
+                    if not archived:
+                        counts["archive_fail"] += 1
+                        pending_archive.append((raw.uid, folder))
+                else:
+                    archived = True
                 logger.info(
                     "OK    uid={} | {} | notion page {} | imap={}",
                     raw.uid,
@@ -497,6 +509,11 @@ async def run(
 
 
 if __name__ == "__main__":
+    _add_archive_raw = _arg("--add-auto-archive")
+    if _add_archive_raw is not None:
+        _add_auto_archive(_parse_inbox_arg(_add_archive_raw))
+        sys.exit(0)
+
     _since = _arg("--since-days")
     _limit = _arg("--limit")
     _inbox_raw = _arg("--inbox")
