@@ -77,33 +77,8 @@ auto_archive:
   - "support@apollo.io"
 
 people:
-  # Google
-  - "@gmail.com"
-  - "@googlemail.com"
-  - "@hotmail.com"
-  - "@hotmail.fr"
-  - "@live.com"
-  - "@live.fr"
-  - "@msn.com"
-  - "@outlook.com"
-  - "@outlook.fr"
-  - "@icloud.com"
-  - "@me.com"
-  - "@mac.com"
-  - "@yahoo.com"
-  - "@yahoo.co.uk"
-  - "@yahoo.fr"
-  - "@ymail.com"
-  - "@laposte.net"
-  - "@orange.fr"
-  - "@wanadoo.fr"
-  - "@free.fr"
-  - "@sfr.fr"
-  - "@bbox.fr"
-  - "@numericable.fr"
-  - "@proton.me"
-  - "@protonmail.com"
-  - "@pm.me"
-  - "@tutanota.com"
-  - "@gmx.com"
-  - "@gmx.fr"
+  # Add specific addresses here after reviewing email-import-people-review.csv.
+  # Domain patterns (@gmail.com etc.) are intentionally NOT used here —
+  # they would auto-upsert every contact from that domain to Notion People DB
+  # without individual review, bypassing the human gate.
+  # Use --apply-review to move individual addresses here from the CSV.
