@@ -35,9 +35,19 @@ _DECISION_AUTO_ARCHIVED = "Auto archived"
 
 _PEOPLE_REVIEW_CSV = Path("data/inbox/email-import-people-review.csv")
 _PEOPLE_CSV_FIELDS = [
-    "email", "display_name", "domain", "folder",
-    "people_list", "enriched", "linkedin", "seniority", "role_type",
-    "dedup_status", "dedup_score", "matched_name", "decision",
+    "email",
+    "display_name",
+    "domain",
+    "folder",
+    "people_list",
+    "enriched",
+    "linkedin",
+    "seniority",
+    "role_type",
+    "dedup_status",
+    "dedup_score",
+    "matched_name",
+    "decision",
 ]
 _DECISION_TO_REVIEW = "To Review"
 
@@ -108,33 +118,47 @@ def _summary(raw) -> str:
 
 def _write_review_csv(rows: list[dict[str, str]]) -> None:
     import pandas as pd
+
     _REVIEW_CSV.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows, columns=_CSV_FIELDS).to_csv(_REVIEW_CSV, sep=";", index=False, encoding="utf-8-sig")
+    pd.DataFrame(rows, columns=_CSV_FIELDS).to_csv(
+        _REVIEW_CSV, sep=";", index=False, encoding="utf-8-sig"
+    )
 
 
 def _read_review_csv() -> list[dict[str, str]]:
     import pandas as pd
-    return pd.read_csv(_REVIEW_CSV, sep=None, engine="python", encoding="utf-8-sig", dtype=str).fillna("").to_dict("records")
+
+    return (
+        pd.read_csv(_REVIEW_CSV, sep=None, engine="python", encoding="utf-8-sig", dtype=str)
+        .fillna("")
+        .to_dict("records")
+    )
 
 
 def _write_people_csv(rows: list[dict[str, str]]) -> None:
     import pandas as pd
+
     _PEOPLE_REVIEW_CSV.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows, columns=_PEOPLE_CSV_FIELDS).to_csv(_PEOPLE_REVIEW_CSV, sep=";", index=False, encoding="utf-8-sig")
+    pd.DataFrame(rows, columns=_PEOPLE_CSV_FIELDS).to_csv(
+        _PEOPLE_REVIEW_CSV, sep=";", index=False, encoding="utf-8-sig"
+    )
 
 
 def _load_sender_config(settings: Settings) -> tuple[list[str], list[str], list[str]]:
     """Return (allowed, auto_archive, people) from YAML if present, else from settings."""
     if _SENDER_CONFIG.exists():
         import yaml  # pyyaml — loaded lazily so unit tests don't require it
+
         data = yaml.safe_load(_SENDER_CONFIG.read_text(encoding="utf-8")) or {}
         return (
             [str(s) for s in (data.get("allowed") or [])],
             [str(s) for s in (data.get("auto_archive") or [])],
             [str(s) for s in (data.get("people") or [])],
         )
+
     def _split(val: str) -> list[str]:
         return [s.strip() for s in (val or "").split(",") if s.strip()]
+
     return (
         _split(settings.imap_allowed_senders),
         _split(settings.imap_auto_archive_senders),
@@ -168,7 +192,10 @@ def _add_auto_archive(patterns: list[str]) -> None:
         logger.error("{} not found — create it first", _SENDER_CONFIG)
         return
     import yaml
-    existing = set((yaml.safe_load(_SENDER_CONFIG.read_text(encoding="utf-8")) or {}).get("auto_archive") or [])
+
+    existing = set(
+        (yaml.safe_load(_SENDER_CONFIG.read_text(encoding="utf-8")) or {}).get("auto_archive") or []
+    )
     new_patterns = [p for p in patterns if p not in existing]
     if not new_patterns:
         logger.info("All patterns already present in auto_archive")
@@ -198,28 +225,37 @@ def _apply_review() -> None:
         return
 
     import yaml
+
     data = yaml.safe_load(_SENDER_CONFIG.read_text(encoding="utf-8")) or {}
     existing: dict[str, set[str]] = {
         "allowed": set(data.get("allowed") or []),
         "auto_archive": set(data.get("auto_archive") or []),
         "people": set(data.get("people") or []),
     }
-    _DECISION_MAP = {"allowed": "allowed", "auto_archive": "auto_archive", "archive": "auto_archive", "people": "people"}
+    _DECISION_MAP = {
+        "allowed": "allowed",
+        "auto_archive": "auto_archive",
+        "archive": "auto_archive",
+        "people": "people",
+    }
     to_add: dict[str, list[str]] = {"allowed": [], "auto_archive": [], "people": []}
     skipped = 0
 
     import pandas as pd
-    df = pd.read_csv(_PEOPLE_REVIEW_CSV, sep=None, engine="python", encoding="utf-8-sig", dtype=str).fillna("")
+
+    df = pd.read_csv(
+        _PEOPLE_REVIEW_CSV, sep=None, engine="python", encoding="utf-8-sig", dtype=str
+    ).fillna("")
     for row in df.to_dict("records"):
-            decision = (row.get("decision") or "").strip().lower()
-            pattern = (row.get("email") or "").strip()
-            if not pattern or decision in ("to review", "", "ignore"):
-                skipped += 1
-                continue
-            dest = _DECISION_MAP.get(decision)
-            if dest and pattern not in existing[dest]:
-                to_add[dest].append(pattern)
-                existing[dest].add(pattern)
+        decision = (row.get("decision") or "").strip().lower()
+        pattern = (row.get("email") or "").strip()
+        if not pattern or decision in ("to review", "", "ignore"):
+            skipped += 1
+            continue
+        dest = _DECISION_MAP.get(decision)
+        if dest and pattern not in existing[dest]:
+            to_add[dest].append(pattern)
+            existing[dest].add(pattern)
 
     for section, patterns in to_add.items():
         if patterns:
@@ -230,7 +266,10 @@ def _apply_review() -> None:
     if total:
         logger.info("Applied {} routing decision(s) to {}", total, _SENDER_CONFIG)
     else:
-        logger.info("Nothing to apply — set decision column to allowed/auto_archive/people in {}", _PEOPLE_REVIEW_CSV)
+        logger.info(
+            "Nothing to apply — set decision column to allowed/auto_archive/people in {}",
+            _PEOPLE_REVIEW_CSV,
+        )
     logger.info("Skipped {} rows (To Review / ignore / no pattern)", skipped)
 
 
@@ -363,21 +402,34 @@ async def run(
 
     csv_rows: list[dict[str, str]] = []
     pending_archive: list[tuple[int, str]] = []
-    counts = {"process": 0, "skip": 0, "review": 0, "dedup": 0, "auto_archive": 0, "archive_fail": 0}
+    counts = {
+        "process": 0,
+        "skip": 0,
+        "review": 0,
+        "dedup": 0,
+        "auto_archive": 0,
+        "archive_fail": 0,
+    }
     people_candidates: list[tuple] = []  # (_RawEmail, folder: str, in_people_list: bool)
 
     for folder in folders:
         if from_csv:
             rows = _read_review_csv()
             to_process = [
-                r for r in rows
+                r
+                for r in rows
                 if _csv_requests_process(r.get("decision", ""))
                 and r.get("folder", folder) == folder
             ]
             if limit > 0:
                 to_process = to_process[:limit]
             if not to_process:
-                logger.info("No rows for folder '{}' with decision='{}' in {}", folder, _DECISION_TREATED, _REVIEW_CSV)
+                logger.info(
+                    "No rows for folder '{}' with decision='{}' in {}",
+                    folder,
+                    _DECISION_TREATED,
+                    _REVIEW_CSV,
+                )
                 continue
             uids = [int(r["uid"]) for r in to_process]
             emails = await asyncio.to_thread(
@@ -387,7 +439,9 @@ async def run(
         else:
             # For the main INBOX fetch ALL messages would be too slow; use UNSEEN only.
             is_inbox = folder.lower() == settings.imap_inbox.lower()
-            folder_since = since_days if not is_inbox else max(since_days or 0, settings.imap_since_days)
+            folder_since = (
+                since_days if not is_inbox else max(since_days or 0, settings.imap_since_days)
+            )
             emails = await asyncio.to_thread(
                 adapter.fetch_messages,
                 folder,
@@ -400,7 +454,9 @@ async def run(
         logger.info("── Email run ─────────────────────────────────────────────")
         logger.info("  Mode          : {}", "DRY RUN" if dry_run else "LIVE")
         logger.info("  Folder        : {}", folder)
-        logger.info("  Since days    : {} ({})", since_days, "all" if since_days == 0 else "filtered")
+        logger.info(
+            "  Since days    : {} ({})", since_days, "all" if since_days == 0 else "filtered"
+        )
         if limit > 0:
             logger.info("  Limit         : {} (newest first)", limit)
         logger.info("  Allowlist     : {}", ", ".join(allowed))
@@ -454,7 +510,11 @@ async def run(
             if _is_duplicate(raw, titles, urls):
                 counts["dedup"] += 1
                 row["decision"] = _DECISION_TREATED
-                if not dry_run and _sender_allowed(raw.sender, allowed) and _can_archive(folder, settings.imap_inbox):
+                if (
+                    not dry_run
+                    and _sender_allowed(raw.sender, allowed)
+                    and _can_archive(folder, settings.imap_inbox)
+                ):
                     archived = await _archive_uids(adapter, folder, [raw.uid], label="dedup")
                     if not archived:
                         counts["archive_fail"] += 1
@@ -507,7 +567,9 @@ async def run(
                 )
             else:
                 counts["skip"] += 1
-                logger.warning("FAIL  uid={} | {} | Notion write failed", raw.uid, _DECISION_UNTOUCHED)
+                logger.warning(
+                    "FAIL  uid={} | {} | Notion write failed", raw.uid, _DECISION_UNTOUCHED
+                )
 
     # ── People: enrich explicit list, write both to CSV ────────────────────
     people_rows: list[dict[str, str]] = []
@@ -542,26 +604,26 @@ async def run(
             dedup_status = "dry-run"
 
         decision = (
-            _DECISION_TO_REVIEW
-            if not in_people_list
-            else (dedup_status or _DECISION_UNTOUCHED)
+            _DECISION_TO_REVIEW if not in_people_list else (dedup_status or _DECISION_UNTOUCHED)
         )
 
-        people_rows.append({
-            "email": raw.sender,
-            "display_name": display,
-            "domain": domain,
-            "folder": folder,
-            "people_list": "yes" if in_people_list else "no",
-            "enriched": enriched_flag,
-            "linkedin": linkedin,
-            "seniority": seniority,
-            "role_type": role_type_str,
-            "dedup_status": dedup_status,
-            "dedup_score": dedup_score,
-            "matched_name": matched_name,
-            "decision": decision,
-        })
+        people_rows.append(
+            {
+                "email": raw.sender,
+                "display_name": display,
+                "domain": domain,
+                "folder": folder,
+                "people_list": "yes" if in_people_list else "no",
+                "enriched": enriched_flag,
+                "linkedin": linkedin,
+                "seniority": seniority,
+                "role_type": role_type_str,
+                "dedup_status": dedup_status,
+                "dedup_score": dedup_score,
+                "matched_name": matched_name,
+                "decision": decision,
+            }
+        )
         logger.info(
             "PEOPLE uid={} | list={} | enriched={} | dedup={} | from={}",
             raw.uid,

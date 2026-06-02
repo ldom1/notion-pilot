@@ -26,7 +26,14 @@ _DEFAULT_CSV = Path("data/crm/Basic_LinkedInDataExport_05-20-2026.zip/Connection
 _REVIEW_CSV = Path("data/crm/import-review.csv")
 _SKIPED_CSV = Path("data/crm/import-skiped.csv")
 
-_REVIEW_FIELDS = ["score", "input_name", "input_company", "matched_name", "matched_company", "linkedin_url"]
+_REVIEW_FIELDS = [
+    "score",
+    "input_name",
+    "input_company",
+    "matched_name",
+    "matched_company",
+    "linkedin_url",
+]
 
 
 def _parse_connections(csv_path: Path) -> list[PersonRecord]:
@@ -94,14 +101,16 @@ async def run(dry_run: bool, enrich: bool, csv_path: Path) -> None:
             status = _STATUS_MAP[match.status]
             counts[status] += 1
             if match.status == DedupStatus.SKIP:
-                skipped_rows.append({
-                    "score": f"{match.score:.1f}",
-                    "input_name": person.name,
-                    "input_company": person.company,
-                    "matched_name": match.matched_name,
-                    "matched_company": match.matched_company,
-                    "linkedin_url": person.linkedin_url,
-                })
+                skipped_rows.append(
+                    {
+                        "score": f"{match.score:.1f}",
+                        "input_name": person.name,
+                        "input_company": person.company,
+                        "matched_name": match.matched_name,
+                        "matched_company": match.matched_company,
+                        "linkedin_url": person.linkedin_url,
+                    }
+                )
             continue
 
         try:
@@ -145,12 +154,16 @@ async def run(dry_run: bool, enrich: bool, csv_path: Path) -> None:
 
     if review_rows:
         _REVIEW_CSV.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame(review_rows, columns=_REVIEW_FIELDS).to_csv(_REVIEW_CSV, sep=";", index=False, encoding="utf-8-sig")
+        pd.DataFrame(review_rows, columns=_REVIEW_FIELDS).to_csv(
+            _REVIEW_CSV, sep=";", index=False, encoding="utf-8-sig"
+        )
         logger.info("Review {} borderline match(es) in {}", len(review_rows), _REVIEW_CSV)
 
     if skipped_rows:
         _SKIPED_CSV.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame(skipped_rows, columns=_REVIEW_FIELDS).to_csv(_SKIPED_CSV, sep=";", index=False, encoding="utf-8-sig")
+        pd.DataFrame(skipped_rows, columns=_REVIEW_FIELDS).to_csv(
+            _SKIPED_CSV, sep=";", index=False, encoding="utf-8-sig"
+        )
 
     mode = "DRY RUN" if dry_run else "LIVE"
     logger.info(

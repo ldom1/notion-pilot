@@ -25,7 +25,9 @@ def main(csv_path: Path) -> None:
         print(f"Missing file: {csv_path}")
         sys.exit(1)
 
-    df = pd.read_csv(csv_path, sep=None, engine="python", encoding="utf-8-sig", dtype=str).fillna("")
+    df = pd.read_csv(csv_path, sep=None, engine="python", encoding="utf-8-sig", dtype=str).fillna(
+        ""
+    )
     by_sender = df["sender"].str.strip().value_counts()
 
     print(f"File: {csv_path}")
