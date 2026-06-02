@@ -139,9 +139,10 @@ def _write_people_csv(rows: list[dict[str, str]]) -> None:
     import pandas as pd
 
     _PEOPLE_REVIEW_CSV.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows, columns=_PEOPLE_CSV_FIELDS).to_csv(
-        _PEOPLE_REVIEW_CSV, sep=";", index=False, encoding="utf-8-sig"
+    df = pd.DataFrame(rows, columns=_PEOPLE_CSV_FIELDS).drop_duplicates(
+        subset=["email"], keep="first"
     )
+    df.to_csv(_PEOPLE_REVIEW_CSV, sep=";", index=False, encoding="utf-8-sig")
 
 
 def _load_sender_config(settings: Settings) -> tuple[list[str], list[str], list[str]]:
