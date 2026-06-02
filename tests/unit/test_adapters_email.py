@@ -41,6 +41,19 @@ class TestSenderAllowed:
         assert _sender_allowed("fr.vivino@e.vivinomail.com", patterns)
         assert not _sender_allowed("noreply@medium.com", patterns)
 
+    def test_exact_email_does_not_match_prefix_variant(self):
+        # evil-alice@acme.com must NOT match the pattern alice@acme.com
+        assert not _sender_allowed("evil-alice@acme.com", ["alice@acme.com"])
+
+    def test_exact_email_matches_self(self):
+        assert _sender_allowed("alice@acme.com", ["alice@acme.com"])
+
+    def test_domain_suffix_still_works_with_mixed_list(self):
+        patterns = ["alice@acme.com", "@gmail.com"]
+        assert _sender_allowed("anyone@gmail.com", patterns)
+        assert _sender_allowed("alice@acme.com", patterns)
+        assert not _sender_allowed("evil@acme.com", patterns)
+
 
 class TestDecodeStr:
     def test_plain_string_unchanged(self):

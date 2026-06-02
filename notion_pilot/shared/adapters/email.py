@@ -4,9 +4,10 @@ import asyncio
 import email as email_lib
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from html.parser import HTMLParser
 from email.header import decode_header as _email_decode_header
 from email.utils import parseaddr, parsedate_to_datetime
+from html.parser import HTMLParser
+from typing import cast
 
 from imapclient import IMAPClient
 from imapclient.imapclient import SEEN
@@ -91,9 +92,23 @@ def _sender_patterns(*fields: str | None) -> list[str]:
 
 
 def _sender_allowed(from_addr: str, allowed: list[str]) -> bool:
-    """Return True if from_addr ends with any entry in allowed (case-insensitive)."""
+    """Return True if from_addr matches any entry in allowed (case-insensitive).
+
+    Patterns starting with '@' are suffix-matched (domain wildcard).
+    All other patterns are exact-matched.
+    """
     addr = from_addr.lower()
-    return any(addr.endswith(a.lower()) for a in allowed if a)
+    for pattern in allowed:
+        if not pattern:
+            continue
+        p = pattern.lower()
+        if p.startswith("@"):
+            if addr.endswith(p):
+                return True
+        else:
+            if addr == p:
+                return True
+    return False
 
 
 def _parse_date(date_str: str | None) -> datetime:
@@ -219,7 +234,7 @@ class EmailAdapter:
         for name in names:
             low = name.lower()
             if low == wanted_l or low.endswith(f"/{wanted_l}") or low.endswith(f".{wanted_l}"):
-                return name
+                return cast(str, name)
         similar = [n for n in names if "archiv" in n.lower()]
         hint = similar[0] if len(similar) == 1 else similar
         raise ValueError(
@@ -228,9 +243,7 @@ class EmailAdapter:
             f"Archive-like folders found: {similar or 'none'}."
         )
 
-    def finalize_folder(
-        self, folder: str, to_archive: list[int], to_mark_seen: list[int]
-    ) -> str:
+    def finalize_folder(self, folder: str, to_archive: list[int], to_mark_seen: list[int]) -> str:
         """Mark seen and move messages to the archive folder. Returns destination folder."""
         return self._finalize(to_archive, to_mark_seen, folder)
 
@@ -245,9 +258,7 @@ class EmailAdapter:
                 client.add_flags(to_mark_seen, [SEEN])
             if to_archive:
                 client.add_flags(to_archive, [SEEN])
-                logger.info(
-                    "IMAP: moving {} message(s) {} → {}", len(to_archive), src, dest
-                )
+                logger.info("IMAP: moving {} message(s) {} → {}", len(to_archive), src, dest)
                 client.move(to_archive, dest)
             return dest
 
