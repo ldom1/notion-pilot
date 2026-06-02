@@ -1350,7 +1350,7 @@ requires-dist = [
     { name = "itsdangerous", specifier = ">=2.1" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "notion-client", specifier = ">=2.2.1" },
-    { name = "pandas", specifier = ">=2.0" },
+    { name = "pandas", specifier = ">=3.0.3" },
     { name = "pydantic-settings", specifier = ">=2.5.0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3.0" },
