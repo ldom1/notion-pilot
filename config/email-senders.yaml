@@ -1,13 +1,14 @@
-# Email sender lists for scripts/inbox/process_email.py
+# Email sender routing configuration
+# Used by: scripts/inbox/process_email.py
 #
-# Pattern rules:
-#   "@domain.com"   — matches any sender from that domain (suffix match)
-#   "user@host.com" — exact match only
+# Pattern syntax:
+#   @domain.com      → matches ANY sender from that domain (suffix match)
+#   user@domain.com  → exact match only
 #
-# This file is version-controlled (not sensitive).
-# Edit and commit when your allowlists change.
+# Version-controlled (non-sensitive). Commit changes when allowlists are updated.
 
-# ── Routed to knowledge DB (Notion) ─────────────────────────────────────────
+# ── Knowledge DB (Notion) ────────────────────────────────────────────────────
+# Emails routed here are parsed and stored as knowledge entries.
 allowed:
   - "louis@giron-dom.eu"
   - "@medium.com"
@@ -15,20 +16,105 @@ allowed:
   - "@a.strategies.fr"
   - "@parti-equinoxe.fr"
 
-# ── Silently archived, no Notion entry ──────────────────────────────────────
-# Add domains here via: --add-auto-archive=@domain.com
+# ── Auto-archive ─────────────────────────────────────────────────────────────
+# Silently archived — no Notion entry created.
+# To add entries from CLI: --add-auto-archive=@domain.com
+  - "discover@news.statista.com"
+  - "marion@lebigdata.fr"
+  - "info@pollinis.org"
+  - "noreply@theshifters.org"
 auto_archive:
-  - "@e.vivinomail.com"
-  - "@vivinomail.com"
+  # Medium transactional/partner mail (superseded by @medium.com in allowed)
   - "members@medium.com"
   - "partnerprogram@medium.com"
   - "writersupport@medium.com"
+  # Vivino marketing
+  - "@e.vivinomail.com"
+  - "@vivinomail.com"
 
-# ── Routed to People DB with enrichment (IMAP_PEOPLE_SENDERS) ───────────────
+# ── People DB ────────────────────────────────────────────────────────────────
+# Routed to People DB with contact enrichment (env: IMAP_PEOPLE_SENDERS).
+# Typically personal/consumer email domains.
+  - "annonce@amazon.fr"
+  - "newsletter@highlandtitles.com"
+  - "inspiration@mp1.tripadvisor.com"
+  - "mongodbteam@messages.mongodb.com"
+  - "noreply@glassdoor.com"
+  - "team@mail.notion.so"
+  - "redaction@theatreonline.com"
+  - "eva@studioboucleparis.com"
+  - "info@theatre-atelier.com"
+  - "actu@info.tf1.fr"
+  - "thierry@mesaccordsmetsvins.fr"
+  - "hello@mail.apollo.io"
+  - "hello@gocopees.com"
+  - "info@australiapreciousmetals.com"
+  - "club@actionnaires.engie.com"
+  - "no-reply@checklyhq.com"
+  - "newsletter@emails.hellowork.com"
+  - "no-reply@spotify.com"
+  - "hello@announcement.deliveroo.fr"
+  - "quatre-vingt-neuf+sender@mg.zenchefrestaurants.com"
+  - "hello@newsletters.mapstr.com"
+  - "vivino@m.vivino.com"
+  - "blurb@makebooks.blurb.com"
+  - "info@monsieurtshirt.com"
+  - "contact@inga.eco"
+  - "communication@theatredelarenaissance.com"
+  - "mehdi@team-planet.com"
+  - "no-reply@n.dribbble.com"
+  - "club@emails.cybex-online.com"
+  - "hello@studioboucleparis.com"
+  - "contact@cahorslamartine.com"
+  - "fr-mailing@i-run.me"
+  - "team@cs.resumeworded.com"
+  - "notification@emails.hellowork.com"
+  - "miam@info.benebono.fr"
+  - "love@bigmammagroup.com"
+  - "noreply@diggersfactory.com"
+  - "win@mail.apollo.io"
+  - "store+79504048477@g.shopifyemail.com"
+  - "contact@lagrandecourse.fr"
+  - "support@apollo.io"
 people:
+  # Google
   - "@gmail.com"
+  - "@googlemail.com"
+
+  # Microsoft
+  - "@hotmail.com"
   - "@hotmail.fr"
-  - "@icloud.com"
-  - "@yahoo.fr"
-  - "@yahoo.com"
+  - "@live.com"
+  - "@live.fr"
+  - "@msn.com"
   - "@outlook.com"
+  - "@outlook.fr"
+
+  # Apple
+  - "@icloud.com"
+  - "@me.com"
+  - "@mac.com"
+
+  # Yahoo
+  - "@yahoo.com"
+  - "@yahoo.co.uk"
+  - "@yahoo.fr"
+  - "@ymail.com"
+
+  # French ISP / legacy
+  - "@laposte.net"
+  - "@orange.fr"
+  - "@wanadoo.fr"
+  - "@free.fr"
+  - "@sfr.fr"
+  - "@bbox.fr"
+  - "@numericable.fr"
+
+  # Other common
+  - "@proton.me"
+  - "@protonmail.com"
+  - "@pm.me"
+  - "@tutanota.com"
+  - "@gmx.com"
+  - "@gmx.fr"
+  - "pierre-louis.jeauffroy@edhec.com"

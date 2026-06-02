@@ -109,21 +109,21 @@ def _summary(raw) -> str:
 
 def _write_review_csv(rows: list[dict[str, str]]) -> None:
     _REVIEW_CSV.parent.mkdir(parents=True, exist_ok=True)
-    with _REVIEW_CSV.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=_CSV_FIELDS)
+    with _REVIEW_CSV.open("w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=_CSV_FIELDS, delimiter=";", quoting=csv.QUOTE_ALL)
         writer.writeheader()
         writer.writerows(rows)
 
 
 def _read_review_csv() -> list[dict[str, str]]:
-    with _REVIEW_CSV.open(newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+    with _REVIEW_CSV.open(newline="", encoding="utf-8-sig") as f:
+        return list(csv.DictReader(f, delimiter=";"))
 
 
 def _write_people_csv(rows: list[dict[str, str]]) -> None:
     _PEOPLE_REVIEW_CSV.parent.mkdir(parents=True, exist_ok=True)
-    with _PEOPLE_REVIEW_CSV.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=_PEOPLE_CSV_FIELDS)
+    with _PEOPLE_REVIEW_CSV.open("w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=_PEOPLE_CSV_FIELDS, delimiter=";", quoting=csv.QUOTE_ALL)
         writer.writeheader()
         writer.writerows(rows)
 
@@ -213,8 +213,10 @@ def _apply_review() -> None:
     to_add: dict[str, list[str]] = {"allowed": [], "auto_archive": [], "people": []}
     skipped = 0
 
-    with _PEOPLE_REVIEW_CSV.open(encoding="utf-8") as f:
-        for row in csv.DictReader(f):
+    raw = _PEOPLE_REVIEW_CSV.read_text(encoding="utf-8-sig")
+    delimiter = ";" if raw.startswith('"email";"') or raw.startswith("email;") else ","
+    with _PEOPLE_REVIEW_CSV.open(newline="", encoding="utf-8-sig") as f:
+        for row in csv.DictReader(f, delimiter=delimiter):
             decision = (row.get("decision") or "").strip().lower()
             pattern = (row.get("email") or "").strip()
             if not pattern or decision in ("to review", "", "ignore"):
