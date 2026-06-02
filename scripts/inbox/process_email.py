@@ -26,6 +26,7 @@ from notion_pilot.shared.config import Settings, load_settings
 from notion_pilot.shared.models import _first_url
 from notion_pilot.shared.utils.enrichment import enrich_person
 
+_SENDER_CONFIG = Path("config/email-senders.yaml")
 _REVIEW_CSV = Path("data/email-import-review.csv")
 _CSV_FIELDS = ["uid", "folder", "sender", "subject", "sent_at", "summary", "decision"]
 _DECISION_UNTOUCHED = "Untouched"
@@ -126,24 +127,55 @@ def _write_people_csv(rows: list[dict[str, str]]) -> None:
         writer.writerows(rows)
 
 
+def _load_sender_config(settings: Settings) -> tuple[list[str], list[str], list[str]]:
+    """Return (allowed, auto_archive, people) from YAML if present, else from settings."""
+    if _SENDER_CONFIG.exists():
+        import yaml  # pyyaml — loaded lazily so unit tests don't require it
+        data = yaml.safe_load(_SENDER_CONFIG.read_text(encoding="utf-8")) or {}
+        return (
+            [str(s) for s in (data.get("allowed") or [])],
+            [str(s) for s in (data.get("auto_archive") or [])],
+            [str(s) for s in (data.get("people") or [])],
+        )
+    def _split(val: str) -> list[str]:
+        return [s.strip() for s in (val or "").split(",") if s.strip()]
+    return (
+        _split(settings.imap_allowed_senders),
+        _split(settings.imap_auto_archive_senders),
+        _split(settings.imap_people_senders),
+    )
+
+
 def _add_auto_archive(patterns: list[str]) -> None:
-    """Append patterns to IMAP_AUTO_ARCHIVE_SENDERS in .env (creates entry if missing)."""
-    env_path = Path(".env")
-    if not env_path.exists():
-        logger.error(".env not found — cannot update IMAP_AUTO_ARCHIVE_SENDERS")
+    """Append patterns to the auto_archive list in config/email-senders.yaml."""
+    if not _SENDER_CONFIG.exists():
+        logger.error("{} not found — create it first", _SENDER_CONFIG)
         return
-    text = env_path.read_text(encoding="utf-8")
-    import re as _re
-    m = _re.search(r"^(IMAP_AUTO_ARCHIVE_SENDERS\s*=\s*)(.*)$", text, _re.MULTILINE)
-    if m:
-        existing = [s.strip() for s in m.group(2).split(",") if s.strip()]
-        merged = existing + [p for p in patterns if p not in existing]
-        new_line = m.group(1) + ",".join(merged)
-        text = text[: m.start()] + new_line + text[m.end() :]
-    else:
-        text += f"\nIMAP_AUTO_ARCHIVE_SENDERS={','.join(patterns)}\n"
-    env_path.write_text(text, encoding="utf-8")
-    logger.info("Updated IMAP_AUTO_ARCHIVE_SENDERS with: {}", ", ".join(patterns))
+    import yaml
+    data = yaml.safe_load(_SENDER_CONFIG.read_text(encoding="utf-8")) or {}
+    existing = set(data.get("auto_archive") or [])
+    new_patterns = [p for p in patterns if p not in existing]
+    if not new_patterns:
+        logger.info("All patterns already present in auto_archive")
+        return
+    # Text-based insert to preserve comments: find end of auto_archive block, splice in new items.
+    lines = _SENDER_CONFIG.read_text(encoding="utf-8").splitlines()
+    insert_at = len(lines)
+    in_block = False
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("auto_archive:"):
+            in_block = True
+            continue
+        if in_block:
+            if stripped.startswith("- ") or stripped.startswith("#"):
+                insert_at = i + 1
+            elif stripped and not line.startswith(" "):
+                break  # hit next top-level key
+    new_lines = [f"  - {p}" for p in new_patterns]
+    result = lines[:insert_at] + new_lines + lines[insert_at:]
+    _SENDER_CONFIG.write_text("\n".join(result) + "\n", encoding="utf-8")
+    logger.info("Added {} pattern(s) to {} → {}", len(new_patterns), _SENDER_CONFIG, new_patterns)
 
 
 def _can_archive(folder: str, imap_inbox: str) -> bool:
@@ -242,10 +274,16 @@ async def run(
 
     adapter = EmailAdapter(settings)
     folders = inbox or [settings.imap_promotions_folder]
-    allowed = adapter._allowed
-    auto_archive = adapter._auto_archive
+    allowed, auto_archive, people = _load_sender_config(settings)
+    # Override adapter lists so the rest of the script uses YAML values
+    adapter._allowed = allowed
+    adapter._auto_archive = auto_archive
+    adapter._people = people
     if not allowed:
-        logger.error("IMAP_ALLOWED_SENDERS is empty — set e.g. @tldr.tech,@medium.com")
+        logger.error(
+            "allowed list is empty — add senders to {} or set IMAP_ALLOWED_SENDERS in .env",
+            _SENDER_CONFIG,
+        )
         sys.exit(1)
 
     if since_days is None:

@@ -1,0 +1,35 @@
+# Email sender lists for scripts/inbox/process_email.py
+#
+# Pattern rules:
+#   @domain.com   — matches any sender from that domain (suffix match)
+#   user@host.com — exact match only
+#
+# This file is version-controlled (not sensitive).
+# Edit and commit when your allowlists change.
+
+# ── Routed to knowledge DB (Notion) ─────────────────────────────────────────
+allowed:
+  - louis@giron-dom.eu
+  - @medium.com
+  - @tldrnewsletter.com
+  - @a.strategies.fr
+  - @parti-equinoxe.fr
+
+# ── Silently archived, no Notion entry ──────────────────────────────────────
+# Add domains here via: --add-auto-archive=@domain.com
+auto_archive:
+  - @e.vivinomail.com
+  - @vivinomail.com
+  - members@medium.com
+  - partnerprogram@medium.com
+  - writersupport@medium.com
+
+# ── Routed to People DB with enrichment (IMAP_PEOPLE_SENDERS) ───────────────
+people:
+  - @gmail.com
+  - @hotmail.fr
+  - @hotmail.com
+  - @icloud.com
+  - @yahoo.fr
+  - @yahoo.com
+  - @outlook.com
