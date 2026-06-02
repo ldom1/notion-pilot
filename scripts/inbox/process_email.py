@@ -29,6 +29,14 @@ _DECISION_UNTOUCHED = "Untouched"
 _DECISION_TREATED = "Treated and archived"
 _DECISION_AUTO_ARCHIVED = "Auto archived"
 
+_PEOPLE_REVIEW_CSV = Path("data/email-import-people-review.csv")
+_PEOPLE_CSV_FIELDS = [
+    "email", "display_name", "domain", "folder",
+    "people_list", "enriched", "linkedin", "seniority", "role_type",
+    "dedup_status", "dedup_score", "matched_name", "decision",
+]
+_DECISION_TO_REVIEW = "To Review"
+
 
 def _flag(name: str) -> bool:
     return name in sys.argv
@@ -118,6 +126,14 @@ def _write_review_csv(rows: list[dict[str, str]]) -> None:
 def _read_review_csv() -> list[dict[str, str]]:
     with _REVIEW_CSV.open(newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
+
+
+def _write_people_csv(rows: list[dict[str, str]]) -> None:
+    _PEOPLE_REVIEW_CSV.parent.mkdir(parents=True, exist_ok=True)
+    with _PEOPLE_REVIEW_CSV.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=_PEOPLE_CSV_FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 async def _archive_uids(adapter: EmailAdapter, folder: str, uids: list[int], *, label: str) -> bool:
@@ -219,6 +235,7 @@ async def run(
     csv_rows: list[dict[str, str]] = []
     pending_archive: list[tuple[int, str]] = []
     counts = {"process": 0, "skip": 0, "review": 0, "dedup": 0, "auto_archive": 0, "archive_fail": 0}
+    people_candidates: list[tuple] = []  # (_RawEmail, folder: str, in_people_list: bool)
 
     for folder in folders:
         if from_csv:
@@ -291,10 +308,13 @@ async def run(
 
             if not from_csv and not _sender_allowed(raw.sender, allowed):
                 counts["review"] += 1
+                in_people_list = _sender_allowed(raw.sender, adapter._people)
+                if in_people_list or not _is_automated(raw.sender):
+                    people_candidates.append((raw, folder, in_people_list))
                 logger.info(
-                    "REVIEW uid={} | {} | from={} | subject={!r}",
+                    "REVIEW uid={} | people={} | from={} | subject={!r}",
                     raw.uid,
-                    _DECISION_UNTOUCHED,
+                    "yes" if in_people_list else ("candidate" if not _is_automated(raw.sender) else "automated"),
                     raw.sender,
                     raw.subject or "(no subject)",
                 )
@@ -354,6 +374,31 @@ async def run(
             else:
                 counts["skip"] += 1
                 logger.warning("FAIL  uid={} | {} | Notion write failed", raw.uid, _DECISION_UNTOUCHED)
+
+    # ── People CSV (no Notion upsert here — see Task 6 for enrichment) ─────
+    people_rows: list[dict[str, str]] = []
+    for raw, folder, in_people_list in people_candidates:
+        domain = raw.sender.split("@")[-1] if "@" in raw.sender else ""
+        display = raw.sender.split("@")[0].replace(".", " ").replace("_", " ").title()
+        people_rows.append({
+            "email": raw.sender,
+            "display_name": display,
+            "domain": domain,
+            "folder": folder,
+            "people_list": "yes" if in_people_list else "no",
+            "enriched": "",
+            "linkedin": "",
+            "seniority": "",
+            "role_type": "",
+            "dedup_status": "",
+            "dedup_score": "",
+            "matched_name": "",
+            "decision": _DECISION_UNTOUCHED if in_people_list else _DECISION_TO_REVIEW,
+        })
+
+    if people_rows:
+        _write_people_csv(people_rows)
+        logger.info("Wrote {} people candidates → {}", len(people_rows), _PEOPLE_REVIEW_CSV)
 
     _write_review_csv(csv_rows)
     logger.info("Wrote {}", _REVIEW_CSV)
