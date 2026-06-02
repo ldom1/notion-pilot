@@ -473,11 +473,12 @@ async def run(
             )
             logger.info("--from-csv: {} message(s) to process from {}", len(emails), folder)
         else:
-            # For the main INBOX fetch ALL messages would be too slow; use UNSEEN only.
             is_inbox = folder.lower() == settings.imap_inbox.lower()
-            folder_since = (
-                since_days if not is_inbox else max(since_days or 0, settings.imap_since_days)
-            )
+            if is_inbox and not dry_run:
+                # Live INBOX: enforce a minimum window to avoid hanging on a large mailbox.
+                folder_since = max(since_days or 0, settings.imap_since_days)
+            else:
+                folder_since = since_days
             emails = await asyncio.to_thread(
                 adapter.fetch_messages,
                 folder,
