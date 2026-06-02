@@ -217,7 +217,7 @@ async def run(
     pipeline = build_knowledge_pipeline(settings)
 
     csv_rows: list[dict[str, str]] = []
-    pending_archive: list[int] = []
+    pending_archive: list[tuple[int, str]] = []
     counts = {"process": 0, "skip": 0, "review": 0, "dedup": 0, "auto_archive": 0, "archive_fail": 0}
 
     for folder in folders:
@@ -307,7 +307,7 @@ async def run(
                     archived = await _archive_uids(adapter, folder, [raw.uid], label="dedup")
                     if not archived:
                         counts["archive_fail"] += 1
-                        pending_archive.append(raw.uid)
+                        pending_archive.append((raw.uid, folder))
                 logger.info(
                     "SKIP  uid={} | {} | dedup (already in Notion) | subject={!r}",
                     raw.uid,
@@ -343,7 +343,7 @@ async def run(
                 archived = await _archive_uids(adapter, folder, [raw.uid], label="notion")
                 if not archived:
                     counts["archive_fail"] += 1
-                    pending_archive.append(raw.uid)
+                    pending_archive.append((raw.uid, folder))
                 logger.info(
                     "OK    uid={} | {} | notion page {} | imap={}",
                     raw.uid,
@@ -360,15 +360,15 @@ async def run(
 
     if not dry_run and pending_archive:
         failed = [
-            u
-            for u in pending_archive
-            if not await _archive_uids(adapter, folder, [u], label="retry")
+            (u, fldr)
+            for u, fldr in pending_archive
+            if not await _archive_uids(adapter, fldr, [u], label="retry")
         ]
         if failed:
             logger.error(
                 "Archive still failed for {} uid(s): {} — check IMAP_ARCHIVE in .env",
                 len(failed),
-                failed[:10],
+                [u for u, _ in failed][:10],
             )
 
     logger.info(
