@@ -8,6 +8,7 @@ Usage:
     uv run python scripts/inbox/process_email.py --dry-run --since-days=14
     uv run python scripts/inbox/process_email.py --limit=10   # newest 10 only (smoke test)
     uv run python scripts/inbox/process_email.py --add-auto-archive=@domain.com,sender@other.com
+    uv run python scripts/inbox/process_email.py --apply-review   # apply CSV decisions → YAML
 """
 
 import asyncio
@@ -146,36 +147,95 @@ def _load_sender_config(settings: Settings) -> tuple[list[str], list[str], list[
     )
 
 
+def _yaml_append_to_section(section: str, patterns: list[str]) -> None:
+    """Append quoted patterns to a named section in email-senders.yaml, preserving comments."""
+    lines = _SENDER_CONFIG.read_text(encoding="utf-8").splitlines()
+    insert_at = len(lines)
+    in_block = False
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith(f"{section}:"):
+            in_block = True
+            continue
+        if in_block:
+            if stripped.startswith("- ") or stripped.startswith("#") or not stripped:
+                insert_at = i + 1
+            elif stripped and not line.startswith(" "):
+                break
+    new_lines = [f'  - "{p}"' for p in patterns]
+    result = lines[:insert_at] + new_lines + lines[insert_at:]
+    _SENDER_CONFIG.write_text("\n".join(result) + "\n", encoding="utf-8")
+
+
 def _add_auto_archive(patterns: list[str]) -> None:
     """Append patterns to the auto_archive list in config/email-senders.yaml."""
     if not _SENDER_CONFIG.exists():
         logger.error("{} not found — create it first", _SENDER_CONFIG)
         return
     import yaml
-    data = yaml.safe_load(_SENDER_CONFIG.read_text(encoding="utf-8")) or {}
-    existing = set(data.get("auto_archive") or [])
+    existing = set((yaml.safe_load(_SENDER_CONFIG.read_text(encoding="utf-8")) or {}).get("auto_archive") or [])
     new_patterns = [p for p in patterns if p not in existing]
     if not new_patterns:
         logger.info("All patterns already present in auto_archive")
         return
-    # Text-based insert to preserve comments: find end of auto_archive block, splice in new items.
-    lines = _SENDER_CONFIG.read_text(encoding="utf-8").splitlines()
-    insert_at = len(lines)
-    in_block = False
-    for i, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped.startswith("auto_archive:"):
-            in_block = True
-            continue
-        if in_block:
-            if stripped.startswith("- ") or stripped.startswith("#"):
-                insert_at = i + 1
-            elif stripped and not line.startswith(" "):
-                break  # hit next top-level key
-    new_lines = [f'  - "{p}"' for p in new_patterns]
-    result = lines[:insert_at] + new_lines + lines[insert_at:]
-    _SENDER_CONFIG.write_text("\n".join(result) + "\n", encoding="utf-8")
-    logger.info("Added {} pattern(s) to {} → {}", len(new_patterns), _SENDER_CONFIG, new_patterns)
+    _yaml_append_to_section("auto_archive", new_patterns)
+    logger.info("Added {} pattern(s) to auto_archive → {}", len(new_patterns), new_patterns)
+
+
+def _apply_review() -> None:
+    """Read email-import-people-review.csv and apply routing decisions to email-senders.yaml.
+
+    Edit the 'decision' column in the CSV before running this command:
+      allowed      → add to allowed (knowledge DB)
+      auto_archive → add to auto_archive (silent archive)
+      people       → add to people (People DB + enrichment)
+      ignore       → skip permanently
+      To Review    → skip for now (process later)
+
+    Edit the 'email' column to '@domain.com' to add a domain-level rule
+    instead of matching only that exact address.
+    """
+    if not _PEOPLE_REVIEW_CSV.exists():
+        logger.error("{} not found — run --dry-run first", _PEOPLE_REVIEW_CSV)
+        return
+    if not _SENDER_CONFIG.exists():
+        logger.error("{} not found", _SENDER_CONFIG)
+        return
+
+    import yaml
+    data = yaml.safe_load(_SENDER_CONFIG.read_text(encoding="utf-8")) or {}
+    existing: dict[str, set[str]] = {
+        "allowed": set(data.get("allowed") or []),
+        "auto_archive": set(data.get("auto_archive") or []),
+        "people": set(data.get("people") or []),
+    }
+    _DECISION_MAP = {"allowed": "allowed", "auto_archive": "auto_archive", "archive": "auto_archive", "people": "people"}
+    to_add: dict[str, list[str]] = {"allowed": [], "auto_archive": [], "people": []}
+    skipped = 0
+
+    with _PEOPLE_REVIEW_CSV.open(encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            decision = (row.get("decision") or "").strip().lower()
+            pattern = (row.get("email") or "").strip()
+            if not pattern or decision in ("to review", "", "ignore"):
+                skipped += 1
+                continue
+            dest = _DECISION_MAP.get(decision)
+            if dest and pattern not in existing[dest]:
+                to_add[dest].append(pattern)
+                existing[dest].add(pattern)
+
+    for section, patterns in to_add.items():
+        if patterns:
+            _yaml_append_to_section(section, patterns)
+            logger.info("  {} ← {}", section, patterns)
+
+    total = sum(len(v) for v in to_add.values())
+    if total:
+        logger.info("Applied {} routing decision(s) to {}", total, _SENDER_CONFIG)
+    else:
+        logger.info("Nothing to apply — set decision column to allowed/auto_archive/people in {}", _PEOPLE_REVIEW_CSV)
+    logger.info("Skipped {} rows (To Review / ignore / no pattern)", skipped)
 
 
 def _can_archive(folder: str, imap_inbox: str) -> bool:
@@ -550,6 +610,10 @@ if __name__ == "__main__":
     _add_archive_raw = _arg("--add-auto-archive")
     if _add_archive_raw is not None:
         _add_auto_archive(_parse_inbox_arg(_add_archive_raw))
+        sys.exit(0)
+
+    if _flag("--apply-review"):
+        _apply_review()
         sys.exit(0)
 
     _since = _arg("--since-days")
