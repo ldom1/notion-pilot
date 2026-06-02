@@ -23,8 +23,8 @@ from notion_pilot.shared.adapters.email import EmailAdapter, _sender_allowed
 from notion_pilot.shared.config import load_settings
 from notion_pilot.shared.models import _first_url
 
-_REVIEW_CSV = Path("data/promotions-review.csv")
-_CSV_FIELDS = ["uid", "sender", "subject", "sent_at", "summary", "decision"]
+_REVIEW_CSV = Path("data/email-import-review.csv")
+_CSV_FIELDS = ["uid", "folder", "sender", "subject", "sent_at", "summary", "decision"]
 _DECISION_UNTOUCHED = "Untouched"
 _DECISION_TREATED = "Treated and archived"
 _DECISION_AUTO_ARCHIVED = "Auto archived"
@@ -191,6 +191,7 @@ async def run(
     from_csv: bool,
     since_days: int | None,
     limit: int = 0,
+    inbox: list[str] | None = None,
 ) -> None:
     settings = load_settings()
     if settings.notion_token is None:
@@ -198,7 +199,7 @@ async def run(
         sys.exit(1)
 
     adapter = EmailAdapter(settings)
-    folder = settings.imap_promotions_folder
+    folders = inbox or [settings.imap_promotions_folder]
     allowed = adapter._allowed
     auto_archive = adapter._auto_archive
     if not allowed:
@@ -215,143 +216,144 @@ async def run(
 
     pipeline = build_knowledge_pipeline(settings)
 
-    if from_csv:
-        rows = _read_review_csv()
-        to_process = [r for r in rows if _csv_requests_process(r.get("decision", ""))]
-        if limit > 0:
-            to_process = to_process[:limit]
-        if not to_process:
-            logger.info("No rows with decision='{}' in {}", _DECISION_TREATED, _REVIEW_CSV)
-            return
-        uids = [int(r["uid"]) for r in to_process]
-        emails = await asyncio.to_thread(adapter.fetch_messages, folder, uids=uids, since_days=0)
-        logger.info("--from-csv: {} message(s) to process", len(emails))
-    else:
-        emails = await asyncio.to_thread(
-            adapter.fetch_messages,
-            folder,
-            all_messages=dry_run,
-            since_days=since_days,
-        )
-        if limit > 0:
-            emails = sorted(emails, key=lambda e: e.sent_at, reverse=True)[:limit]
-
-    logger.info("── Promotions run ───────────────────────────────────────")
-    logger.info("  Mode          : {}", "DRY RUN" if dry_run else "LIVE")
-    logger.info("  Folder        : {}", folder)
-    logger.info("  Since days    : {} ({})", since_days, "all" if since_days == 0 else "filtered")
-    if limit > 0:
-        logger.info("  Limit         : {} (newest first)", limit)
-    logger.info("  Allowlist     : {}", ", ".join(allowed))
-    logger.info("  Auto-archive  : {}", ", ".join(auto_archive) or "(none)")
-    logger.info("  Messages      : {}", len(emails))
-    logger.info("────────────────────────────────────────────────────────")
-
     csv_rows: list[dict[str, str]] = []
     pending_archive: list[int] = []
-    counts = {
-        "process": 0,
-        "skip": 0,
-        "review": 0,
-        "dedup": 0,
-        "auto_archive": 0,
-        "archive_fail": 0,
-    }
+    counts = {"process": 0, "skip": 0, "review": 0, "dedup": 0, "auto_archive": 0, "archive_fail": 0}
 
-    for raw in emails:
-        summary = _summary(raw)
-        row = {
-            "uid": str(raw.uid),
-            "sender": raw.sender,
-            "subject": raw.subject,
-            "sent_at": raw.sent_at.strftime("%Y-%m-%d %H:%M"),
-            "summary": summary,
-            "decision": _DECISION_UNTOUCHED,
-        }
-        csv_rows.append(row)
-
-        if not from_csv and auto_archive and _sender_allowed(raw.sender, auto_archive):
-            counts["auto_archive"] += 1
-            row["decision"] = _DECISION_AUTO_ARCHIVED
-            if not dry_run:
-                ok = await _archive_uids(adapter, folder, [raw.uid], label="auto-archive")
-                if not ok:
-                    counts["archive_fail"] += 1
-            logger.info(
-                "{} uid={} | {} | from={} | subject={!r}",
-                "WOULD" if dry_run else "OK",
-                raw.uid,
-                _DECISION_AUTO_ARCHIVED,
-                raw.sender,
-                raw.subject or "(no subject)",
+    for folder in folders:
+        if from_csv:
+            rows = _read_review_csv()
+            to_process = [
+                r for r in rows
+                if _csv_requests_process(r.get("decision", ""))
+                and r.get("folder", folder) == folder
+            ]
+            if limit > 0:
+                to_process = to_process[:limit]
+            if not to_process:
+                logger.info("No rows for folder '{}' with decision='{}' in {}", folder, _DECISION_TREATED, _REVIEW_CSV)
+                continue
+            uids = [int(r["uid"]) for r in to_process]
+            emails = await asyncio.to_thread(
+                adapter.fetch_messages, folder, uids=uids, since_days=0
             )
-            continue
-
-        if not from_csv and not _sender_allowed(raw.sender, allowed):
-            counts["review"] += 1
-            logger.info(
-                "REVIEW uid={} | {} | from={} | subject={!r}",
-                raw.uid,
-                _DECISION_UNTOUCHED,
-                raw.sender,
-                raw.subject or "(no subject)",
+            logger.info("--from-csv: {} message(s) to process from {}", len(emails), folder)
+        else:
+            emails = await asyncio.to_thread(
+                adapter.fetch_messages,
+                folder,
+                all_messages=dry_run,
+                since_days=since_days,
             )
-            continue
+            if limit > 0:
+                emails = sorted(emails, key=lambda e: e.sent_at, reverse=True)[:limit]
 
-        if _is_duplicate(raw, titles, urls):
-            counts["dedup"] += 1
-            row["decision"] = _DECISION_TREATED
-            if not dry_run and _sender_allowed(raw.sender, allowed):
-                archived = await _archive_uids(adapter, folder, [raw.uid], label="dedup")
+        logger.info("── Email run ─────────────────────────────────────────────")
+        logger.info("  Mode          : {}", "DRY RUN" if dry_run else "LIVE")
+        logger.info("  Folder        : {}", folder)
+        logger.info("  Since days    : {} ({})", since_days, "all" if since_days == 0 else "filtered")
+        if limit > 0:
+            logger.info("  Limit         : {} (newest first)", limit)
+        logger.info("  Allowlist     : {}", ", ".join(allowed))
+        logger.info("  Auto-archive  : {}", ", ".join(auto_archive) or "(none)")
+        logger.info("  Messages      : {}", len(emails))
+        logger.info("──────────────────────────────────────────────────────────")
+
+        for raw in emails:
+            summary = _summary(raw)
+            row = {
+                "uid": str(raw.uid),
+                "folder": folder,
+                "sender": raw.sender,
+                "subject": raw.subject,
+                "sent_at": raw.sent_at.strftime("%Y-%m-%d %H:%M"),
+                "summary": summary,
+                "decision": _DECISION_UNTOUCHED,
+            }
+            csv_rows.append(row)
+
+            if not from_csv and auto_archive and _sender_allowed(raw.sender, auto_archive):
+                counts["auto_archive"] += 1
+                row["decision"] = _DECISION_AUTO_ARCHIVED
+                if not dry_run:
+                    ok = await _archive_uids(adapter, folder, [raw.uid], label="auto-archive")
+                    if not ok:
+                        counts["archive_fail"] += 1
+                logger.info(
+                    "{} uid={} | {} | from={} | subject={!r}",
+                    "WOULD" if dry_run else "OK",
+                    raw.uid,
+                    _DECISION_AUTO_ARCHIVED,
+                    raw.sender,
+                    raw.subject or "(no subject)",
+                )
+                continue
+
+            if not from_csv and not _sender_allowed(raw.sender, allowed):
+                counts["review"] += 1
+                logger.info(
+                    "REVIEW uid={} | {} | from={} | subject={!r}",
+                    raw.uid,
+                    _DECISION_UNTOUCHED,
+                    raw.sender,
+                    raw.subject or "(no subject)",
+                )
+                continue
+
+            if _is_duplicate(raw, titles, urls):
+                counts["dedup"] += 1
+                row["decision"] = _DECISION_TREATED
+                if not dry_run and _sender_allowed(raw.sender, allowed):
+                    archived = await _archive_uids(adapter, folder, [raw.uid], label="dedup")
+                    if not archived:
+                        counts["archive_fail"] += 1
+                        pending_archive.append(raw.uid)
+                logger.info(
+                    "SKIP  uid={} | {} | dedup (already in Notion) | subject={!r}",
+                    raw.uid,
+                    _DECISION_TREATED if not dry_run else _DECISION_UNTOUCHED,
+                    raw.subject or "(no subject)",
+                )
+                continue
+
+            if dry_run:
+                counts["process"] += 1
+                row["decision"] = _DECISION_TREATED
+                logger.info(
+                    "WOULD uid={} | {} | → Notion → {} | subject={!r} | sent={}",
+                    raw.uid,
+                    _DECISION_TREATED,
+                    settings.imap_archive,
+                    raw.subject or "(no subject)",
+                    raw.sent_at.strftime("%Y-%m-%d"),
+                )
+                continue
+
+            incoming = adapter._to_incoming(raw)
+            page_id = await pipeline(incoming)
+            if page_id:
+                counts["process"] += 1
+                row["decision"] = _DECISION_TREATED
+                subj = raw.subject.strip().lower()
+                if subj:
+                    titles.add(subj)
+                url = _first_url(raw.body or "") or _first_url(raw.subject or "")
+                if url:
+                    urls.add(url)
+                archived = await _archive_uids(adapter, folder, [raw.uid], label="notion")
                 if not archived:
                     counts["archive_fail"] += 1
                     pending_archive.append(raw.uid)
-            logger.info(
-                "SKIP  uid={} | {} | dedup (already in Notion) | subject={!r}",
-                raw.uid,
-                _DECISION_TREATED if not dry_run else _DECISION_UNTOUCHED,
-                raw.subject or "(no subject)",
-            )
-            continue
-
-        if dry_run:
-            counts["process"] += 1
-            row["decision"] = _DECISION_TREATED
-            logger.info(
-                "WOULD uid={} | {} | → Notion → {} | subject={!r} | sent={}",
-                raw.uid,
-                _DECISION_TREATED,
-                settings.imap_archive,
-                raw.subject or "(no subject)",
-                raw.sent_at.strftime("%Y-%m-%d"),
-            )
-            continue
-
-        incoming = adapter._to_incoming(raw)
-        page_id = await pipeline(incoming)
-        if page_id:
-            counts["process"] += 1
-            row["decision"] = _DECISION_TREATED
-            subj = raw.subject.strip().lower()
-            if subj:
-                titles.add(subj)
-            url = _first_url(raw.body or "") or _first_url(raw.subject or "")
-            if url:
-                urls.add(url)
-            archived = await _archive_uids(adapter, folder, [raw.uid], label="notion")
-            if not archived:
-                counts["archive_fail"] += 1
-                pending_archive.append(raw.uid)
-            logger.info(
-                "OK    uid={} | {} | notion page {} | imap={}",
-                raw.uid,
-                _DECISION_TREATED,
-                page_id,
-                "archived" if archived else "ARCHIVE FAILED",
-            )
-        else:
-            counts["skip"] += 1
-            logger.warning("FAIL  uid={} | {} | Notion write failed", raw.uid, _DECISION_UNTOUCHED)
+                logger.info(
+                    "OK    uid={} | {} | notion page {} | imap={}",
+                    raw.uid,
+                    _DECISION_TREATED,
+                    page_id,
+                    "archived" if archived else "ARCHIVE FAILED",
+                )
+            else:
+                counts["skip"] += 1
+                logger.warning("FAIL  uid={} | {} | Notion write failed", raw.uid, _DECISION_UNTOUCHED)
 
     _write_review_csv(csv_rows)
     logger.info("Wrote {}", _REVIEW_CSV)
@@ -383,11 +385,13 @@ async def run(
 if __name__ == "__main__":
     _since = _arg("--since-days")
     _limit = _arg("--limit")
+    _inbox_raw = _arg("--inbox")
     asyncio.run(
         run(
             dry_run=_flag("--dry-run"),
             from_csv=_flag("--from-csv"),
             since_days=int(_since) if _since is not None else None,
             limit=int(_limit) if _limit else 0,
+            inbox=_parse_inbox_arg(_inbox_raw) if _inbox_raw else None,
         )
     )
