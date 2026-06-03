@@ -196,6 +196,44 @@ class TestNotionPeopleSyncer:
         assert {"name": "management"} in props["Role Type"]["multi_select"]
 
 
+def _make_people_page_no_company(page_id: str, name: str, email: str = "") -> dict:
+    props: dict = {
+        "Nom": {"title": [{"plain_text": name}]},
+        "Company": {"relation": []},
+    }
+    if email:
+        props["Email - pro"] = {"email": email}
+    return {"id": page_id, "properties": props}
+
+
+class TestNotionPeopleSyncerNoCompany:
+    async def test_upsert_without_company_syncer_creates_page(self):
+        client = _mock_ds_query([])  # empty snapshot
+        client.pages.create = AsyncMock(return_value={"id": "new-person-id"})
+        syncer = NotionPeopleSyncer(client, "fake-ds-id", company_syncer=None)
+        await syncer.load_snapshot()
+
+        result = await syncer.upsert(
+            PersonRecord(name="Alice Smith", company="", email="alice@acme.com")
+        )
+        assert result.status == "created"
+        assert result.page_id == "new-person-id"
+        # No company relation should be set
+        call_properties = client.pages.create.call_args.kwargs["properties"]
+        assert "Company" not in call_properties
+
+    async def test_upsert_without_company_syncer_deduplicates_by_name(self):
+        client = _mock_ds_query([_make_people_page_no_company("existing-id", "Alice Smith")])
+        syncer = NotionPeopleSyncer(client, "fake-ds-id", company_syncer=None)
+        await syncer.load_snapshot()
+
+        result = await syncer.upsert(
+            PersonRecord(name="Alice Smith", company="", email="alice@acme.com")
+        )
+        assert result.status == "skipped"
+        client.pages.create.assert_not_called()
+
+
 async def test_load_snapshot_reads_optional_fields():
     client = _mock_people_client(
         people_pages=[

@@ -125,7 +125,7 @@ async def advance_setup(
                 if scope in ("inbox", "both"):
                     inbox = await create_inbox_workspace(client, parent_id)
                     lines += [
-                        f"NOTION_DATABASE_ID={inbox.notions_id}",
+                        f"NOTION_TELEGRAM_MSG_DATABASE_ID={inbox.notions_id}",
                         f"NOTION_IDEAS_DATABASE_ID={inbox.ideas_id}",
                         f"NOTION_TOOLS_DATABASE_ID={inbox.tools_id}",
                         f"NOTION_DATA_TECH_DATABASE_ID={inbox.data_tech_id}",

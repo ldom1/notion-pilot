@@ -21,12 +21,13 @@ async def main() -> None:
 
     # Step 1 — Build a normalized inbound message (what the bot produces from Telegram).
     incoming = IncomingMessage(
-        text="J'ai trouvé un nouvel outil hyper intéressant: https://github.com/ldom1/telegram-to-notion",
+        text="J'ai trouvé un nouvel outil hyper intéressant: https://github.com/ldom1/notion-pilot",
         caption=None,
         sender="example.py",
         sent_at=datetime.now(timezone.utc),
         media_type=MediaType.TEXT,
         media=None,
+        source_adapter="telegram",
     )
     logger.info(f"[1/3] Incoming message: {incoming.name!r}")
 
@@ -36,7 +37,9 @@ async def main() -> None:
 
     # Step 3 — Write a page to the Notion database.
     client = NotionClient(auth=settings.notion_token.get_secret_value())
-    writer = NotionDatabaseWriter(client=client, database_id=settings.notion_database_id)
+    writer = NotionDatabaseWriter(
+        client=client, database_id=settings.notion_telegram_msg_database_id
+    )
     page_id = await writer.create_page(properties)
     logger.info(f"[3/3] Notion page created: {page_id}")
 

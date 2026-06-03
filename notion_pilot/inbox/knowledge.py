@@ -20,4 +20,6 @@ async def process_message(
 
 def build_knowledge_pipeline(settings: Settings) -> MessageHandler:
     """Return a handler that enriches via LLM and writes to the main knowledge DB."""
-    return build_pipeline(settings, settings.notion_database_id, process_message, "knowledge")
+    return build_pipeline(
+        settings, settings.notion_telegram_msg_database_id, process_message, "knowledge"
+    )

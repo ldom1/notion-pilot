@@ -221,7 +221,7 @@ class TelegramAdapter:
 
         async def _ping(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
             if update.message is not None:
-                await update.message.reply_text("telegram-to-notion: ok")
+                await update.message.reply_text("notion-pilot: ok")
 
         assert self._settings.telegram_bot_token is not None
         app = (

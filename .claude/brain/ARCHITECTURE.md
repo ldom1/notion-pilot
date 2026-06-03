@@ -5,7 +5,7 @@
 Two products, one mono-repo, shared core:
 
 ```
-notion-pilot/            ← repo name (rename from telegram-to-notion)
+notion-pilot/            ← repo name (rename from notion-pilot)
 ├── notion_pilot/        ← Python package (rename from telegram_to_notion)
 │   ├── shared/          ← core used by both products
 │   │   ├── adapters/    ← SourceAdapter/SinkAdapter protocols + Telegram/Email/Discord impls
@@ -65,12 +65,11 @@ Source adapter (telegram / email / discord)
 | Env var | Purpose |
 |---------|---------|
 | `NOTION_DATABASE_ID` | Knowledge / inbox DB |
-| `NOTION_PEOPLE_DATABASE_ID` | People DB (standard API) |
 | `NOTION_COMPANIES_DATA_SOURCE_ID` | Companies DB (inline DS API) |
-| `NOTION_PEOPLE_DATA_SOURCE_ID` | People DB (inline DS API — for upsert) |
+| `NOTION_PEOPLE_DATA_SOURCE_ID` | People DB (central CRM syncer: dedup + upsert) |
 | `NOTION_DEALS_DATABASE_ID` | Deals DB |
 
-> Note: two IDs for People is a current inconsistency — `people_database_id` for writes, `people_data_source_id` for the inline DS query API. To be unified in refactor.
+> Email people capture uses the same CRM syncer path as `/people` commands instead of a separate contacts writer.
 
 ## Architectural Notes
 

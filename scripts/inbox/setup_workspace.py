@@ -50,7 +50,7 @@ async def main(parent_id: str, page_title: str) -> None:
 
     logger.info("")
     logger.info("✅  Knowledge workspace ready — add to .env:")
-    logger.info("  NOTION_DATABASE_ID={}", result.notions_id)
+    logger.info("  NOTION_TELEGRAM_MSG_DATABASE_ID={}", result.notions_id)
     logger.info("  NOTION_IDEAS_DATABASE_ID={}", result.ideas_id)
     logger.info("  NOTION_TOOLS_DATABASE_ID={}", result.tools_id)
     logger.info("  NOTION_DATA_TECH_DATABASE_ID={}", result.data_tech_id)

@@ -10,7 +10,7 @@ from notion_pilot.shared.utils.enrichment import (
     enrich_person,
 )
 
-_SETTINGS_BASE = dict(notion_token="t", notion_database_id="d")
+_SETTINGS_BASE = dict(notion_token="t", notion_telegram_msg_database_id="d")
 
 
 def _mock_http_client(get_resp=None, post_resp=None):

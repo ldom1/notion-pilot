@@ -4,19 +4,19 @@
 
 Rename and reorganize before adding features. No new behavior, just structural clarity.
 
-- [ ] Rename repo: `telegram-to-notion` → `notion-pilot`
-- [ ] Rename Python package: `telegram_to_notion` → `notion_pilot`
-- [ ] Reorganize into verticals: `crm/`, `inbox/` (from `pipelines/`), `shared/` (adapters, llm, utils, notion.py, config.py, models.py)
-- [ ] Organize scripts: `scripts/crm/` + `scripts/inbox/`
-- [ ] Unify config: merge `notion_people_database_id` + `notion_people_data_source_id` into single coherent IDs
-- [ ] Update README, CHANGELOG, brain vault note path
+- [x] Rename repo: `telegram-to-notion` → `notion-pilot`
+- [x] Rename Python package: `telegram_to_notion` → `notion_pilot`
+- [x] Reorganize into verticals: `crm/`, `inbox/` (from `pipelines/`), `shared/` (adapters, llm, utils, notion.py, config.py, models.py)
+- [x] Organize scripts: `scripts/crm/` + `scripts/inbox/`
+- [x] Unify People capture through `notion_people_data_source_id` and the central CRM syncer
+- [x] Update README, CHANGELOG, brain vault note path
 
 ## Phase 1 — Setup Wizard (CLI)
 
 One-command bootstrap on virgin Notion for both products.
 
-- [ ] `scripts/inbox/setup_workspace.py` — create Knowledge DBs (Notions, Ideas, Tools, Data & Technology)
-- [ ] Extend `scripts/crm/setup_workspace.py` to optionally create all 4 DBs in one shot
+- [x] `scripts/inbox/setup_workspace.py` — create Knowledge DBs (Notions, Ideas, Tools, Data & Technology)
+- [x] Extend `scripts/crm/setup_workspace.py` to optionally create all 4 DBs in one shot
 - [ ] `/setup` Telegram command — guided onboarding wizard that sets up the workspace and outputs `.env` values
 
 ## Phase 2 — Email "à relire"
