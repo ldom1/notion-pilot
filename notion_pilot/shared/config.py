@@ -1,6 +1,6 @@
 """Runtime configuration loaded from environment variables."""
 
-from pydantic import Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +12,7 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        populate_by_name=True,
     )
 
     # ── Notion (optional when using OAuth) ──────────────────────────────────
@@ -19,8 +20,14 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         default=None,
         description="Notion integration token. Not required when using the OAuth deploy wizard.",
     )
-    notion_database_id: str
-    notion_title_property: str = Field(
+    notion_telegram_msg_database_id: str = Field(
+        validation_alias=AliasChoices(
+            "notion_telegram_msg_database_id",
+            "NOTION_TELEGRAM_MSG_DATABASE_ID",
+            "NOTION_DATABASE_ID",
+        ),
+    )
+    notion_telegram_msg_database_title_property: str = Field(
         default="Name",
         description="Notion title column name (use Name if your DB uses the default title)",
     )
@@ -49,7 +56,7 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         description="HTTP-Referer header sent to OpenRouter for cost attribution",
     )
     openrouter_app_title: str = Field(
-        default="telegram-to-notion",
+        default="notion-pilot",
         description="X-Title header sent to OpenRouter for dashboard display",
     )
 
@@ -63,6 +70,14 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
     imap_user: str | None = Field(default=None, description="IMAP login username")
     imap_password: SecretStr | None = Field(default=None, description="IMAP login password")
     imap_inbox: str = Field(default="INBOX", description="Folder to poll for new mail")
+    imap_promotions_folder: str = Field(
+        default="Promotions",
+        description="IMAP folder for newsletter promotions (e.g. Medium, TLDR).",
+    )
+    imap_since_days: int = Field(
+        default=7,
+        description="Only process mail newer than this many days (0 = no limit).",
+    )
     imap_archive: str = Field(default="Archive", description="Folder to move processed mail into")
     imap_poll_interval: int = Field(default=60, description="Seconds between IMAP poll cycles")
     imap_allowed_senders: str = Field(
@@ -72,18 +87,19 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
             "Emails from other senders are marked seen but not archived or forwarded."
         ),
     )
+    imap_auto_archive_senders: str = Field(
+        default="members@medium.com,partnerprogram@medium.com",
+        description=(
+            "Comma-separated sender suffixes to archive without Notion "
+            "(e.g. @e.vivinomail.com, members@medium.com). Checked before allowlist."
+        ),
+    )
     imap_people_senders: str = Field(
         default="",
         description=(
             "Comma-separated sender suffixes for personal contacts "
-            "(e.g. @gmail.com,@icloud.com). Routed to NOTION_PEOPLE_DATABASE_ID."
+            "(e.g. @gmail.com,@icloud.com). Routed through the CRM People syncer."
         ),
-    )
-
-    # ── Notion People DB (optional) ──────────────────────────────────────────
-    notion_people_database_id: str | None = Field(
-        default=None,
-        description="Notion database ID for the people / contacts database.",
     )
 
     # ── CRM / People import (optional) ──────────────────────────────────────
@@ -113,6 +129,10 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
     )
 
     # ── Knowledge Inbox DBs (optional) ──────────────────────────────────────
+    notion_notions_database_id: str | None = Field(
+        default=None,
+        description="Notion database ID for the Notions database (personal reflections, methodologies).",
+    )
     notion_ideas_database_id: str | None = Field(
         default=None,
         description="Notion database ID for the Ideas database.",

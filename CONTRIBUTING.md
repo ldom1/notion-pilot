@@ -12,7 +12,7 @@ Thanks for your interest! This project is small and opinionated — PRs that kee
 
 ```bash
 git clone https://github.com/ldom1/notion-pilot && cd notion-pilot
-cp .env.example .env   # fill in TELEGRAM_BOT_TOKEN, NOTION_TOKEN, NOTION_DATABASE_ID
+cp .env.example .env   # fill in TELEGRAM_BOT_TOKEN, NOTION_TOKEN, NOTION_TELEGRAM_MSG_DATABASE_ID
 uv sync
 ```
 

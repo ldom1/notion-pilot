@@ -1,0 +1,84 @@
+# Email sender routing configuration
+# Used by: scripts/inbox/process_email.py
+#
+# Pattern syntax:
+#   @domain.com      → matches ANY sender from that domain (suffix match)
+#   user@domain.com  → exact match only
+#
+# Version-controlled (non-sensitive). Commit changes when allowlists are updated.
+
+# ── Allowed ────────────────────────────────────────────────────
+# Knowledge DB (Notion)
+# Emails routed here are parsed and stored as knowledge entries.
+
+# ── Auto-archive ─────────────────────────────────────────────────────────────
+# Silently archived — no Notion entry created.
+# To add entries from CLI: --add-auto-archive=@domain.com
+
+
+allowed:
+  - "louis@giron-dom.eu"
+  - "@medium.com"
+  - "@tldrnewsletter.com"
+  - "@a.strategies.fr"
+  - "@parti-equinoxe.fr"
+  - "discover@news.statista.com"
+  - "marion@lebigdata.fr"
+  - "info@pollinis.org"
+  - "noreply@theshifters.org"
+
+
+auto_archive:
+  - "members@medium.com"
+  - "partnerprogram@medium.com"
+  - "writersupport@medium.com"
+  - "@e.vivinomail.com"
+  - "@vivinomail.com"
+  - "annonce@amazon.fr"
+  - "newsletter@highlandtitles.com"
+  - "inspiration@mp1.tripadvisor.com"
+  - "mongodbteam@messages.mongodb.com"
+  - "noreply@glassdoor.com"
+  - "team@mail.notion.so"
+  - "redaction@theatreonline.com"
+  - "eva@studioboucleparis.com"
+  - "info@theatre-atelier.com"
+  - "actu@info.tf1.fr"
+  - "thierry@mesaccordsmetsvins.fr"
+  - "hello@mail.apollo.io"
+  - "hello@gocopees.com"
+  - "info@australiapreciousmetals.com"
+  - "club@actionnaires.engie.com"
+  - "no-reply@checklyhq.com"
+  - "newsletter@emails.hellowork.com"
+  - "no-reply@spotify.com"
+  - "hello@announcement.deliveroo.fr"
+  - "quatre-vingt-neuf+sender@mg.zenchefrestaurants.com"
+  - "hello@newsletters.mapstr.com"
+  - "vivino@m.vivino.com"
+  - "blurb@makebooks.blurb.com"
+  - "info@monsieurtshirt.com"
+  - "contact@inga.eco"
+  - "communication@theatredelarenaissance.com"
+  - "mehdi@team-planet.com"
+  - "no-reply@n.dribbble.com"
+  - "club@emails.cybex-online.com"
+  - "hello@studioboucleparis.com"
+  - "contact@cahorslamartine.com"
+  - "fr-mailing@i-run.me"
+  - "team@cs.resumeworded.com"
+  - "notification@emails.hellowork.com"
+  - "miam@info.benebono.fr"
+  - "love@bigmammagroup.com"
+  - "noreply@diggersfactory.com"
+  - "win@mail.apollo.io"
+  - "store+79504048477@g.shopifyemail.com"
+  - "contact@lagrandecourse.fr"
+  - "support@apollo.io"
+
+people:
+  # Add specific addresses here after reviewing email-import-people-review.csv.
+  # Domain patterns (@gmail.com etc.) are intentionally NOT used here —
+  # they would auto-upsert every contact from that domain to Notion People DB
+  # without individual review, bypassing the human gate.
+  # Use --apply-review to move individual addresses here from the CSV.

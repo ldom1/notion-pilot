@@ -21,7 +21,6 @@
 
 ## Open Decisions
 
-- Config unification: `notion_people_database_id` vs `notion_people_data_source_id` — two IDs for same table, to be merged
 - Notion OAuth approach for deploy wizard (Phase 4): internal integration vs public OAuth app
 
 ## Next Steps

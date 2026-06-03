@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from notion_pilot.crm.prospection import rank_contacts
 from notion_pilot.shared.config import Settings
 
-_SETTINGS = dict(notion_token="t", notion_database_id="d", openrouter_api_key="ok")
+_SETTINGS = dict(notion_token="t", notion_telegram_msg_database_id="d", openrouter_api_key="ok")
 
 _CANDIDATES = [
     {
@@ -21,7 +21,7 @@ _CANDIDATES = [
 
 
 async def test_returns_empty_without_api_key():
-    s = Settings(notion_token="t", notion_database_id="d")
+    s = Settings(notion_token="t", notion_telegram_msg_database_id="d")
     result = await rank_contacts("sell HPC", _CANDIDATES, s)
     assert result == []
 

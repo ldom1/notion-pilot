@@ -152,31 +152,46 @@ class NotionCompanySyncer:
 
 
 class NotionPeopleSyncer:
-    """Load People snapshot from Notion; upsert with dedup and company resolution."""
+    """Load People snapshot from Notion; upsert with dedup and optional company resolution."""
 
     def __init__(
         self,
         client: AsyncClient,
         data_source_id: str,
-        company_syncer: NotionCompanySyncer,
+        company_syncer: NotionCompanySyncer | None = None,
     ) -> None:
         self._client = client
         self._ds_id = data_source_id
         self._company_syncer = company_syncer
+        self._standard_api: bool | None = None
         self._existing: list[CandidateRecord] = []
 
-    @property
-    def _standard_api(self) -> bool:
-        return bool(self._company_syncer._standard_api)
+    def _httpx_headers(self) -> dict[str, str]:
+        if self._company_syncer:
+            return self._company_syncer._httpx_headers()
+        return {
+            "Authorization": f"Bearer {self._client.options.auth}",
+            "Notion-Version": "2022-06-28",
+            "Content-Type": "application/json",
+        }
+
+    async def _detect_api(self) -> None:
+        try:
+            await self._client.databases.retrieve(self._ds_id)
+            self._standard_api = True
+            logger.debug("People {}: using standard databases API", self._ds_id[:8])
+        except Exception:  # noqa: BLE001
+            self._standard_api = False
+            logger.debug("People {}: using data_sources API", self._ds_id[:8])
 
     async def _query_page(self, cursor: str | None) -> dict[str, Any]:
+        if self._standard_api is None:
+            await self._detect_api()
         if self._standard_api:
             body: dict[str, object] = {"page_size": 100}
             if cursor:
                 body["start_cursor"] = cursor
-            async with httpx.AsyncClient(
-                headers=self._company_syncer._httpx_headers(), timeout=30
-            ) as hx:
+            async with httpx.AsyncClient(headers=self._httpx_headers(), timeout=30) as hx:
                 r = await hx.post(
                     f"https://api.notion.com/v1/databases/{self._ds_id}/query", json=body
                 )
@@ -188,7 +203,9 @@ class NotionPeopleSyncer:
         return cast(dict[str, Any], await self._client.data_sources.query(self._ds_id, **kw))
 
     async def load_snapshot(self) -> None:
-        """Load all existing people into memory. Call after company_syncer.load_snapshot()."""
+        """Load all existing people into memory. Call company_syncer.load_snapshot() first if using one."""
+        if self._company_syncer is not None and self._company_syncer._standard_api is not None:
+            self._standard_api = self._company_syncer._standard_api
         cursor: str | None = None
         while True:
             result = await self._query_page(cursor)
@@ -199,7 +216,11 @@ class NotionPeopleSyncer:
                 if not name:
                     continue
                 company_ids = [r["id"] for r in props.get("Company", {}).get("relation", [])]
-                company = self._company_syncer.id_to_name(company_ids[0]) if company_ids else ""
+                company = (
+                    self._company_syncer.id_to_name(company_ids[0])
+                    if company_ids and self._company_syncer
+                    else ""
+                )
                 candidate: CandidateRecord = {
                     "name": name,
                     "company": company,
@@ -248,7 +269,7 @@ class NotionPeopleSyncer:
             )
 
         company_id = ""
-        if person.company:
+        if person.company and self._company_syncer:
             company_id = await self._company_syncer.get_or_create(person.company)
 
         properties: dict[str, object] = {
@@ -270,6 +291,8 @@ class NotionPeopleSyncer:
         if company_id:
             properties["Company"] = {"relation": [{"id": company_id}]}
 
+        if self._standard_api is None:
+            await self._detect_api()
         parent = (
             {"type": "database_id", "database_id": self._ds_id}
             if self._standard_api

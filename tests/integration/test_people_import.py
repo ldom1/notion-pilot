@@ -3,11 +3,11 @@
 from pathlib import Path
 
 import pytest
-from scripts.crm_import_linkedin import _parse_connections, run
+from scripts.crm.crm_import_linkedin import _parse_connections, run
 
 pytestmark = pytest.mark.integration
 
-CSV_PATH = Path("data/Basic_LinkedInDataExport_05-20-2026.zip/Connections.csv")
+CSV_PATH = Path("data/crm/Basic_LinkedInDataExport_05-20-2026.zip/Connections.csv")
 
 
 def test_parse_connections_returns_records():
