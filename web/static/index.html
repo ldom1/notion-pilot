@@ -13,6 +13,8 @@
   .nav-logo { font-weight: 800; font-size: 1.05rem; color: #6e56cf; letter-spacing: -0.3px; }
   .nav-deploy { background: #6e56cf; color: #fff; border: none; padding: 0.5rem 1.25rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
   .nav-deploy:hover { background: #5a45b0; }
+  .nav-login { color: #6e56cf; text-decoration: none; font-size: 0.85rem; font-weight: 600; padding: 0.5rem 1rem; border: 1.5px solid #e8e4ff; border-radius: 6px; }
+  .nav-login:hover { background: #f0eeff; }
 
   /* HERO */
   .hero { max-width: 720px; margin: 0 auto; padding: 3rem 2rem 3.5rem; text-align: center; }
@@ -103,7 +105,7 @@
   .adv-hint a { color: #6e56cf; }
 
   /* Step 2 */
-  .scope-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-bottom: 1.25rem; }
+  .scope-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; margin-bottom: 1.25rem; }
   .scope-card { border: 1.5px solid #eee; border-radius: 8px; padding: 0.85rem 0.5rem; text-align: center; cursor: pointer; transition: border-color .12s; }
   .scope-card:hover { border-color: #b3a0e8; }
   .scope-card.selected { border-color: #6e56cf; background: #f8f6ff; }
@@ -144,7 +146,10 @@
 <!-- NAV -->
 <nav>
   <div class="nav-logo">Notion Pilot</div>
-  <button class="nav-deploy" onclick="openWizard()">Deploy to Notion</button>
+  <div style="display:flex;gap:0.5rem;align-items:center">
+    <button class="nav-deploy" onclick="openWizard()">Deploy to Notion</button>
+    <a href="/auth/notion?next=/cockpit" class="nav-login">Sign in</a>
+  </div>
 </nav>
 
 <!-- HERO -->
@@ -324,8 +329,12 @@
           <h4>Inbox only</h4>
           <p>Links, Voice, Ideas</p>
         </div>
+        <div class="scope-card" data-scope="skip" onclick="selectScope(this)">
+          <h4>Skip</h4>
+          <p>Already deployed — just connect</p>
+        </div>
       </div>
-      <button class="wiz-btn" onclick="nextStep(3)">Continue</button>
+      <button class="wiz-btn" onclick="handleStep2Continue()">Continue</button>
       <button class="wiz-back" onclick="nextStep(1)">← Back</button>
     </div>
 
@@ -384,6 +393,14 @@ function toggleAdvanced() {
 function selectScope(el) {
   document.querySelectorAll('.scope-card').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
+}
+
+function handleStep2Continue() {
+  if (getSelectedScope() === 'skip') {
+    window.location.href = '/cockpit';
+    return;
+  }
+  nextStep(3);
 }
 
 function startOAuth() {
@@ -461,11 +478,12 @@ async function doSetup() {
         } else if (event.type === 'done') {
           hideLogSpinner();
           appendLog('✓ All done!');
-          document.getElementById('notion-open-link').href = event.url;
-          setTimeout(() => {
-            ['step1','step2','step3'].forEach(id => { document.getElementById(id).style.display = 'none'; });
-            document.getElementById('step-success').style.display = 'block';
-          }, 600);
+          await fetch('/api/cockpit/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ databases: {}, workspace_url: event.url }),
+          }).catch(() => {});
+          setTimeout(() => { window.location.href = '/cockpit'; }, 800);
           return;
         } else if (event.type === 'error') {
           hideLogSpinner();

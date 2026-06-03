@@ -1,0 +1,45 @@
+scripts:
+  # ── CRM ────────────────────────────────────────────────────────────────────
+
+  - id: refresh_people
+    label: Refresh People
+    description: Dedup + enrich contacts in one pass — flags duplicates then fills missing data
+    path: scripts/crm/crm_refresh_people.py
+    args: []
+    category: CRM
+
+  - id: refresh_companies
+    label: Refresh Companies
+    description: Dedup + enrich companies in one pass — flags duplicates then fills missing data
+    path: scripts/crm/crm_refresh_companies.py
+    args: []
+    category: CRM
+
+  - id: import_linkedin
+    label: Import LinkedIn
+    # How to get your LinkedIn data:
+    #   1. Go to https://www.linkedin.com/mypreferences/d/download-my-data
+    #      (Settings → Data Privacy → Get a copy of your data → select "Connections")
+    #   2. LinkedIn emails a ZIP within ~10 minutes
+    #   3. Unzip it and copy Connections.csv to:  data/crm/linkedin/Connections.csv
+    #   4. Run this script (--dry-run first to preview, then without to import)
+    description: Import LinkedIn Connections.csv — place file at data/crm/linkedin/Connections.csv first
+    path: scripts/crm/crm_import_linkedin.py
+    args: []
+    category: CRM
+
+  # ── Inbox ──────────────────────────────────────────────────────────────────
+
+  - id: get_people_from_email
+    label: Get People from Emails
+    description: Preview contacts extracted from email senders (dry run — no writes)
+    path: scripts/inbox/process_email.py
+    args: ["--dry-run"]
+    category: Inbox
+
+  - id: retrieve_email
+    label: Retrieve Emails
+    description: Fetch new emails from IMAP and sync to Notion knowledge base
+    path: scripts/inbox/process_email.py
+    args: []
+    category: Inbox

@@ -72,3 +72,5 @@ data/
 
 # --- Claude ---
 .superpowers
+# Per-workspace data (DB pointers, workflows — not committed)
+web/workspaces/

@@ -1,0 +1,1662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cockpit — Notion Pilot</title>
+<link rel="stylesheet" href="https://unpkg.com/reactflow@11/dist/style.css">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, -apple-system, sans-serif; background: #f5f4ff; color: #1a1a1a; min-height: 100vh; }
+
+/* ── Header ── */
+.hdr { display: flex; align-items: center; gap: 1rem; padding: 0 2rem; height: 54px; background: #fff; border-bottom: 1px solid #ece8ff; position: sticky; top: 0; z-index: 100; }
+.hdr-logo { font-weight: 900; font-size: 1rem; color: #6e56cf; text-decoration: none; letter-spacing: -0.3px; }
+.hdr-badge { background: #6e56cf; color: #fff; font-size: 0.6rem; font-weight: 800; letter-spacing: 2px; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.hdr-ws { flex: 1; text-align: center; font-size: 0.82rem; color: #888; }
+.hdr-user { font-size: 0.82rem; color: #555; font-weight: 500; }
+.hdr-notion-link { font-size: 0.78rem; font-weight: 600; color: #fff; background: #6e56cf; text-decoration: none; padding: 0.3rem 0.8rem; border-radius: 5px; }
+.hdr-notion-link:hover { background: #5a45b0; }
+.hdr-logout { font-size: 0.78rem; color: #bbb; text-decoration: none; padding: 0.3rem 0.7rem; border: 1px solid #e5e5e5; border-radius: 5px; }
+.hdr-logout:hover { color: #666; border-color: #ccc; }
+
+/* ── Layout ── */
+.main { max-width: 1080px; margin: 0 auto; padding: 1.75rem 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+
+/* ── Panel (card) ── */
+.panel { background: #fff; border: 1px solid #ece8ff; border-radius: 12px; padding: 1.4rem 1.5rem; }
+.panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; gap: 0.75rem; }
+.panel-title { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: #6e56cf; }
+
+/* ── Buttons ── */
+.btn-ghost { background: none; border: 1px solid #e5e5e5; color: #666; font-size: 0.78rem; padding: 0.3rem 0.7rem; border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; }
+.btn-ghost:hover { border-color: #ccc; color: #333; }
+.btn-primary { background: #6e56cf; color: #fff; border: none; font-size: 0.88rem; font-weight: 600; padding: 0.55rem 1.1rem; border-radius: 6px; cursor: pointer; }
+.btn-primary:hover { background: #5a45b0; }
+.btn-sm { font-size: 0.75rem; padding: 0.25rem 0.6rem; }
+
+/* ── DB Grid ── */
+.db-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
+@media (max-width: 880px) { .db-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .db-grid { grid-template-columns: 1fr; } }
+
+.db-card { border: 1px solid #ece8ff; border-radius: 9px; padding: 1rem; background: #fdfcff; transition: border-color .15s; }
+.db-card:hover { border-color: #c4b5f7; }
+.db-card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.6rem; }
+.db-icon { font-size: 1.4rem; line-height: 1; }
+.db-cat { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #bbb; }
+.db-name { font-size: 0.88rem; font-weight: 700; margin-bottom: 0.2rem; }
+.db-count { font-size: 1.6rem; font-weight: 900; line-height: 1; color: #6e56cf; margin-bottom: 0.1rem; }
+.db-count-label { font-size: 0.66rem; color: #aaa; margin-bottom: 0.75rem; }
+.db-count.na { font-size: 0.78rem; color: #bbb; font-weight: 500; }
+.db-count.error { font-size: 0.78rem; color: #dc2626; font-weight: 500; }
+.db-footer { display: flex; align-items: center; gap: 0.4rem; border-top: 1px solid #f0eeff; padding-top: 0.65rem; margin-top: 0.1rem; }
+.db-id-display { font-family: 'SF Mono', 'Fira Mono', monospace; font-size: 0.66rem; color: #999; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.db-edit-btn { background: none; border: none; cursor: pointer; color: #bbb; font-size: 0.78rem; padding: 0.15rem 0.3rem; border-radius: 3px; flex-shrink: 0; }
+.db-edit-btn:hover { color: #6e56cf; background: #f0eeff; }
+.db-edit-form { display: none; flex-direction: column; gap: 0.4rem; border-top: 1px solid #f0eeff; padding-top: 0.65rem; margin-top: 0.1rem; }
+.db-edit-form.open { display: flex; }
+.db-edit-select { font-size: 0.78rem; border: 1px solid #ddd; border-radius: 5px; padding: 0.35rem 0.5rem; width: 100%; outline: none; background: #fff; color: #1a1a1a; cursor: pointer; }
+.db-edit-select:focus { border-color: #6e56cf; }
+.db-edit-select option { padding: 0.25rem; }
+.db-edit-loading { font-size: 0.75rem; color: #aaa; padding: 0.3rem 0; }
+.db-edit-actions { display: flex; gap: 0.4rem; }
+.db-edit-save { background: #6e56cf; color: #fff; border: none; font-size: 0.72rem; font-weight: 600; padding: 0.3rem 0.65rem; border-radius: 4px; cursor: pointer; }
+.db-edit-cancel { background: none; border: 1px solid #e5e5e5; color: #666; font-size: 0.72rem; padding: 0.3rem 0.65rem; border-radius: 4px; cursor: pointer; }
+
+/* ── Automation view toggle ── */
+.auto-view-toggle { display: flex; gap: 0; border: 1px solid #e5e5e5; border-radius: 6px; overflow: hidden; }
+.view-btn { background: none; border: none; color: #888; font-size: 0.74rem; font-weight: 600; padding: 0.28rem 0.85rem; cursor: pointer; border-right: 1px solid #e5e5e5; white-space: nowrap; }
+.view-btn:last-child { border-right: none; }
+.view-btn:hover { background: #f5f5f5; color: #555; }
+.view-btn.active { background: #f0eeff; color: #6e56cf; }
+
+/* ── Automation list view ── */
+.auto-tabs-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; }
+.auto-type-tabs { display: flex; gap: 0; border: 1px solid #e5e5e5; border-radius: 6px; overflow: hidden; }
+.atype-btn { background: none; border: none; color: #888; font-size: 0.74rem; font-weight: 600; padding: 0.28rem 0.85rem; cursor: pointer; border-right: 1px solid #e5e5e5; }
+.atype-btn:last-child { border-right: none; }
+.atype-btn:hover { background: #f5f5f5; color: #555; }
+.atype-btn.active { background: #f0eeff; color: #6e56cf; }
+.filter-tabs { display: flex; gap: 0.3rem; }
+.ftab { background: none; border: 1px solid #e5e5e5; color: #888; font-size: 0.74rem; font-weight: 600; padding: 0.28rem 0.7rem; border-radius: 4px; cursor: pointer; }
+.ftab:hover { border-color: #ccc; color: #555; }
+.ftab.active { background: #f0eeff; border-color: #c4b5f7; color: #6e56cf; }
+
+.script-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+@media (max-width: 700px) { .script-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .script-grid { grid-template-columns: 1fr; } }
+.script-card { border: 1px solid #ece8ff; border-radius: 9px; padding: 1rem; background: #fdfcff; display: flex; flex-direction: column; gap: 0.4rem; transition: border-color .15s; }
+.script-card:hover { border-color: #c4b5f7; }
+.script-card-top { display: flex; align-items: center; justify-content: space-between; }
+.script-cat-badge { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; padding: 0.15rem 0.45rem; border-radius: 999px; }
+.script-cat-badge.crm   { background: #f0eeff; color: #6e56cf; }
+.script-cat-badge.inbox { background: #ecfdf5; color: #065f46; }
+.script-name { font-size: 0.88rem; font-weight: 700; }
+.script-desc { font-size: 0.76rem; color: #888; line-height: 1.45; flex: 1; }
+.script-footer { display: flex; justify-content: flex-end; margin-top: 0.4rem; }
+.run-btn { background: #6e56cf; color: #fff; border: none; font-size: 0.76rem; font-weight: 600; padding: 0.3rem 0.8rem; border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+.run-btn:hover { background: #5a45b0; }
+.run-btn.running { background: #8b5cf6; cursor: not-allowed; }
+.run-btn.done    { background: #16a34a; cursor: default; }
+.run-btn.error   { background: #dc2626; }
+
+/* ── Workflow cards (list view) ── */
+.wf-cards-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.wf-card { display: flex; align-items: center; gap: 0.9rem; background: #fdfcff; border: 1px solid #ece8ff; border-radius: 9px; padding: 0.85rem 1rem; transition: border-color .15s; }
+.wf-card:hover { border-color: #c4b5f7; }
+.wf-card-icon { font-size: 1.35rem; flex-shrink: 0; }
+.wf-card-info { flex: 1; min-width: 0; }
+.wf-card-name { font-size: 0.88rem; font-weight: 700; color: #1a1a1a; }
+.wf-card-meta { font-size: 0.72rem; color: #aaa; margin-top: 0.15rem; }
+.wf-card-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+.wf-compose-btn { display: flex; align-items: center; gap: 0.5rem; color: #6e56cf; font-size: 0.82rem; font-weight: 600; background: none; border: 1.5px dashed #c4b5f7; border-radius: 9px; padding: 0.75rem 1.25rem; cursor: pointer; width: 100%; justify-content: center; }
+.wf-compose-btn:hover { background: #f0eeff; border-style: solid; }
+
+/* ── Graph view hint ── */
+.graph-hint { font-size: 0.75rem; color: #aaa; margin-bottom: 0.6rem; display: flex; align-items: center; justify-content: space-between; }
+
+/* ── React Flow canvas ── */
+#rf-root { height: 400px; border-radius: 9px; overflow: hidden; border: 1px solid #ece8ff; background: #fafaff; }
+
+/* React Flow overrides */
+.react-flow__attribution { display: none; }
+.react-flow__edge-path { stroke: #c4b5f7; }
+.react-flow__edge.animated path { stroke-dasharray: 5; animation: dashdraw .5s linear infinite; }
+@keyframes dashdraw { to { stroke-dashoffset: -10; } }
+
+/* ── Script node (React Flow custom node) ── */
+.rf-script-node {
+  background: #fff;
+  border: 1.5px solid #ece8ff;
+  border-radius: 9px;
+  padding: 0.85rem 1rem;
+  width: 230px;
+  font-family: system-ui, -apple-system, sans-serif;
+  box-shadow: 0 1px 4px rgba(110,86,207,.06);
+  transition: border-color .15s, box-shadow .15s;
+}
+.rf-script-node:hover { border-color: #c4b5f7; box-shadow: 0 2px 8px rgba(110,86,207,.12); }
+.rf-status-running { border-color: #8b5cf6 !important; box-shadow: 0 0 0 3px rgba(110,86,207,.18) !important; }
+.rf-status-done    { border-color: #16a34a !important; }
+.rf-status-error   { border-color: #dc2626 !important; }
+.rf-node-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; gap: 0.4rem; }
+.rf-node-cat { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; padding: 0.12rem 0.45rem; border-radius: 999px; flex-shrink: 0; }
+.rf-node-cat.crm   { background: #f0eeff; color: #6e56cf; }
+.rf-node-cat.inbox { background: #ecfdf5; color: #065f46; }
+.rf-node-label { font-size: 0.85rem; font-weight: 700; color: #1a1a1a; margin-bottom: 0.25rem; }
+.rf-node-desc  { font-size: 0.71rem; color: #999; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.rf-node-footer { display: flex; justify-content: flex-end; margin-top: 0.65rem; gap: 0.4rem; }
+.rf-run-btn  { background: #6e56cf; color: #fff; border: none; font-size: 0.72rem; font-weight: 600; padding: 0.28rem 0.65rem; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+.rf-run-btn:hover { background: #5a45b0; }
+.rf-run-btn.done  { background: #16a34a; cursor: default; }
+.rf-run-btn.error { background: #dc2626; }
+.rf-stop-btn { background: #6b7280; color: #fff; border: none; font-size: 0.72rem; font-weight: 600; padding: 0.28rem 0.65rem; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+.rf-stop-btn:hover { background: #4b5563; }
+
+/* ── Log panel ── */
+.log-wrap { margin-top: 1rem; border-radius: 9px; overflow: hidden; border: 1px solid #222; }
+.log-hdr { display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0.9rem; background: #1a1a2e; border-bottom: 1px solid #333; }
+.log-label { font-family: 'SF Mono', 'Fira Mono', monospace; font-size: 0.72rem; color: #888; flex: 1; }
+.log-spinner { width: 10px; height: 10px; border: 2px solid #333; border-top-color: #6e56cf; border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+.log-spinner.hidden { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.log-body { background: #0f1117; padding: 0.75rem 1rem; max-height: 260px; overflow-y: auto; font-family: 'SF Mono', 'Fira Mono', monospace; font-size: 0.75rem; line-height: 1.65; color: #9ca3af; }
+.log-line { white-space: pre-wrap; word-break: break-all; }
+.log-line.cmd  { color: #6e56cf; }
+.log-line.done { color: #4ade80; }
+.log-line.err  { color: #f87171; }
+
+/* ── Chat layout ── */
+.chat-container { display: flex; gap: 1rem; align-items: flex-start; }
+.chat-sidebar { width: 168px; flex-shrink: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.chat-sidebar-label { font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #bbb; padding: 0 0.1rem; }
+.conv-list { display: flex; flex-direction: column; gap: 0.25rem; max-height: 450px; overflow-y: auto; }
+.conv-item { background: none; border: 1px solid transparent; border-radius: 6px; padding: 0.4rem 0.55rem; cursor: pointer; text-align: left; width: 100%; transition: background .1s; }
+.conv-item:hover { background: #f0eeff; border-color: #c4b5f7; }
+.conv-item.active { background: #f0eeff; border-color: #6e56cf; }
+.conv-item-title { font-size: 0.74rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1a1a1a; }
+.conv-item-meta { font-size: 0.64rem; color: #aaa; margin-top: 0.1rem; display: flex; justify-content: space-between; align-items: center; }
+.conv-del { background: none; border: none; color: #ddd; cursor: pointer; font-size: 0.7rem; padding: 0 0.1rem; line-height: 1; display: none; }
+.conv-item:hover .conv-del { display: inline; }
+.conv-del:hover { color: #dc2626; }
+.conv-empty-hint { font-size: 0.71rem; color: #ccc; text-align: center; padding: 0.75rem 0.25rem; }
+.conv-new-btn { background: none; border: 1.5px dashed #c4b5f7; border-radius: 6px; padding: 0.35rem; color: #6e56cf; font-size: 0.74rem; font-weight: 600; cursor: pointer; width: 100%; margin-top: 0.15rem; }
+.conv-new-btn:hover { background: #f0eeff; border-style: solid; }
+.chat-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* ── Memory editor ── */
+.memory-bar { background: #f8f7ff; border: 1px solid #ece8ff; border-radius: 8px; padding: 0.6rem 0.85rem; margin-bottom: 0.75rem; display: none; }
+.memory-bar.open { display: block; }
+.memory-bar-label { font-size: 0.63rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #6e56cf; margin-bottom: 0.35rem; }
+.memory-hint { font-size: 0.72rem; color: #aaa; margin-bottom: 0.45rem; line-height: 1.4; }
+.memory-textarea { width: 100%; border: 1px solid #ddd; border-radius: 5px; padding: 0.5rem 0.7rem; font-size: 0.82rem; font-family: inherit; resize: vertical; min-height: 68px; max-height: 140px; outline: none; }
+.memory-textarea:focus { border-color: #6e56cf; }
+.memory-actions { display: flex; justify-content: flex-end; margin-top: 0.4rem; }
+.memory-save-btn { background: #6e56cf; color: #fff; border: none; font-size: 0.72rem; font-weight: 600; padding: 0.28rem 0.75rem; border-radius: 4px; cursor: pointer; }
+.memory-save-btn:hover { background: #5a45b0; }
+
+/* ── Chat messages ── */
+.chat-history { min-height: 60px; max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; }
+.chat-empty { text-align: center; padding: 2rem; color: #bbb; font-size: 0.84rem; }
+.chat-msg { display: flex; flex-direction: column; gap: 0.3rem; }
+.chat-msg.user { align-items: flex-end; }
+.chat-bubble { max-width: 75%; padding: 0.6rem 0.9rem; border-radius: 9px; font-size: 0.85rem; line-height: 1.55; }
+.chat-msg.user .chat-bubble { background: #6e56cf; color: #fff; border-radius: 9px 9px 2px 9px; }
+.chat-msg.assistant .chat-bubble { background: #f5f4ff; border: 1px solid #ece8ff; border-radius: 9px 9px 9px 2px; }
+.chat-status { font-size: 0.75rem; color: #999; padding: 0.35rem 0.65rem; }
+
+.leads-grid { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+.lead-card { border: 1px solid #ece8ff; border-radius: 8px; padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.75rem; background: #fff; }
+.lead-avatar { width: 36px; height: 36px; border-radius: 50%; background: #f0eeff; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+.lead-info { flex: 1; min-width: 0; }
+.lead-name { font-size: 0.85rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lead-sub { font-size: 0.75rem; color: #777; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lead-reason { font-size: 0.72rem; color: #999; margin-top: 0.2rem; }
+.lead-badge { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; padding: 0.12rem 0.4rem; border-radius: 999px; flex-shrink: 0; }
+.lead-badge.existing { background: #ecfdf5; color: #065f46; }
+.lead-badge.new { background: #f0eeff; color: #6e56cf; }
+.lead-action { flex-shrink: 0; }
+.lead-open { color: #6e56cf; font-size: 0.75rem; text-decoration: none; padding: 0.28rem 0.65rem; border: 1px solid #c4b5f7; border-radius: 5px; }
+.lead-open:hover { background: #f0eeff; }
+.lead-add { background: #6e56cf; color: #fff; border: none; font-size: 0.75rem; font-weight: 600; padding: 0.28rem 0.65rem; border-radius: 5px; cursor: pointer; }
+.lead-add:hover { background: #5a45b0; }
+.lead-add:disabled { background: #16a34a; cursor: default; }
+
+.chat-input-row { display: flex; gap: 0.6rem; }
+.chat-input { flex: 1; border: 1.5px solid #ddd; border-radius: 7px; padding: 0.6rem 0.9rem; font-size: 0.88rem; outline: none; font-family: inherit; }
+.chat-input:focus { border-color: #6e56cf; }
+
+/* ── Chat options (wizard) ── */
+.chat-options { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.65rem; }
+.chat-opt { background: #fff; border: 1.5px solid #c4b5f7; color: #6e56cf; font-size: 0.78rem; font-weight: 600; padding: 0.3rem 0.75rem; border-radius: 5px; cursor: pointer; transition: background .12s; }
+.chat-opt:hover { background: #f0eeff; }
+.chat-opt.selected { background: #6e56cf; color: #fff; border-color: #6e56cf; cursor: default; }
+.chat-opt.skip  { border-color: #e5e5e5; color: #aaa; }
+.chat-opt.skip:hover { border-color: #ccc; color: #666; background: #f9f9f9; }
+.chat-clear-btn { font-size: 0.72rem; color: #bbb; background: none; border: none; cursor: pointer; padding: 0.2rem 0.4rem; }
+.chat-clear-btn:hover { color: #888; }
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <a href="/" class="hdr-logo">Notion Pilot</a>
+  <span class="hdr-badge">COCKPIT</span>
+  <span class="hdr-ws" id="hdr-ws">—</span>
+  <span class="hdr-user" id="hdr-user"></span>
+  <a href="https://notion.so" id="hdr-notion-link" class="hdr-notion-link" target="_blank">Open in Notion ↗</a>
+  <a href="/auth/logout" class="hdr-logout">Sign out</a>
+</header>
+
+<main class="main">
+
+  <!-- CHAT -->
+  <section class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Ask your data</span>
+      <div style="display:flex;gap:0.4rem;align-items:center;">
+        <button class="btn-ghost btn-sm" onclick="toggleMemory()" title="Edit workspace context">✎ Context</button>
+        <button class="chat-clear-btn" onclick="startNewSession()" title="New conversation">+ New</button>
+      </div>
+    </div>
+    <div class="chat-container">
+      <!-- Conversations sidebar -->
+      <div class="chat-sidebar">
+        <div class="chat-sidebar-label">History</div>
+        <div class="conv-list" id="conv-list">
+          <div class="conv-empty-hint">No history yet</div>
+        </div>
+      </div>
+      <!-- Main chat area -->
+      <div class="chat-main">
+        <!-- Memory editor (hidden by default) -->
+        <div class="memory-bar" id="memory-bar">
+          <div class="memory-bar-label">Workspace context</div>
+          <div class="memory-hint">Tell the AI about your role, product, and target market. This is injected into every chat call.</div>
+          <textarea class="memory-textarea" id="memory-textarea"
+            placeholder="e.g. I work at Artelys selling Crystal HPC, an optimization solver. My target customers are R&D teams in energy, aerospace, and finance who need large-scale mathematical programming."></textarea>
+          <div class="memory-actions">
+            <button class="memory-save-btn" onclick="saveMemory()">Save</button>
+          </div>
+        </div>
+        <div class="chat-history" id="chat-history">
+          <div class="chat-empty" id="chat-empty">Ask anything about your Notion databases — find leads, analyse contacts, get suggestions.</div>
+        </div>
+        <div class="chat-input-row">
+          <input type="text" id="chat-input" class="chat-input"
+            placeholder="J'essaye de vendre Artelys Crystal HPC, trouve moi 3 leads…"
+            onkeydown="if(event.key==='Enter')sendChat()">
+          <button class="btn-primary" onclick="sendChat()">Send</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WORKSPACE OVERVIEW -->
+  <section class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Workspace</span>
+      <button class="btn-ghost btn-sm" onclick="fetchStatus()">↻ Refresh</button>
+    </div>
+    <div class="db-grid" id="db-grid">
+      <div style="grid-column:1/-1;text-align:center;padding:2rem;color:#bbb;font-size:0.84rem">Loading…</div>
+    </div>
+  </section>
+
+  <!-- AUTOMATION -->
+  <section class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Automation</span>
+      <div class="auto-view-toggle">
+        <button class="view-btn active" id="btn-view-list"  onclick="switchView('list')">≡ List</button>
+        <button class="view-btn"        id="btn-view-graph" onclick="switchView('graph')">⬡ Graph</button>
+      </div>
+    </div>
+
+    <!-- ── LIST VIEW (default) ── -->
+    <div id="auto-list-view">
+      <div class="auto-tabs-row">
+        <div class="auto-type-tabs">
+          <button class="atype-btn active" data-type="operations" onclick="switchType('operations')">Operations</button>
+          <button class="atype-btn"        data-type="workflows"  onclick="switchType('workflows')">Workflows</button>
+        </div>
+        <div class="filter-tabs" id="filter-tabs">
+          <button class="ftab active" data-cat="all"   onclick="filterScripts('all')">All</button>
+          <button class="ftab"        data-cat="CRM"   onclick="filterScripts('CRM')">CRM</button>
+          <button class="ftab"        data-cat="Inbox" onclick="filterScripts('Inbox')">Inbox</button>
+        </div>
+      </div>
+
+      <!-- Operations pane -->
+      <div id="auto-ops-pane">
+        <div class="script-grid" id="script-grid">
+          <div style="grid-column:1/-1;text-align:center;padding:1.5rem;color:#bbb;font-size:0.84rem">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Workflows pane (hidden by default) -->
+      <div id="auto-wf-pane" style="display:none">
+        <div class="wf-cards-list" id="wf-cards-list">
+          <div style="text-align:center;padding:1.5rem;color:#bbb;font-size:0.84rem">No workflows saved yet.</div>
+        </div>
+        <button class="wf-compose-btn" style="margin-top:0.75rem" onclick="switchView('graph')">
+          ⬡ Compose a new workflow in graph view
+        </button>
+      </div>
+    </div>
+
+    <!-- ── GRAPH VIEW ── -->
+    <div id="auto-graph-view" style="display:none">
+      <div class="graph-hint">
+        <span>Connect nodes to define execution order — drag from a node's right handle to another's left.</span>
+        <button class="btn-ghost btn-sm" onclick="switchView('list')">← Back to list</button>
+      </div>
+      <div id="rf-root"></div>
+      <div id="wf-bar" style="display:none;margin-top:0.75rem;padding:0.75rem 1rem;background:#fafaff;border:1px solid #ece8ff;border-radius:8px;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+        <span style="font-size:0.78rem;font-weight:600;color:#6e56cf;">Workflow</span>
+        <input id="wf-name" type="text" placeholder="Workflow name…"
+          style="flex:1;min-width:120px;border:1.5px solid #ddd;border-radius:5px;padding:0.3rem 0.7rem;font-size:0.82rem;outline:none;"
+          onfocus="this.style.borderColor='#6e56cf'" onblur="this.style.borderColor='#ddd'">
+        <button class="btn-ghost btn-sm" onclick="saveWorkflow()">💾 Save</button>
+        <button class="btn-primary btn-sm" id="run-wf-btn" onclick="runWorkflow()" style="font-size:0.78rem;padding:0.3rem 0.8rem;">▶ Run</button>
+        <button class="btn-ghost btn-sm" onclick="clearWorkflow()" style="margin-left:auto;">✕ Clear</button>
+      </div>
+    </div>
+
+    <div class="log-wrap" id="log-wrap" style="display:none">
+      <div class="log-hdr">
+        <span class="log-label" id="log-label">Output</span>
+        <span class="log-spinner hidden" id="log-spinner"></span>
+        <button class="btn-ghost btn-sm" onclick="closeLog()" style="margin-left:auto;border-color:#444;color:#666;">✕</button>
+      </div>
+      <div class="log-body" id="log-body"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- React + React Flow (UMD, loaded before inline script) -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/reactflow@11/dist/umd/index.js" crossorigin></script>
+
+<script>
+// ── React Flow globals ─────────────────────────────────────────────────────
+const {
+  ReactFlow: RF,
+  Handle,
+  Position,
+  Background,
+  Controls,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  MarkerType,
+} = window.ReactFlow;
+const { useState, useEffect, useMemo, useCallback } = React;
+const h = React.createElement;
+
+// ── Pipeline graph layout ──────────────────────────────────────────────────
+// Positions are hardcoded to match the known scripts in config/scripts.yaml.
+// New scripts added to the YAML appear as isolated nodes at the bottom.
+const FLOW_NODE_POSITIONS = {
+  import_linkedin:        { x: 20,  y: 40  },
+  refresh_people:         { x: 320, y: 20  },
+  refresh_companies:      { x: 320, y: 160 },
+  retrieve_email:         { x: 20,  y: 290 },
+  get_people_from_email:  { x: 320, y: 290 },
+};
+
+const FLOW_EDGES = [
+  { id: 'e-linkedin-people',  source: 'import_linkedin', target: 'refresh_people',        animated: true, label: 'then refresh' },
+  { id: 'e-email-contacts',   source: 'retrieve_email',  target: 'get_people_from_email', animated: true, label: 'preview contacts' },
+];
+
+// ── State bridge (vanilla JS ↔ React) ─────────────────────────────────────
+let _rfSetState = null;  // set by AutomationFlow on mount
+
+function updateNodeStatus(scriptId, status) {
+  // Update React Flow graph nodes
+  if (_rfSetState) _rfSetState(prev => ({ ...prev, statuses: { ...prev.statuses, [scriptId]: status } }));
+  // Update list-view run button
+  const btn = document.getElementById('run-' + scriptId);
+  if (btn) {
+    if (status === 'running') { btn.className = 'run-btn running'; btn.textContent = '● Running…'; btn.disabled = true; }
+    else if (status === 'done')  { btn.className = 'run-btn done';    btn.textContent = '✓ Done';      btn.disabled = false; }
+    else if (status === 'error') { btn.className = 'run-btn error';   btn.textContent = '✗ Error';     btn.disabled = false; }
+    else                         { btn.className = 'run-btn';         btn.textContent = '▶ Run';       btn.disabled = false; }
+  }
+  // Update workflow card run button if this was a workflow step
+  const wfBtn = document.getElementById('run-wf-' + scriptId);
+  if (wfBtn && status === 'running') { wfBtn.className = 'run-btn btn-sm running'; wfBtn.textContent = '● Running…'; }
+}
+function setRFScripts(scripts) {
+  if (_rfSetState) _rfSetState(prev => ({ ...prev, scripts }));
+}
+function setRFCat(cat) {
+  if (_rfSetState) _rfSetState(prev => ({ ...prev, currentCat: cat }));
+}
+
+// Exposed for React node buttons
+window._startScript = function(id) { runScript(id); };
+window._stopScript  = function(id) { stopScript(id); };
+
+// ── Custom Script Node ─────────────────────────────────────────────────────
+function ScriptNode({ data }) {
+  const status   = data.status || 'idle';
+  const catClass = (data.category || '').toLowerCase();
+  const isRunning = status === 'running';
+
+  return h('div', { className: `rf-script-node rf-status-${status}` },
+    h(Handle, { type: 'target', position: Position.Left,  style: { background: '#c4b5f7' } }),
+    h('div', { className: 'rf-node-header' },
+      h('span', { className: `rf-node-cat ${catClass}` }, data.category || ''),
+    ),
+    h('div', { className: 'rf-node-label' }, data.label || data.id),
+    data.description && h('div', { className: 'rf-node-desc' }, data.description),
+    h('div', { className: 'rf-node-footer' },
+      isRunning
+        ? h('button', {
+            className: 'rf-stop-btn',
+            onClick: e => { e.stopPropagation(); window._stopScript(data.id); },
+          }, '■ Stop')
+        : h('button', {
+            className: `rf-run-btn${status === 'done' ? ' done' : status === 'error' ? ' error' : ''}`,
+            onClick: e => { e.stopPropagation(); window._startScript(data.id); },
+          },
+          status === 'done'  ? '✓ Done'   :
+          status === 'error' ? '↺ Retry'  : '▶ Run'
+        )
+    ),
+    h(Handle, { type: 'source', position: Position.Right, style: { background: '#c4b5f7' } }),
+  );
+}
+
+// Stable node type map (must not be recreated on render)
+const nodeTypes = { scriptNode: ScriptNode };
+
+// ── Build nodes from state ─────────────────────────────────────────────────
+function buildNodes(scripts, statuses, currentCat) {
+  const known = new Set(scripts.map(s => s.id));
+  const byId  = Object.fromEntries(scripts.map(s => [s.id, s]));
+  const positioned = new Set();
+
+  const nodes = Object.entries(FLOW_NODE_POSITIONS).map(([id, pos], idx) => {
+    positioned.add(id);
+    const script = byId[id];
+    if (!script) return { id, position: pos, hidden: true, data: { id, label: id } };
+    const status = statuses[id] || 'idle';
+    const hidden = currentCat !== 'all' && script.category !== currentCat;
+    return {
+      id,
+      type: 'scriptNode',
+      position: pos,
+      hidden,
+      data: { id, label: script.label, description: script.description, category: script.category, status },
+    };
+  });
+
+  // Append unknown scripts (added to YAML later) below existing layout
+  let yExtra = 430;
+  scripts.forEach((script, i) => {
+    if (positioned.has(script.id)) return;
+    const status = statuses[script.id] || 'idle';
+    const hidden = currentCat !== 'all' && script.category !== currentCat;
+    nodes.push({
+      id: script.id,
+      type: 'scriptNode',
+      position: { x: 20 + (i % 3) * 280, y: yExtra },
+      hidden,
+      data: { id: script.id, label: script.label, description: script.description, category: script.category, status },
+    });
+    if (i % 3 === 2) yExtra += 160;
+  });
+
+  return nodes;
+}
+
+// Expose current graph snapshot for workflow saving
+let _getGraphSnapshot = null;
+
+// ── AutomationFlow React component ────────────────────────────────────────
+function AutomationFlow() {
+  const [rfState, setRFState] = useState({ scripts: [], statuses: {}, currentCat: 'all' });
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(FLOW_EDGES);
+
+  // Expose setter + graph reader to vanilla JS
+  useEffect(() => {
+    _rfSetState = setRFState;
+    return () => { _rfSetState = null; };
+  }, []);
+
+  // Expose workflow loader (used by editWorkflow())
+  useEffect(() => {
+    window._loadWorkflowInGraph = (wf) => {
+      const scripts = rfState.scripts;
+      const byId = Object.fromEntries(scripts.map(s => [s.id, s]));
+      const wfNodes = (wf.nodes || []).map(n => {
+        const script = byId[n.id];
+        return {
+          id: n.id,
+          type: script ? 'scriptNode' : undefined,
+          position: n.position,
+          hidden: false,
+          data: script
+            ? { id: script.id, label: script.label, description: script.description, category: script.category, status: 'idle' }
+            : { id: n.id, label: n.id },
+        };
+      });
+      const wfEdges = (wf.edges || []).map(e => ({
+        ...e,
+        animated: true,
+        style: { stroke: '#8b5cf6' },
+      }));
+      setNodes(wfNodes);
+      setEdges(wfEdges);
+      _onEdgesUpdated(wfEdges);
+    };
+    return () => { window._loadWorkflowInGraph = null; };
+  }, [rfState.scripts]);
+
+  useEffect(() => {
+    _getGraphSnapshot = () => ({
+      nodes: nodes.filter(n => !n.hidden).map(n => ({ id: n.id, position: n.position })),
+      edges: edges.filter(e => !e.hidden).map(e => ({ id: e.id, source: e.source, target: e.target })),
+    });
+  }, [nodes, edges]);
+
+  // Sync nodes/edges whenever rfState changes
+  useEffect(() => {
+    const newNodes = buildNodes(rfState.scripts, rfState.statuses, rfState.currentCat);
+    setNodes(newNodes);
+    const nodeIds = new Set(newNodes.filter(n => !n.hidden).map(n => n.id));
+    setEdges(prev => {
+      // Keep user-drawn edges that are still valid; merge with pipeline edges
+      const builtIn = FLOW_EDGES.map(e => ({ ...e, hidden: !nodeIds.has(e.source) || !nodeIds.has(e.target) }));
+      const builtInIds = new Set(builtIn.map(e => e.id));
+      const userEdges = prev.filter(e => !builtInIds.has(e.id) && nodeIds.has(e.source) && nodeIds.has(e.target));
+      return [...builtIn, ...userEdges];
+    });
+  }, [rfState]);
+
+  // Handle new edge drawn by user
+  const onConnect = useCallback((params) => {
+    setEdges(eds => {
+      const newEdge = {
+        ...params,
+        id: `user-${params.source}-${params.target}`,
+        animated: true,
+        markerEnd: { type: MarkerType ? MarkerType.ArrowClosed : 'arrowclosed' },
+        style: { stroke: '#8b5cf6' },
+      };
+      const updated = addEdge(newEdge, eds);
+      // Show workflow bar when user draws edges
+      _onEdgesUpdated(updated);
+      return updated;
+    });
+  }, []);
+
+  // Show/hide workflow toolbar based on user-drawn edges
+  useEffect(() => {
+    _onEdgesUpdated(edges);
+  }, [edges]);
+
+  return h(RF, {
+    nodes,
+    edges,
+    nodeTypes,
+    onNodesChange,
+    onEdgesChange,
+    onConnect,
+    fitView: true,
+    fitViewOptions: { padding: 0.25 },
+    nodesDraggable: true,
+    nodesConnectable: true,
+    elementsSelectable: true,
+    deleteKeyCode: 'Backspace',
+    minZoom: 0.5,
+    maxZoom: 1.5,
+    connectionLineStyle: { stroke: '#8b5cf6', strokeDasharray: '5 5' },
+  },
+    h(Background, { variant: 'dots', gap: 18, size: 1, color: '#e8e4ff' }),
+    h(Controls, { showInteractive: true, style: { boxShadow: 'none', border: '1px solid #ece8ff' } }),
+  );
+}
+
+// Mount React Flow
+const rfRoot = ReactDOM.createRoot(document.getElementById('rf-root'));
+rfRoot.render(h(AutomationFlow, null));
+
+// ── State ──────────────────────────────────────────────────────────────────
+let allScripts     = [];
+let savedWorkflows = [];
+let currentCat     = 'all';
+let currentView    = 'list';
+let currentType    = 'operations';
+let dbState        = {};
+let runningScriptId = null;
+
+// ── Init ───────────────────────────────────────────────────────────────────
+async function init() {
+  await Promise.all([fetchStatus(), fetchScripts(), fetchWorkflows()]);
+}
+
+// ── Workspace status ───────────────────────────────────────────────────────
+async function fetchStatus() {
+  const grid = document.getElementById('db-grid');
+  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:2rem;color:#bbb;font-size:0.84rem">Loading…</div>';
+  try {
+    const r = await fetch('/api/cockpit/status');
+    if (r.status === 401) { window.location = '/auth/notion?next=/cockpit'; return; }
+    const data = await r.json();
+    document.getElementById('hdr-ws').textContent = data.workspace_name || '—';
+    if (data.user_name) document.getElementById('hdr-user').textContent = data.user_name;
+    const notionLink = document.getElementById('hdr-notion-link');
+    if (data.workspace_url) notionLink.href = data.workspace_url;
+    data.databases.forEach(db => { dbState[db.key] = db.db_id || ''; });
+    renderDBs(data.databases);
+  } catch (e) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:2rem;color:#dc2626;font-size:0.84rem">Failed to load: ${e.message}</div>`;
+  }
+}
+
+function renderDBs(databases) {
+  const grid = document.getElementById('db-grid');
+  grid.innerHTML = databases.map(db => {
+    const countHtml = !db.configured
+      ? '<div class="db-count na">not configured</div>'
+      : db.error
+        ? '<div class="db-count error">error</div>'
+        : `<div class="db-count">${db.count !== null ? (db.has_more ? db.count + '+' : db.count) : '···'}</div>`;
+
+    const idDisplay = db.db_id
+      ? `<span class="db-id-display" title="${db.db_id}">${esc(db.notion_name || db.db_id.replace(/-/g, '').substring(0, 16) + '…')}</span>`
+      : `<span class="db-id-display" style="color:#e0d8ff;font-style:italic">click ✎ to configure</span>`;
+
+    return `
+<div class="db-card" id="dbc-${db.key}">
+  <div class="db-card-top">
+    <span class="db-icon">${db.icon}</span>
+    <span class="db-cat">${db.category.toUpperCase()}</span>
+  </div>
+  <div class="db-name">${db.label}</div>
+  ${countHtml}
+  <div class="db-count-label">records</div>
+  <div class="db-footer" id="dbf-${db.key}">
+    ${idDisplay}
+    <button class="db-edit-btn" onclick="editDB('${db.key}')" title="Change database ID">✎</button>
+  </div>
+  <div class="db-edit-form" id="dbedit-${db.key}">
+    <div class="db-edit-loading" id="dbloading-${db.key}">Loading databases…</div>
+    <select class="db-edit-select" id="dbinput-${db.key}" style="display:none"></select>
+    <div class="db-edit-actions">
+      <button class="db-edit-save" onclick="saveDB('${db.key}')">Save</button>
+      <button class="db-edit-cancel" onclick="cancelEdit('${db.key}')">Cancel</button>
+    </div>
+  </div>
+</div>`;
+  }).join('');
+}
+
+async function editDB(key) {
+  document.getElementById('dbf-' + key).style.display = 'none';
+  const form = document.getElementById('dbedit-' + key);
+  form.classList.add('open');
+  const loading = document.getElementById('dbloading-' + key);
+  const sel = document.getElementById('dbinput-' + key);
+  loading.style.display = '';
+  sel.style.display = 'none';
+
+  try {
+    const r = await fetch('/api/cockpit/notion-databases');
+    if (!r.ok) throw new Error(await r.text());
+    const data = await r.json();
+    sel.innerHTML = '<option value="">— select a database —</option>' +
+      data.databases.map(db =>
+        `<option value="${db.id}"${dbState[key] === db.id ? ' selected' : ''}>${esc(db.name)}</option>`
+      ).join('');
+    loading.style.display = 'none';
+    sel.style.display = '';
+    sel.focus();
+  } catch (e) {
+    loading.textContent = 'Failed to load: ' + e.message;
+  }
+}
+
+async function saveDB(key) {
+  const newId = document.getElementById('dbinput-' + key).value;
+  dbState[key] = newId;
+  const saveBtn = document.querySelector(`#dbedit-${key} .db-edit-save`);
+  saveBtn.textContent = 'Saving…';
+  saveBtn.disabled = true;
+  try {
+    const r = await fetch('/api/cockpit/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({databases: dbState}),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    cancelEdit(key);
+    fetchStatus();
+  } catch (e) {
+    saveBtn.textContent = 'Error';
+    setTimeout(() => { saveBtn.textContent = 'Save'; saveBtn.disabled = false; }, 2000);
+  }
+}
+
+function cancelEdit(key) {
+  document.getElementById('dbedit-' + key).classList.remove('open');
+  document.getElementById('dbf-' + key).style.display = 'flex';
+  const loading = document.getElementById('dbloading-' + key);
+  if (loading) { loading.textContent = 'Loading databases…'; loading.style.display = ''; }
+  const sel = document.getElementById('dbinput-' + key);
+  if (sel) sel.style.display = 'none';
+}
+
+// ── View / type switching ─────────────────────────────────────────────────
+function switchView(view) {
+  currentView = view;
+  document.getElementById('auto-list-view').style.display  = view === 'list'  ? '' : 'none';
+  document.getElementById('auto-graph-view').style.display = view === 'graph' ? '' : 'none';
+  document.getElementById('btn-view-list').classList.toggle('active',  view === 'list');
+  document.getElementById('btn-view-graph').classList.toggle('active', view === 'graph');
+}
+
+function switchType(type) {
+  currentType = type;
+  document.querySelectorAll('.atype-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+  document.getElementById('auto-ops-pane').style.display = type === 'operations' ? '' : 'none';
+  document.getElementById('auto-wf-pane').style.display  = type === 'workflows'  ? '' : 'none';
+  // Hide category filter when showing workflows
+  document.getElementById('filter-tabs').style.display   = type === 'operations' ? '' : 'none';
+}
+
+// ── Scripts (operations) ───────────────────────────────────────────────────
+async function fetchScripts() {
+  try {
+    const r = await fetch('/api/cockpit/scripts');
+    const data = await r.json();
+    allScripts = data.scripts || [];
+    renderScripts();
+    setRFScripts(allScripts);
+  } catch (e) {
+    document.getElementById('script-grid').innerHTML =
+      `<div style="grid-column:1/-1;color:#dc2626;font-size:0.82rem">Failed to load scripts: ${e.message}</div>`;
+  }
+}
+
+function renderScripts() {
+  const grid    = document.getElementById('script-grid');
+  const visible = currentCat === 'all' ? allScripts : allScripts.filter(s => s.category === currentCat);
+  if (!visible.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:1.5rem;color:#bbb;font-size:0.84rem">No scripts.</div>';
+    return;
+  }
+  grid.innerHTML = visible.map(s => {
+    const catClass = (s.category || '').toLowerCase();
+    return `
+<div class="script-card" id="sc-${s.id}">
+  <div class="script-card-top">
+    <span class="script-cat-badge ${catClass}">${s.category || ''}</span>
+  </div>
+  <div class="script-name">${esc(s.label)}</div>
+  <div class="script-desc">${esc(s.description || '')}</div>
+  <div class="script-footer">
+    <button class="run-btn" id="run-${s.id}" onclick="runScript('${s.id}')">▶ Run</button>
+  </div>
+</div>`;
+  }).join('');
+}
+
+function filterScripts(cat) {
+  currentCat = cat;
+  document.querySelectorAll('.ftab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.cat === cat);
+  });
+  renderScripts();
+  setRFCat(cat);
+}
+
+// ── Script runner ──────────────────────────────────────────────────────────
+async function runScript(scriptId) {
+  if (runningScriptId) return;
+  runningScriptId = scriptId;
+  updateNodeStatus(scriptId, 'running');
+
+  const logWrap   = document.getElementById('log-wrap');
+  const logBody   = document.getElementById('log-body');
+  const logLabel  = document.getElementById('log-label');
+  const logSpinner = document.getElementById('log-spinner');
+  const script    = allScripts.find(s => s.id === scriptId);
+
+  logLabel.textContent = script ? script.label : scriptId;
+  logBody.innerHTML = '';
+  logWrap.style.display = 'block';
+  logSpinner.classList.remove('hidden');
+  logWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  function addLine(text, cls = '') {
+    const el = document.createElement('div');
+    el.className = 'log-line' + (cls ? ' ' + cls : '');
+    el.textContent = text;
+    logBody.appendChild(el);
+    logBody.scrollTop = logBody.scrollHeight;
+  }
+
+  try {
+    const r = await fetch('/api/cockpit/run-script', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({script_id: scriptId}),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      addLine('Error: ' + (err.detail || r.statusText), 'err');
+      finishScript(scriptId, 'error');
+      return;
+    }
+
+    const reader  = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, {stream: true});
+      const chunks = buf.split('\n\n');
+      buf = chunks.pop();
+      for (const chunk of chunks) {
+        const line = chunk.trim();
+        if (!line.startsWith('data: ')) continue;
+        let ev;
+        try { ev = JSON.parse(line.slice(6)); } catch { continue; }
+        if (ev.type === 'log') {
+          addLine(ev.message, ev.message.startsWith('$') ? 'cmd' : '');
+        } else if (ev.type === 'done') {
+          addLine('✓ ' + (ev.message || 'Done'), 'done');
+          finishScript(scriptId, 'done');
+        } else if (ev.type === 'error') {
+          addLine('✗ ' + ev.message, 'err');
+          finishScript(scriptId, 'error');
+        }
+      }
+    }
+  } catch (e) {
+    addLine('Network error: ' + e.message, 'err');
+    finishScript(scriptId, 'error');
+  }
+}
+
+function finishScript(scriptId, result) {
+  document.getElementById('log-spinner').classList.add('hidden');
+  runningScriptId = null;
+  updateNodeStatus(scriptId, result);
+  setTimeout(() => updateNodeStatus(scriptId, 'idle'), 3000);
+}
+
+async function stopScript(scriptId) {
+  try {
+    await fetch('/api/cockpit/stop-script', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({script_id: scriptId}),
+    });
+  } catch (_) {}
+  runningScriptId = null;
+  updateNodeStatus(scriptId, 'idle');
+  document.getElementById('log-spinner')?.classList.add('hidden');
+  const logBody = document.getElementById('log-body');
+  if (logBody) {
+    const el = document.createElement('div');
+    el.className = 'log-line err';
+    el.textContent = '■ Stopped by user';
+    logBody.appendChild(el);
+    logBody.scrollTop = logBody.scrollHeight;
+  }
+}
+
+function closeLog() {
+  document.getElementById('log-wrap').style.display = 'none';
+}
+
+// ── Workflow management ────────────────────────────────────────────────────
+async function fetchWorkflows() {
+  try {
+    const r = await fetch('/api/cockpit/workflows');
+    if (!r.ok) return;
+    const data = await r.json();
+    savedWorkflows = data.workflows || [];
+    renderWorkflowCards(savedWorkflows);
+  } catch (_) {}
+}
+
+function renderWorkflowCards(workflows) {
+  const container = document.getElementById('wf-cards-list');
+  if (!container) return;
+  if (!workflows.length) {
+    container.innerHTML = '<div style="text-align:center;padding:1.5rem;color:#bbb;font-size:0.84rem">No workflows saved yet. Switch to Graph view to compose one.</div>';
+    return;
+  }
+  container.innerHTML = workflows.map(wf => {
+    const stepCount = (wf.nodes || []).length;
+    const edgeCount = (wf.edges || []).length;
+    const meta = `${stepCount} step${stepCount !== 1 ? 's' : ''}, ${edgeCount} connection${edgeCount !== 1 ? 's' : ''}`;
+    return `
+<div class="wf-card" id="wfc-${wf.id}">
+  <span class="wf-card-icon">🔗</span>
+  <div class="wf-card-info">
+    <div class="wf-card-name">${esc(wf.name)}</div>
+    <div class="wf-card-meta">${meta}</div>
+  </div>
+  <div class="wf-card-actions">
+    <button class="run-btn btn-sm" id="run-wf-${wf.id}" style="font-size:0.72rem;padding:0.28rem 0.65rem;" onclick="runSavedWorkflow('${wf.id}')">▶ Run</button>
+    <button class="btn-ghost btn-sm" onclick="editWorkflow('${wf.id}')" title="Edit in graph view">✎ Edit</button>
+    <button class="btn-ghost btn-sm" onclick="deleteWorkflow('${wf.id}')" style="color:#dc2626;border-color:#fca5a5;" title="Delete">✕</button>
+  </div>
+</div>`;
+  }).join('');
+}
+
+async function deleteWorkflow(id) {
+  await fetch(`/api/cockpit/workflows/${id}`, { method: 'DELETE' });
+  fetchWorkflows();
+}
+
+function editWorkflow(id) {
+  const wf = savedWorkflows.find(w => w.id === id);
+  if (!wf) return;
+  switchView('graph');
+  document.getElementById('wf-name').value = wf.name;
+  if (window._loadWorkflowInGraph) window._loadWorkflowInGraph(wf);
+}
+
+// ── Workflow composition ───────────────────────────────────────────────────
+const USER_EDGE_PREFIX = 'user-';
+
+function _hasUserEdges(edges) {
+  return edges.some(e => e.id && e.id.startsWith(USER_EDGE_PREFIX) && !e.hidden);
+}
+
+function _onEdgesUpdated(edges) {
+  const bar = document.getElementById('wf-bar');
+  if (!bar) return;
+  bar.style.display = _hasUserEdges(edges) ? 'flex' : 'none';
+}
+
+function clearWorkflow() {
+  // Remove user-drawn edges via RF state bridge
+  if (_rfSetState) {
+    _rfSetState(prev => prev); // trigger edge cleanup on next sync
+  }
+  // Force re-sync to drop user edges
+  if (_rfSetState) _rfSetState(p => ({ ...p }));
+  document.getElementById('wf-bar').style.display = 'none';
+  document.getElementById('wf-name').value = '';
+}
+
+async function saveWorkflow() {
+  if (!_getGraphSnapshot) return;
+  const { nodes, edges } = _getGraphSnapshot();
+  const userEdges = edges.filter(e => e.id.startsWith(USER_EDGE_PREFIX));
+  if (!userEdges.length) { alert('Draw edges between nodes first to compose a workflow.'); return; }
+
+  const name = document.getElementById('wf-name').value.trim() || 'My Workflow';
+  const id = `wf-${Date.now()}`;
+  const wf = { id, name, nodes, edges: userEdges };
+
+  try {
+    const r = await fetch('/api/cockpit/workflows', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ workflow: wf }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    await fetchWorkflows();
+    document.getElementById('wf-name').value = '';
+    // Flash save button
+    const saveBtn = document.querySelector('#wf-bar .btn-ghost');
+    if (saveBtn) { const t = saveBtn.textContent; saveBtn.textContent = '✓ Saved'; setTimeout(() => { saveBtn.textContent = t; }, 1500); }
+    // Switch to Workflows tab in list view after short delay
+    setTimeout(() => { switchView('list'); switchType('workflows'); }, 800);
+  } catch (e) {
+    alert('Failed to save: ' + e.message);
+  }
+}
+
+async function runWorkflow() {
+  if (!_getGraphSnapshot) return;
+  const { nodes, edges } = _getGraphSnapshot();
+  const userEdges = edges.filter(e => e.id.startsWith(USER_EDGE_PREFIX));
+  if (!userEdges.length) { alert('Draw edges between script nodes to define the workflow order.'); return; }
+
+  const name = document.getElementById('wf-name').value.trim() || 'Ad-hoc workflow';
+  const id = `wf-adhoc-${Date.now()}`;
+  const wf = { id, name, nodes, edges: userEdges };
+
+  // Save transiently and run
+  try {
+    const saveR = await fetch('/api/cockpit/workflows', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ workflow: wf }),
+    });
+    if (!saveR.ok) throw new Error(await saveR.text());
+    await runSavedWorkflow(id);
+    // Clean up transient workflow
+    await fetch(`/api/cockpit/workflows/${id}`, { method: 'DELETE' });
+  } catch (e) {
+    alert('Failed to run workflow: ' + e.message);
+  }
+}
+
+async function runSavedWorkflow(workflowId) {
+  const logWrap    = document.getElementById('log-wrap');
+  const logBody    = document.getElementById('log-body');
+  const logLabel   = document.getElementById('log-label');
+  const logSpinner = document.getElementById('log-spinner');
+
+  const wf = savedWorkflows.find(w => w.id === workflowId);
+  logLabel.textContent = wf ? wf.name : 'Workflow';
+  logBody.innerHTML = '';
+  logWrap.style.display = 'block';
+  logSpinner.classList.remove('hidden');
+  logWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // Disable both the graph-view run button and the list-view card button
+  const runBtn    = document.getElementById('run-wf-btn');
+  const cardBtn   = document.getElementById(`run-wf-${workflowId}`);
+  if (runBtn)  { runBtn.disabled  = true; runBtn.textContent  = '● Running…'; }
+  if (cardBtn) { cardBtn.disabled = true; cardBtn.className = 'run-btn btn-sm running'; cardBtn.textContent = '● Running…'; }
+
+  function addLine(text, cls = '') {
+    const el = document.createElement('div');
+    el.className = 'log-line' + (cls ? ' ' + cls : '');
+    el.textContent = text;
+    logBody.appendChild(el);
+    logBody.scrollTop = logBody.scrollHeight;
+  }
+
+  try {
+    const r = await fetch('/api/cockpit/run-workflow', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ workflow_id: workflowId }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      addLine('Error: ' + (err.detail || r.statusText), 'err');
+      return;
+    }
+
+    const reader  = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, {stream: true});
+      const chunks = buf.split('\n\n');
+      buf = chunks.pop();
+      for (const chunk of chunks) {
+        const line = chunk.trim();
+        if (!line.startsWith('data: ')) continue;
+        let ev;
+        try { ev = JSON.parse(line.slice(6)); } catch { continue; }
+        if (ev.type === 'step_start') {
+          addLine(`▶ ${ev.label || ev.script_id}`, 'cmd');
+          if (ev.script_id) updateNodeStatus(ev.script_id, 'running');
+        } else if (ev.type === 'log') {
+          addLine(ev.message, ev.message.startsWith('$') ? 'cmd' : '');
+        } else if (ev.type === 'step_done') {
+          addLine(ev.message || '✓ Done', 'done');
+          if (ev.script_id) { updateNodeStatus(ev.script_id, 'done'); setTimeout(() => updateNodeStatus(ev.script_id, 'idle'), 3000); }
+        } else if (ev.type === 'step_error') {
+          addLine('✗ ' + ev.message, 'err');
+          if (ev.script_id) { updateNodeStatus(ev.script_id, 'error'); setTimeout(() => updateNodeStatus(ev.script_id, 'idle'), 3000); }
+        } else if (ev.type === 'done') {
+          addLine('✓ ' + (ev.message || 'Workflow complete'), 'done');
+        } else if (ev.type === 'error') {
+          addLine('✗ ' + ev.message, 'err');
+        }
+      }
+    }
+  } catch (e) {
+    addLine('Network error: ' + e.message, 'err');
+  } finally {
+    logSpinner.classList.add('hidden');
+    if (runBtn)  { runBtn.disabled  = false; runBtn.textContent  = '▶ Run'; }
+    if (cardBtn) { cardBtn.disabled = false; cardBtn.className = 'run-btn btn-sm'; cardBtn.textContent = '▶ Run'; }
+  }
+}
+
+// ── Chat session management ────────────────────────────────────────────────
+let currentSessionId = crypto.randomUUID();
+let chatHistory = [];   // [{role, content}] — sent to LLM
+let chatMessages = [];  // [{role, content, data?}] — full UI state
+
+function _emptyChatEl() {
+  return '<div class="chat-empty" id="chat-empty">Ask anything about your Notion databases — find leads, analyse contacts, get suggestions.</div>';
+}
+
+function startNewSession() {
+  currentSessionId = crypto.randomUUID();
+  chatHistory = [];
+  chatMessages = [];
+  document.getElementById('chat-history').innerHTML = _emptyChatEl();
+  document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
+}
+
+// Legacy — kept so deal/lead handlers that call saveChatHistory() don't break
+function saveChatHistory() {}
+
+function restoreChat() {
+  if (!chatMessages.length) return;
+  document.getElementById('chat-empty')?.remove();
+  for (const msg of chatMessages) {
+    if (msg.role === 'user') {
+      _appendChatBubble('user', msg.content);
+    } else if (msg.data) {
+      _renderLeadResult(msg.data, /* skipSave */ true);
+    } else {
+      _appendChatBubble('assistant', msg.content);
+    }
+  }
+}
+
+// ── Conversations sidebar ──────────────────────────────────────────────────
+async function loadConversationsList() {
+  try {
+    const r = await fetch('/api/cockpit/conversations');
+    if (!r.ok) return;
+    const { conversations } = await r.json();
+    _renderConversationsList(conversations);
+  } catch (_) {}
+}
+
+function _renderConversationsList(conversations) {
+  const list = document.getElementById('conv-list');
+  list.innerHTML = '';
+  if (!conversations.length) {
+    list.innerHTML = '<div class="conv-empty-hint">No history yet</div>';
+    return;
+  }
+  conversations.forEach(conv => {
+    const btn = document.createElement('button');
+    btn.className = 'conv-item' + (conv.id === currentSessionId ? ' active' : '');
+    btn.dataset.id = conv.id;
+    const date = conv.updated_at
+      ? new Date(conv.updated_at).toLocaleDateString('fr-FR', {day:'2-digit', month:'short'})
+      : '';
+    btn.innerHTML = `
+      <div class="conv-item-title">${esc(conv.title)}</div>
+      <div class="conv-item-meta">
+        <span>${date}</span>
+        <button class="conv-del" title="Delete" onclick="deleteConversation(event,'${esc(conv.id)}')">✕</button>
+      </div>`;
+    btn.onclick = (e) => { if (!e.target.classList.contains('conv-del')) loadConversation(conv.id); };
+    list.appendChild(btn);
+  });
+}
+
+async function loadConversation(sessionId) {
+  try {
+    const r = await fetch(`/api/cockpit/conversations/${sessionId}`);
+    if (!r.ok) return;
+    const { session } = await r.json();
+    currentSessionId = sessionId;
+    chatHistory = session.history || [];
+    chatMessages = session.messages || [];
+    document.getElementById('chat-history').innerHTML = '';
+    restoreChat();
+    document.querySelectorAll('.conv-item').forEach(el =>
+      el.classList.toggle('active', el.dataset.id === sessionId));
+  } catch (_) {}
+}
+
+async function deleteConversation(e, sessionId) {
+  e.stopPropagation();
+  if (!confirm('Delete this conversation?')) return;
+  try {
+    await fetch(`/api/cockpit/conversations/${sessionId}`, { method: 'DELETE' });
+    if (sessionId === currentSessionId) startNewSession();
+    await loadConversationsList();
+  } catch (_) {}
+}
+
+// ── Workspace memory ──────────────────────────────────────────────────────
+let _memoryOpen = false;
+
+async function toggleMemory() {
+  const bar = document.getElementById('memory-bar');
+  _memoryOpen = !_memoryOpen;
+  bar.classList.toggle('open', _memoryOpen);
+  if (_memoryOpen) {
+    try {
+      const r = await fetch('/api/cockpit/memory');
+      if (r.ok) document.getElementById('memory-textarea').value = (await r.json()).text;
+    } catch (_) {}
+  }
+}
+
+async function saveMemory() {
+  const text = document.getElementById('memory-textarea').value;
+  const btn = document.querySelector('.memory-save-btn');
+  try {
+    const r = await fetch('/api/cockpit/memory', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ text }),
+    });
+    if (r.ok) {
+      btn.textContent = '✓ Saved';
+      setTimeout(() => { btn.textContent = 'Save'; }, 1800);
+    }
+  } catch (_) {}
+}
+
+// ── Chat ───────────────────────────────────────────────────────────────────
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const query = input.value.trim();
+  if (!query) return;
+  input.value = '';
+
+  document.getElementById('chat-empty')?.remove();
+  _appendChatBubble('user', query);
+  chatHistory.push({ role: 'user', content: query });
+  chatMessages.push({ role: 'user', content: query });
+
+  const statusEl = document.createElement('div');
+  statusEl.className = 'chat-status';
+  statusEl.textContent = '···';
+  document.getElementById('chat-history').appendChild(statusEl);
+  scrollChat();
+
+  try {
+    const r = await fetch('/api/cockpit/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ query, history: chatHistory.slice(0, -1), session_id: currentSessionId }),
+    });
+    if (!r.ok) {
+      statusEl.remove();
+      const msg = 'Error: ' + r.statusText;
+      _appendChatBubble('assistant', msg);
+      chatHistory.push({ role: 'assistant', content: msg });
+      chatMessages.push({ role: 'assistant', content: msg });
+      saveChatHistory();
+      return;
+    }
+
+    const reader  = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let finalData = null;
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, {stream: true});
+      const chunks = buf.split('\n\n');
+      buf = chunks.pop();
+      for (const chunk of chunks) {
+        const line = chunk.trim();
+        if (!line.startsWith('data: ')) continue;
+        let ev;
+        try { ev = JSON.parse(line.slice(6)); } catch { continue; }
+        if (ev.type === 'status') {
+          statusEl.textContent = ev.message;
+          scrollChat();
+        } else if (ev.type === 'result') {
+          statusEl.remove();
+          finalData = ev.data;
+          _renderLeadResult(ev.data);
+        } else if (ev.type === 'error') {
+          statusEl.remove();
+          const msg = '✗ ' + ev.message;
+          _appendChatBubble('assistant', msg);
+          chatHistory.push({ role: 'assistant', content: msg });
+          chatMessages.push({ role: 'assistant', content: msg });
+          saveChatHistory();
+        }
+      }
+    }
+
+    if (finalData) {
+      const summary = finalData.message || JSON.stringify({ action: finalData.action, count: (finalData.leads||[]).length });
+      chatHistory.push({ role: 'assistant', content: summary });
+      // chatMessages entry added inside _renderLeadResult
+      loadConversationsList(); // refresh sidebar
+    }
+  } catch (e) {
+    statusEl.remove();
+    const msg = 'Network error: ' + e.message;
+    _appendChatBubble('assistant', msg);
+    chatHistory.push({ role: 'assistant', content: msg });
+    chatMessages.push({ role: 'assistant', content: msg });
+    saveChatHistory();
+  }
+}
+
+function _appendChatBubble(role, text) {
+  const container = document.getElementById('chat-history');
+  const msg  = document.createElement('div');
+  msg.className = 'chat-msg ' + role;
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-bubble';
+  bubble.textContent = text;
+  msg.appendChild(bubble);
+  container.appendChild(msg);
+  scrollChat();
+}
+
+// Legacy alias
+function appendChatMsg(role, text) { _appendChatBubble(role, text); }
+
+function _renderLeadResult(data, skipSave = false) {
+  const container = document.getElementById('chat-history');
+  const wrap  = document.createElement('div');
+  wrap.className = 'chat-msg assistant';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-bubble';
+
+  // "create" = LLM proposed deals to create — user must confirm each one
+  const isCreate = data.action === 'create';
+
+  if (isCreate) {
+    const badge = document.createElement('div');
+    badge.style.cssText = 'font-size:0.7rem;font-weight:700;color:#6e56cf;text-transform:uppercase;letter-spacing:1px;margin-bottom:0.5rem;';
+    badge.textContent = '📋 Deals to create — confirm below';
+    bubble.appendChild(badge);
+  }
+
+  if (data.message) {
+    const p = document.createElement('div');
+    p.style.marginBottom = '0.75rem';
+    p.textContent = data.message;
+    bubble.appendChild(p);
+  }
+
+  const leadsGrid = document.createElement('div');
+  leadsGrid.className = 'leads-grid';
+
+  (data.leads || []).forEach(lead => {
+    const card = document.createElement('div');
+    card.className = 'lead-card';
+    card.innerHTML = `
+      <div class="lead-avatar">👤</div>
+      <div class="lead-info">
+        <div class="lead-name">${esc(lead.name)}</div>
+        <div class="lead-sub">${esc(lead.position || '')}${lead.position && lead.company ? ' @ ' : ''}${esc(lead.company || '')}</div>
+        ${lead.reason ? `<div class="lead-reason">${esc(lead.reason)}</div>` : ''}
+        ${isCreate && lead.deal_name ? `<div class="lead-reason" style="color:#6e56cf">📋 ${esc(lead.deal_name)}</div>` : ''}
+      </div>
+      <span class="lead-badge ${lead.type}">${lead.type === 'existing' ? 'CRM' : 'New'}</span>
+      <div class="lead-action"></div>
+    `;
+    const actionEl = card.querySelector('.lead-action');
+
+    if (isCreate) {
+      // Proposed deal — user must confirm to trigger wizard + actual creation
+      const actions = document.createElement('div');
+      actions.style.cssText = 'display:flex;gap:0.35rem;flex-direction:column;align-items:flex-end;';
+      if (lead.type === 'existing' && lead.notion_id) {
+        const openA = document.createElement('a');
+        openA.className = 'lead-open';
+        openA.href = `https://notion.so/${lead.notion_id.replace(/-/g, '')}`;
+        openA.target = '_blank';
+        openA.textContent = 'Open ↗';
+        actions.appendChild(openA);
+      }
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'lead-add';
+      confirmBtn.style.cssText = 'font-size:0.72rem;background:#6e56cf;';
+      confirmBtn.textContent = '✓ Create deal';
+      confirmBtn.onclick = () => createDeal({ ...lead, deal_name: lead.deal_name }, confirmBtn);
+      actions.appendChild(confirmBtn);
+      actionEl.appendChild(actions);
+    } else {
+      if (lead.type === 'existing' && lead.notion_id) {
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display:flex;gap:0.35rem;flex-direction:column;align-items:flex-end;';
+        const a = document.createElement('a');
+        a.className = 'lead-open';
+        a.href = `https://notion.so/${lead.notion_id.replace(/-/g, '')}`;
+        a.target = '_blank';
+        a.textContent = 'Open ↗';
+        const btn = document.createElement('button');
+        btn.className = 'lead-add';
+        btn.textContent = '+ Deal';
+        btn.style.fontSize = '0.7rem';
+        btn.onclick = () => createDeal(lead, btn);
+        actions.appendChild(a);
+        actions.appendChild(btn);
+        actionEl.appendChild(actions);
+      } else if (lead.type === 'new') {
+        const btn = document.createElement('button');
+        btn.className = 'lead-add';
+        btn.textContent = '+ Add';
+        btn.onclick = () => createLead(lead, btn);
+        actionEl.appendChild(btn);
+      }
+    }
+
+    leadsGrid.appendChild(card);
+  });
+
+  bubble.appendChild(leadsGrid);
+  wrap.appendChild(bubble);
+  container.appendChild(wrap);
+  scrollChat();
+
+  if (!skipSave) {
+    chatMessages.push({ role: 'assistant', data });
+    saveChatHistory();
+  }
+}
+
+// ── Deal wizard ────────────────────────────────────────────────────────────
+let dealWizard = null;
+// Shape: { lead, dealName, fields: [{key,type,options}], answers: {}, step, triggerBtn }
+
+async function createDeal(lead, btn) {
+  if (dealWizard) return;
+  btn.disabled    = true;
+  btn.textContent = '···';
+
+  let fields = [];
+  try {
+    const r = await fetch('/api/cockpit/deals-properties');
+    if (r.ok) fields = (await r.json()).fields || [];
+  } catch (_) {}
+
+  const WIZARD_KEYS = ['Product', 'Type', 'Stage', 'Value (euros)', 'Next Action', 'Notes'];
+  const wizardFields = fields.filter(f => WIZARD_KEYS.includes(f.key));
+
+  // Use LLM-suggested deal name if present, otherwise build a default
+  const dealName = lead.deal_name || `Deal — ${lead.name}${lead.company ? ' — ' + lead.company : ''}`;
+  dealWizard = { lead, dealName, fields: wizardFields, answers: {}, step: 0, triggerBtn: btn };
+  btn.textContent = '⋯';
+
+  _appendChatBubble('assistant',
+    `Creating a deal for ${lead.name}${lead.company ? ' at ' + lead.company : ''}. A few quick questions:`
+  );
+  _advanceWizard();
+}
+
+function _advanceWizard() {
+  if (!dealWizard) return;
+  const { fields, step } = dealWizard;
+  if (step >= fields.length) { _finishWizard(); return; }
+
+  const field = fields[step];
+  const container = document.getElementById('chat-history');
+  const wrap = document.createElement('div');
+  wrap.className = 'chat-msg assistant';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-bubble';
+  bubble.appendChild(Object.assign(document.createElement('div'), { textContent: _wizardQ(field.key) }));
+
+  const opts = document.createElement('div');
+  opts.className = 'chat-options';
+
+  if (field.type === 'select' || field.type === 'multi_select') {
+    field.options.forEach(opt => {
+      const b = document.createElement('button');
+      b.className = 'chat-opt';
+      b.textContent = opt;
+      b.onclick = () => _wizardAnswer(step, field, opt, b, opts);
+      opts.appendChild(b);
+    });
+  } else {
+    const inp = document.createElement('input');
+    inp.type = field.type === 'number' ? 'number' : 'text';
+    inp.placeholder = field.type === 'number' ? '0' : 'Type here…';
+    inp.style.cssText = 'border:1.5px solid #ddd;border-radius:5px;padding:0.3rem 0.6rem;font-size:0.82rem;width:160px;outline:none;margin-right:0.4rem;';
+    inp.onfocus = () => { inp.style.borderColor = '#6e56cf'; };
+    inp.onblur  = () => { inp.style.borderColor = '#ddd'; };
+    const okBtn = document.createElement('button');
+    okBtn.className = 'chat-opt';
+    okBtn.textContent = 'Confirm';
+    okBtn.onclick = () => {
+      const v = field.type === 'number' ? (parseFloat(inp.value) || null) : (inp.value.trim() || null);
+      _wizardAnswer(step, field, v, okBtn, opts);
+    };
+    opts.appendChild(inp);
+    opts.appendChild(okBtn);
+  }
+
+  const skip = document.createElement('button');
+  skip.className = 'chat-opt skip';
+  skip.textContent = 'Skip';
+  skip.onclick = () => _wizardAnswer(step, field, null, skip, opts);
+  opts.appendChild(skip);
+
+  bubble.appendChild(opts);
+  wrap.appendChild(bubble);
+  container.appendChild(wrap);
+  scrollChat();
+}
+
+function _wizardQ(key) {
+  return ({
+    'Product':        'Which product is this deal about?',
+    'Type':           'What type of prospection?',
+    'Stage':          'What stage is this deal at?',
+    'Value (euros)':  'Estimated deal value (€)?',
+    'Next Action':    'What is the next action?',
+    'Notes':          'Any notes?',
+  })[key] || `Value for ${key}?`;
+}
+
+function _wizardAnswer(step, field, value, clickedBtn, optsEl) {
+  optsEl.querySelectorAll('.chat-opt, input').forEach(el => { if (el.tagName === 'BUTTON') el.disabled = true; });
+  if (clickedBtn) clickedBtn.classList.add('selected');
+
+  if (value !== null && value !== undefined) {
+    dealWizard.answers[field.key] = field.type === 'multi_select' ? [value] : value;
+  }
+
+  const chosen = value !== null ? String(value) : '(skipped)';
+  _appendChatBubble('user', chosen);
+  chatHistory.push({ role: 'user', content: chosen });
+  chatMessages.push({ role: 'user', content: chosen });
+
+  dealWizard.step += 1;
+  setTimeout(_advanceWizard, 200);
+}
+
+async function _finishWizard() {
+  const { lead, dealName, answers, triggerBtn } = dealWizard;
+  dealWizard = null;
+
+  _appendChatBubble('assistant', `Creating the deal "${dealName}"…`);
+
+  try {
+    const body = {
+      deal_name:    dealName,
+      notion_id:    lead.notion_id || null,
+      new_person:   lead.type === 'new' ? { name: lead.name, position: lead.position || '', company: lead.company || '' } : null,
+      extra_fields: answers,
+    };
+    const r = await fetch('/api/cockpit/create-deal', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Failed');
+    const data = await r.json();
+
+    if (triggerBtn) {
+      const a = Object.assign(document.createElement('a'), { className: 'lead-open', href: data.url, target: '_blank', textContent: 'Deal ↗' });
+      a.style.cssText = 'background:#ecfdf5;border-color:#86efac;color:#16a34a;';
+      triggerBtn.replaceWith(a);
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'chat-msg assistant';
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble';
+    bubble.style.cssText = 'display:flex;align-items:center;gap:0.75rem;';
+    bubble.innerHTML = `<span>✓ Deal created: <strong>${esc(dealName)}</strong></span>`;
+    const a = Object.assign(document.createElement('a'), { className: 'lead-open', href: data.url, target: '_blank', textContent: 'Open ↗' });
+    a.style.cssText = 'background:#ecfdf5;border-color:#86efac;color:#16a34a;flex-shrink:0;';
+    bubble.appendChild(a);
+    wrap.appendChild(bubble);
+    document.getElementById('chat-history').appendChild(wrap);
+    scrollChat();
+
+    chatHistory.push({ role: 'assistant', content: `Deal created: ${dealName}` });
+    chatMessages.push({ role: 'assistant', content: `Deal created: ${dealName}` });
+    saveChatHistory();
+  } catch (e) {
+    _appendChatBubble('assistant', `✗ Failed to create deal: ${e.message}`);
+    if (triggerBtn) { triggerBtn.disabled = false; triggerBtn.textContent = '+ Deal'; }
+  }
+}
+
+async function createLead(lead, btn) {
+  btn.disabled    = true;
+  btn.textContent = '···';
+  try {
+    const r = await fetch('/api/cockpit/create-lead', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: lead.name, position: lead.position || '', company: lead.company || ''}),
+    });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Failed');
+    const data = await r.json();
+    btn.textContent = '✓ Added';
+    btn.style.background = '#16a34a';
+    const a    = document.createElement('a');
+    a.className = 'lead-open';
+    a.href     = data.url;
+    a.target   = '_blank';
+    a.textContent = 'Open ↗';
+    btn.replaceWith(a);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '✗ Error';
+    btn.style.background = '#dc2626';
+    setTimeout(() => { btn.textContent = '+ Add'; btn.style.background = ''; btn.disabled = false; }, 2500);
+  }
+}
+
+function scrollChat() {
+  const h = document.getElementById('chat-history');
+  h.scrollTop = h.scrollHeight;
+}
+
+function esc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Start ──────────────────────────────────────────────────────────────────
+init();
+loadConversationsList();
+</script>
+</body>
+</html>

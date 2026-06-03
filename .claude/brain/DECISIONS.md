@@ -53,7 +53,52 @@
 **Rationale:** `pd.read_csv(sep=None, engine="python")` auto-detects delimiters (handles `,` vs `;` from Excel without hacks). `utf-8-sig` BOM ensures correct opening in French/European Excel. Uniform API across CSV, JSON, Parquet if needed. Eliminates the `_write_review_row` append-per-row anti-pattern in favour of collect-then-write.  
 **How to apply:** Any new script reading or writing tabular data must use pandas. Replace any remaining `import csv` found during refactors.
 
+### 2026-06-03 — Customer deployment model: hosted wizard + shared bot + file-upload cockpit
+
+**Context:** The cockpit runs scripts server-side. Scripts read local files (`data/crm/linkedin/`, SQLite state). Customers who set up via the hosted wizard have no SSH access to Louis's server. The Telegram bot is currently a systemd service tied to one user's config.
+
+**Decision:** Three-tier hosted model, in order of implementation:
+
+**Tier 1 — Hosted wizard (done):** Louis runs `notion-pilot.com`. Any customer OAuth with Notion → workspace created in their account. No server-side data yet.
+
+**Tier 2 — Multi-customer cockpit:** The cockpit becomes multi-tenant with two additions:
+- `data/` namespaced by Notion workspace_id: `data/{workspace_id}/crm/linkedin/`, `data/{workspace_id}/conv_state.db`, etc.
+- `/api/cockpit/upload` endpoint for LinkedIn CSV and future files — eliminates the need for SSH access entirely
+- Scripts receive the workspace's data dir and stored Notion token; run in isolation per customer
+- OAuth token stored (encrypted) server-side per workspace_id (needed to run scripts on behalf of the customer)
+
+**Tier 3 — Shared Telegram bot:** Louis runs one bot for all customers. Customers link it from the cockpit:
+- Cockpit shows a "Connect Telegram" button → generates a one-time token deep link (`t.me/NotionPilotBot?start=<token>`)
+- Customer clicks the link in Telegram → bot receives `/start <token>` → maps `telegram_user_id → workspace_id` in a registry
+- All subsequent bot messages from that user are dispatched to their workspace (token + db_ids looked up from the registry)
+- Registry: small SQLite table `{telegram_user_id, workspace_id, linked_at}` — no per-customer bot token needed
+
+**Alternative for power users:** customers who want their own private bot (or want self-hosted) can still deploy via Docker Compose with their own `TELEGRAM_BOT_TOKEN`. The self-hosted path is fully supported as a second deployment option.
+
+**Rejected:** Per-customer separate bot process (too many systemd units, unmanageable)  
+**Rejected:** CLI-only / manual VPS setup without Docker (too high friction for target audience)  
+**Rejected:** Full multi-tenant SaaS immediately (too complex before single-user experience is solid)
+
+**Rationale:** Telegram user ID is already a unique, stable identity. One bot + a user→workspace registry is the minimal delta to serve N customers from a single process. The cockpit file upload removes the last SSH-requiring step. Data namespacing by workspace_id is the only structural change needed in `data/`.
+
+---
+
 ### 2026-05-28 — Website: landing + Notion OAuth deploy wizard + chatbot
 **Decision:** Build a website with three functions: (1) landing/marketing, (2) "Deploy to Notion" wizard using Notion OAuth, (3) chatbot interface to query/add to Notion DBs.  
 **Rejected:** CLI-only onboarding  
 **Rationale:** Target audience (small teams) needs a zero-friction setup path. Notion OAuth eliminates manual token copy-paste. Chatbot extends the Telegram interaction model to a web interface.
+
+### 2026-06-03 — Deal creation: client-side wizard, not server-side auto-create
+**Decision:** When LLM returns `action=create`, the server emits the leads list without creating anything. The client fetches the live Deals DB schema, runs a wizard (clickable option buttons per property), then calls `POST /api/cockpit/create-deal` only after user confirmation.  
+**Rejected:** Server auto-creating deals on `action=create` intent  
+**Rationale:** User must validate the lead before committing to Notion. Auto-create produced a false "✓ created" badge with nothing in Notion. Wizard also collects Product/Type/Stage which the server can't infer.
+
+### 2026-06-03 — web/config.py naming: keep module name, rename directory
+**Decision:** `web/config.py` (Python module) and `web/workspaces/` (per-workspace data directory). Previously named `web/cfg.py` + `web/config/` to avoid collision.  
+**Rejected:** Keeping `cfg.py` abbreviation  
+**Rationale:** `config.py` is the natural Python module name. A file and directory can't share the same name in the same folder, so the directory was renamed to `workspaces/` which is also more descriptive of its content.
+
+### 2026-06-03 — Automation: List view default + Graph view for composition
+**Decision:** Automation panel has two views: List (default, Operations + Workflows sub-tabs) and Graph (React Flow, connectable for workflow composition). Workflows saved from Graph appear in the List Workflows tab.  
+**Rejected:** Graph-only view, or hiding workflow management in a separate page  
+**Rationale:** Most interactions are single-script runs (list view is faster). Graph is an advanced feature for composing sequential pipelines. Separating by view keeps the default UX uncluttered.
