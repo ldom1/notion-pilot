@@ -29,32 +29,34 @@ from notion_pilot.shared.config import Settings, load_settings
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 _STATUS_TODO = "Not analysed"
-_STATUS_WIP  = "Analysing ..."
+_STATUS_WIP = "Analysing ..."
 _STATUS_DONE = "Analysed"
-_PURGE_DAYS  = 14
-_BASE        = "https://api.notion.com/v1"
-_NV          = "2022-06-28"
-_OUTPUT_DIR  = Path("data/inbox")
-_DEDUP_CSV   = _OUTPUT_DIR / "knowledge-dedup-review.csv"
+_PURGE_DAYS = 14
+_BASE = "https://api.notion.com/v1"
+_NV = "2022-06-28"
+_OUTPUT_DIR = Path("data/inbox")
+_DEDUP_CSV = _OUTPUT_DIR / "knowledge-dedup-review.csv"
 
 _TITLE_PROP = {"notions": "Name", "ideas": "Nom", "tools": "Name", "data_tech": "Name"}
-_DB_ATTR    = {
-    "notions":   "notion_notions_database_id",
-    "ideas":     "notion_ideas_database_id",
-    "tools":     "notion_tools_database_id",
+_DB_ATTR = {
+    "notions": "notion_notions_database_id",
+    "ideas": "notion_ideas_database_id",
+    "tools": "notion_tools_database_id",
     "data_tech": "notion_data_tech_database_id",
 }
 _DB_LABEL = {
-    "notions":   "Notions",
-    "ideas":     "Idées",
-    "tools":     "Tools",
+    "notions": "Notions",
+    "ideas": "Idées",
+    "tools": "Tools",
     "data_tech": "Data & Technology",
 }
 
 # ── CLI helpers ───────────────────────────────────────────────────────────────
 
+
 def _flag(name: str) -> bool:
     return name in sys.argv
+
 
 def _arg(prefix: str) -> str | None:
     for a in sys.argv:
@@ -62,7 +64,9 @@ def _arg(prefix: str) -> str | None:
             return a.split("=", 1)[1]
     return None
 
+
 # ── Notion API (raw httpx) ────────────────────────────────────────────────────
+
 
 def _notion_headers(token: str) -> dict[str, str]:
     return {
@@ -70,6 +74,7 @@ def _notion_headers(token: str) -> dict[str, str]:
         "Notion-Version": _NV,
         "Content-Type": "application/json",
     }
+
 
 async def _query_db(
     client: httpx.AsyncClient,
@@ -92,6 +97,7 @@ async def _query_db(
         body["start_cursor"] = data["next_cursor"]
     return results
 
+
 async def _get_blocks(client: httpx.AsyncClient, page_id: str, h: dict) -> list[dict]:
     blocks: list[dict] = []
     params: dict[str, Any] = {"page_size": 100}
@@ -106,13 +112,20 @@ async def _get_blocks(client: httpx.AsyncClient, page_id: str, h: dict) -> list[
         params["start_cursor"] = data["next_cursor"]
     return blocks
 
-async def _append_blocks(client: httpx.AsyncClient, page_id: str, children: list[dict], h: dict) -> None:
-    r = await client.patch(f"{_BASE}/blocks/{page_id}/children", headers=h, json={"children": children})
+
+async def _append_blocks(
+    client: httpx.AsyncClient, page_id: str, children: list[dict], h: dict
+) -> None:
+    r = await client.patch(
+        f"{_BASE}/blocks/{page_id}/children", headers=h, json={"children": children}
+    )
     r.raise_for_status()
+
 
 async def _update_page(client: httpx.AsyncClient, page_id: str, properties: dict, h: dict) -> None:
     r = await client.patch(f"{_BASE}/pages/{page_id}", headers=h, json={"properties": properties})
     r.raise_for_status()
+
 
 async def _create_page(
     client: httpx.AsyncClient, db_id: str, properties: dict, children: list[dict], h: dict
@@ -125,26 +138,34 @@ async def _create_page(
     r.raise_for_status()
     return str(r.json()["id"])
 
+
 async def _archive_page(client: httpx.AsyncClient, page_id: str, h: dict) -> None:
     r = await client.patch(f"{_BASE}/pages/{page_id}", headers=h, json={"archived": True})
     r.raise_for_status()
 
+
 # ── Block builders ────────────────────────────────────────────────────────────
+
 
 def _rt(text: str) -> list[dict]:
     return [{"type": "text", "text": {"content": text[:2000]}}]
 
+
 def _h2(text: str) -> dict:
     return {"object": "block", "type": "heading_2", "heading_2": {"rich_text": _rt(text)}}
+
 
 def _h3(text: str) -> dict:
     return {"object": "block", "type": "heading_3", "heading_3": {"rich_text": _rt(text)}}
 
+
 def _p(text: str) -> dict:
     return {"object": "block", "type": "paragraph", "paragraph": {"rich_text": _rt(text)}}
 
+
 def _divider() -> dict:
     return {"object": "block", "type": "divider", "divider": {}}
+
 
 def _blocks_to_text(blocks: list[dict]) -> str:
     lines = []
@@ -156,14 +177,24 @@ def _blocks_to_text(blocks: list[dict]) -> str:
             lines.append(text)
     return "\n".join(lines)
 
+
 def _count_text_blocks(blocks: list[dict]) -> int:
     return sum(1 for b in blocks if b.get(b.get("type", ""), {}).get("rich_text"))
 
+
 def _meta_page_blocks(overview: str, note: str, date: str, refs: list[str]) -> list[dict]:
-    blocks = [_h2("Overview"), _p(overview), _divider(), _h2("Notes & Insights"), _h3(f"{date} — from Telegram"), _p(note)]
+    blocks = [
+        _h2("Overview"),
+        _p(overview),
+        _divider(),
+        _h2("Notes & Insights"),
+        _h3(f"{date} — from Telegram"),
+        _p(note),
+    ]
     if refs:
         blocks += [_divider(), _h2("References")] + [_p(ref) for ref in refs[:5]]
     return blocks
+
 
 def _note_blocks(note: str, date: str, refs: list[str]) -> list[dict]:
     blocks = [_divider(), _h3(f"{date} — from Telegram"), _p(note)]
@@ -171,10 +202,13 @@ def _note_blocks(note: str, date: str, refs: list[str]) -> list[dict]:
         blocks += [_p(f"→ {ref}") for ref in refs[:3]]
     return blocks
 
+
 def _consolidation_blocks(loser_title: str, loser_text: str, date: str) -> list[dict]:
     return [_divider(), _h3(f"Consolidated from: {loser_title} ({date})"), _p(loser_text[:4000])]
 
+
 # ── Page property helpers ─────────────────────────────────────────────────────
+
 
 def _page_title(page: dict) -> str:
     for pdata in page.get("properties", {}).values():
@@ -182,11 +216,13 @@ def _page_title(page: dict) -> str:
             return "".join(t.get("plain_text", "") for t in pdata.get("title", []))
     return ""
 
+
 def _page_author(page: dict) -> str:
     prop = page.get("properties", {}).get("Author", {})
     if prop.get("type") == "select" and prop.get("select"):
         return prop["select"].get("name", "")
     return ""
+
 
 def _page_to_context(page: dict, blocks: list[dict]) -> str:
     props = page.get("properties", {})
@@ -212,7 +248,9 @@ def _page_to_context(page: dict, blocks: list[dict]) -> str:
         lines.append(f"\nBody:\n{body[:3000]}")
     return "\n".join(lines)
 
+
 # ── Notion property builders per DB ──────────────────────────────────────────
+
 
 def _build_properties(db_key: str, canonical_title: str, db_props: dict) -> dict[str, Any]:
     title_key = _TITLE_PROP[db_key]
@@ -249,14 +287,21 @@ def _build_properties(db_key: str, canonical_title: str, db_props: dict) -> dict
     # tools: only Name + Author
     return props
 
+
 # ── LLM helpers ───────────────────────────────────────────────────────────────
+
 
 def _or_headers(settings: Settings) -> dict[str, str]:
     key = settings.openrouter_api_key.get_secret_value()  # type: ignore[union-attr]
-    h = {"Authorization": f"Bearer {key}", "Content-Type": "application/json", "X-Title": settings.openrouter_app_title}
+    h = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+        "X-Title": settings.openrouter_app_title,
+    }
     if settings.openrouter_http_referer:
         h["HTTP-Referer"] = settings.openrouter_http_referer
     return h
+
 
 def _strip_json(raw: str) -> str:
     text = raw.strip()
@@ -268,12 +313,13 @@ def _strip_json(raw: str) -> str:
     if arr_s != -1 and (obj_s == -1 or arr_s < obj_s):
         end = text.rfind("]")
         if end > arr_s:
-            return text[arr_s:end + 1]
+            return text[arr_s : end + 1]
     obj_s = text.find("{")
     end = text.rfind("}")
     if obj_s != -1 and end > obj_s:
-        return text[obj_s:end + 1]
+        return text[obj_s : end + 1]
     return text
+
 
 _TRIAGE_SYSTEM = """\
 You are a knowledge triage agent. Analyze a Notion page created from a Telegram message and \
@@ -344,7 +390,7 @@ async def _llm_dedup_confirm(
     title_a: str, text_a: str, title_b: str, text_b: str, settings: Settings
 ) -> bool:
     prompt = (
-        f'Are these two knowledge pages about the SAME subject entity?\n\n'
+        f"Are these two knowledge pages about the SAME subject entity?\n\n"
         f'Page A: "{title_a}"\n{text_a[:800]}\n\nPage B: "{title_b}"\n{text_b[:800]}\n\n'
         'Return ONLY JSON: {"same_entity": true/false}'
     )
@@ -360,7 +406,11 @@ async def _llm_dedup_confirm(
                 },
             )
             resp.raise_for_status()
-        return bool(json.loads(_strip_json(resp.json()["choices"][0]["message"]["content"])).get("same_entity"))
+        return bool(
+            json.loads(_strip_json(resp.json()["choices"][0]["message"]["content"])).get(
+                "same_entity"
+            )
+        )
     except Exception:
         return False
 
@@ -389,7 +439,9 @@ async def _llm_smart_description(current: str, new_note: str, settings: Settings
         return None
 
 
-async def _llm_cluster_titles(titles: list[str], db_label: str, settings: Settings) -> list[list[str]]:
+async def _llm_cluster_titles(
+    titles: list[str], db_label: str, settings: Settings
+) -> list[list[str]]:
     titles_text = "\n".join(f"- {t}" for t in titles)
     prompt = (
         f"These are page titles from a '{db_label}' knowledge database.\n"
@@ -409,11 +461,15 @@ async def _llm_cluster_titles(titles: list[str], db_label: str, settings: Settin
                 },
             )
             resp.raise_for_status()
-        return json.loads(_strip_json(resp.json()["choices"][0]["message"]["content"])).get("clusters", [])
+        return json.loads(_strip_json(resp.json()["choices"][0]["message"]["content"])).get(
+            "clusters", []
+        )
     except Exception:
         return []
 
+
 # ── Core: handle one entity ───────────────────────────────────────────────────
+
 
 async def _handle_entity(
     client: httpx.AsyncClient,
@@ -427,24 +483,26 @@ async def _handle_entity(
     today: str,
 ) -> dict:
     canonical = entity.get("canonical_title") or entity.get("subject_entity", "?")
-    overview  = entity.get("overview", "")
-    note      = entity.get("note", "")
-    refs      = entity.get("references") or []
-    db_props  = entity.get("db_properties") or {}
+    overview = entity.get("overview", "")
+    note = entity.get("note", "")
+    refs = entity.get("references") or []
+    db_props = entity.get("db_properties") or {}
     title_prop = _TITLE_PROP[db_key]
     search_word = canonical.split()[0]
 
     # Search target DB
     try:
         candidates = await _query_db(
-            client, db_id, h,
+            client,
+            db_id,
+            h,
             filter_body={"property": title_prop, "title": {"contains": search_word}},
             page_size=10,
         )
     except Exception:
         candidates = []
 
-    ai_pages    = [p for p in candidates if _page_author(p) == "IA"]
+    ai_pages = [p for p in candidates if _page_author(p) == "IA"]
     human_pages = [p for p in candidates if _page_author(p) == "Me"]
 
     # Find surviving AI page ──────────────────────────────────────────────────
@@ -460,16 +518,22 @@ async def _handle_entity(
     if surviving_ai is None and ai_pages:
         cand = ai_pages[0]
         cand_blocks = await _get_blocks(client, cand["id"], h)
-        if await _llm_dedup_confirm(_page_title(cand), _blocks_to_text(cand_blocks), canonical, note, settings):
+        if await _llm_dedup_confirm(
+            _page_title(cand), _blocks_to_text(cand_blocks), canonical, note, settings
+        ):
             surviving_ai = cand
 
     # Merge any additional AI duplicates into surviving page
     for extra in [p for p in ai_pages if surviving_ai and p["id"] != surviving_ai["id"]]:
-        extra_title  = _page_title(extra)
+        extra_title = _page_title(extra)
         extra_blocks = await _get_blocks(client, extra["id"], h)
-        if not await _llm_dedup_confirm(_page_title(surviving_ai), "", extra_title, _blocks_to_text(extra_blocks), settings):
+        if not await _llm_dedup_confirm(
+            _page_title(surviving_ai), "", extra_title, _blocks_to_text(extra_blocks), settings
+        ):
             continue
-        logger.info("{}MERGE {} → {}", "[DRY] " if dry_run else "", extra_title, _page_title(surviving_ai))
+        logger.info(
+            "{}MERGE {} → {}", "[DRY] " if dry_run else "", extra_title, _page_title(surviving_ai)
+        )
         if not dry_run:
             # Winner = most content
             win_blocks = await _get_blocks(client, surviving_ai["id"], h)
@@ -477,20 +541,24 @@ async def _handle_entity(
                 surviving_ai, extra = extra, surviving_ai
                 extra_blocks = win_blocks
             loser_text = _blocks_to_text(extra_blocks)
-            await _append_blocks(client, surviving_ai["id"], _consolidation_blocks(extra_title, loser_text, today), h)
+            await _append_blocks(
+                client, surviving_ai["id"], _consolidation_blocks(extra_title, loser_text, today), h
+            )
             await _archive_page(client, extra["id"], h)
 
     # Flag human page conflicts
     for hp in human_pages:
         hp_url = f"https://notion.so/{hp['id'].replace('-', '')}"
-        csv_rows.append({
-            "db": _DB_LABEL[db_key],
-            "ai_page_title": canonical,
-            "ai_page_url": "",
-            "human_page_title": _page_title(hp),
-            "human_page_url": hp_url,
-            "suggested_action": "merge_into_human",
-        })
+        csv_rows.append(
+            {
+                "db": _DB_LABEL[db_key],
+                "ai_page_title": canonical,
+                "ai_page_url": "",
+                "human_page_title": _page_title(hp),
+                "human_page_url": hp_url,
+                "suggested_action": "merge_into_human",
+            }
+        )
         logger.warning("CONFLICT {} (IA) ↔ {} (Me) → CSV", canonical, _page_title(hp))
 
     # Create or enrich ────────────────────────────────────────────────────────
@@ -498,9 +566,11 @@ async def _handle_entity(
     meta_id: str
 
     if surviving_ai:
-        action  = "enriched"
+        action = "enriched"
         meta_id = surviving_ai["id"]
-        logger.info("{}ENRICH '{}' in {}", "[DRY] " if dry_run else "", canonical, _DB_LABEL[db_key])
+        logger.info(
+            "{}ENRICH '{}' in {}", "[DRY] " if dry_run else "", canonical, _DB_LABEL[db_key]
+        )
         if not dry_run:
             await _append_blocks(client, meta_id, _note_blocks(note, today, refs), h)
             # Smart description update (notions DB only)
@@ -508,12 +578,18 @@ async def _handle_entity(
                 existing_desc = db_props.get("Description", "")
                 new_desc = await _llm_smart_description(existing_desc, note, settings)
                 if new_desc:
-                    await _update_page(client, meta_id, {"Description": {"rich_text": _rt(new_desc)}}, h)
+                    await _update_page(
+                        client, meta_id, {"Description": {"rich_text": _rt(new_desc)}}, h
+                    )
     else:
         action = "created"
-        logger.info("{}CREATE '{}' in {}", "[DRY] " if dry_run else "", canonical, _DB_LABEL[db_key])
+        logger.info(
+            "{}CREATE '{}' in {}", "[DRY] " if dry_run else "", canonical, _DB_LABEL[db_key]
+        )
         if not dry_run:
-            meta_id = await _create_page(client, db_id, notion_props, _meta_page_blocks(overview, note, today, refs), h)
+            meta_id = await _create_page(
+                client, db_id, notion_props, _meta_page_blocks(overview, note, today, refs), h
+            )
         else:
             meta_id = "(dry-run)"
 
@@ -529,7 +605,9 @@ async def _handle_entity(
         "meta_page_id": meta_id,
     }
 
+
 # ── Core: process one source page ────────────────────────────────────────────
+
 
 async def _process_source_page(
     client: httpx.AsyncClient,
@@ -541,8 +619,13 @@ async def _process_source_page(
     today: str,
 ) -> dict:
     page_id = page["id"]
-    title   = _page_title(page)
-    result: dict[str, Any] = {"source_page_id": page_id, "source_title": title, "entities": [], "status": "ok"}
+    title = _page_title(page)
+    result: dict[str, Any] = {
+        "source_page_id": page_id,
+        "source_title": title,
+        "entities": [],
+        "status": "ok",
+    }
 
     if not dry_run:
         try:
@@ -565,22 +648,34 @@ async def _process_source_page(
         if not dry_run:
             await _update_page(client, page_id, {"Status": {"status": {"name": _STATUS_TODO}}}, h)
         result["status"] = "error"
-        result["error"]  = str(e)
+        result["error"] = str(e)
         return result
 
     entity_results = []
     for entity in entities:
         db_key = entity.get("target_db", "data_tech")
-        db_id  = getattr(settings, _DB_ATTR.get(db_key, "notion_data_tech_database_id"), None)
+        db_id = getattr(settings, _DB_ATTR.get(db_key, "notion_data_tech_database_id"), None)
         if not db_id:
-            logger.warning("DB '{}' not configured, skipping entity '{}'", db_key, entity.get("canonical_title"))
+            logger.warning(
+                "DB '{}' not configured, skipping entity '{}'",
+                db_key,
+                entity.get("canonical_title"),
+            )
             continue
         try:
-            er = await _handle_entity(client, entity, db_id, db_key, h, settings, dry_run, csv_rows, today)
+            er = await _handle_entity(
+                client, entity, db_id, db_key, h, settings, dry_run, csv_rows, today
+            )
             entity_results.append(er)
         except Exception as e:
             logger.error("Entity '{}' failed: {}", entity.get("canonical_title"), e)
-            entity_results.append({"canonical_title": entity.get("canonical_title", "?"), "status": "error", "error": str(e)})
+            entity_results.append(
+                {
+                    "canonical_title": entity.get("canonical_title", "?"),
+                    "status": "error",
+                    "error": str(e),
+                }
+            )
 
     result["entities"] = entity_results
 
@@ -605,10 +700,12 @@ async def _process_source_page(
 
     return result
 
+
 # ── Run modes ─────────────────────────────────────────────────────────────────
 
+
 async def run_enrich(settings: Settings, h: dict, dry_run: bool, limit: int) -> list[dict]:
-    today    = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     csv_rows: list[dict] = []
 
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -620,7 +717,11 @@ async def run_enrich(settings: Settings, h: dict, dry_run: bool, limit: int) -> 
         )
         if limit > 0:
             pages = pages[:limit]
-        logger.info("Found {} page(s) to enrich{}", len(pages), " (capped)" if limit and len(pages) == limit else "")
+        logger.info(
+            "Found {} page(s) to enrich{}",
+            len(pages),
+            " (capped)" if limit and len(pages) == limit else "",
+        )
 
         results = []
         for page in pages:
@@ -634,7 +735,7 @@ async def run_enrich(settings: Settings, h: dict, dry_run: bool, limit: int) -> 
 
 
 async def run_dedup(settings: Settings, h: dict, dry_run: bool) -> list[dict]:
-    today  = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     merges: list[dict] = []
 
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -643,15 +744,19 @@ async def run_dedup(settings: Settings, h: dict, dry_run: bool) -> list[dict]:
             if not db_id:
                 continue
             ai_pages = await _query_db(
-                client, db_id, h,
+                client,
+                db_id,
+                h,
                 filter_body={"property": "Author", "select": {"equals": "IA"}},
             )
             if len(ai_pages) < 2:
-                logger.info("[{}] {} IA page(s) — nothing to dedup", _DB_LABEL[db_key], len(ai_pages))
+                logger.info(
+                    "[{}] {} IA page(s) — nothing to dedup", _DB_LABEL[db_key], len(ai_pages)
+                )
                 continue
 
-            titles         = [_page_title(p) for p in ai_pages]
-            title_to_page  = {_page_title(p): p for p in ai_pages}
+            titles = [_page_title(p) for p in ai_pages]
+            title_to_page = {_page_title(p): p for p in ai_pages}
             logger.info("[{}] {} IA pages — clustering...", _DB_LABEL[db_key], len(titles))
 
             clusters = await _llm_cluster_titles(titles, _DB_LABEL[db_key], settings)
@@ -670,24 +775,38 @@ async def run_dedup(settings: Settings, h: dict, dry_run: bool) -> list[dict]:
 
                 for loser, loser_blocks, _ in ranked[1:]:
                     loser_title = _page_title(loser)
-                    loser_text  = _blocks_to_text(loser_blocks)
-                    logger.info("{}DEDUP MERGE {} → {}", "[DRY] " if dry_run else "", loser_title, _page_title(winner))
+                    loser_text = _blocks_to_text(loser_blocks)
+                    logger.info(
+                        "{}DEDUP MERGE {} → {}",
+                        "[DRY] " if dry_run else "",
+                        loser_title,
+                        _page_title(winner),
+                    )
                     if not dry_run:
-                        await _append_blocks(client, winner["id"], _consolidation_blocks(loser_title, loser_text, today), h)
+                        await _append_blocks(
+                            client,
+                            winner["id"],
+                            _consolidation_blocks(loser_title, loser_text, today),
+                            h,
+                        )
                         await _archive_page(client, loser["id"], h)
-                    merges.append({
-                        "db": _DB_LABEL[db_key],
-                        "winner": _page_title(winner),
-                        "loser": loser_title,
-                        "action": "merged" if not dry_run else "would-merge",
-                    })
+                    merges.append(
+                        {
+                            "db": _DB_LABEL[db_key],
+                            "winner": _page_title(winner),
+                            "loser": loser_title,
+                            "action": "merged" if not dry_run else "would-merge",
+                        }
+                    )
 
     return merges
 
 
 async def run_purge(settings: Settings, h: dict, dry_run: bool) -> int:
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=_PURGE_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    count  = 0
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=_PURGE_DAYS)).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+    count = 0
     async with httpx.AsyncClient(timeout=30.0) as client:
         pages = await _query_db(
             client,
@@ -709,27 +828,38 @@ async def run_purge(settings: Settings, h: dict, dry_run: bool) -> int:
             count += 1
     return count
 
+
 # ── CSV output ────────────────────────────────────────────────────────────────
+
 
 def _write_dedup_csv(rows: list[dict]) -> None:
     _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    fields = ["db", "ai_page_title", "ai_page_url", "human_page_title", "human_page_url", "suggested_action"]
+    fields = [
+        "db",
+        "ai_page_title",
+        "ai_page_url",
+        "human_page_title",
+        "human_page_url",
+        "suggested_action",
+    ]
     with _DEDUP_CSV.open("w", newline="", encoding="utf-8-sig") as f:
         w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         w.writeheader()
         w.writerows(rows)
     logger.info("Wrote {} conflict(s) → {}", len(rows), _DEDUP_CSV)
 
+
 # ── Entry point ───────────────────────────────────────────────────────────────
+
 
 async def main() -> None:
     dry_run = _flag("--dry-run")
-    dedup   = _flag("--dedup")
-    purge   = _flag("--purge")
-    limit   = int(_arg("--limit") or "0")
+    dedup = _flag("--dedup")
+    purge = _flag("--purge")
+    limit = int(_arg("--limit") or "0")
     out_raw = _arg("--output")
-    today   = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    out     = Path(out_raw) if out_raw else _OUTPUT_DIR / f"knowledge-enrichment-{today}.json"
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    out = Path(out_raw) if out_raw else _OUTPUT_DIR / f"knowledge-enrichment-{today}.json"
 
     settings = load_settings()
     if not settings.notion_token:
@@ -743,23 +873,30 @@ async def main() -> None:
 
     logger.info("── Knowledge Enrichment ────────────────────────────────────")
     logger.info("  Mode    : {}", "DRY RUN" if dry_run else "LIVE")
-    logger.info("  Process : {}", "dedup" if dedup else "purge" if purge else f"enrich (limit={limit or '∞'})")
+    logger.info(
+        "  Process : {}",
+        "dedup" if dedup else "purge" if purge else f"enrich (limit={limit or '∞'})",
+    )
     logger.info("────────────────────────────────────────────────────────────")
 
     if dedup:
         results = await run_dedup(settings, h, dry_run)
-        mode    = "dedup"
+        mode = "dedup"
     elif purge:
-        count   = await run_purge(settings, h, dry_run)
+        count = await run_purge(settings, h, dry_run)
         results = [{"purged": count}]
-        mode    = "purge"
+        mode = "purge"
     else:
         results = await run_enrich(settings, h, dry_run, limit)
-        mode    = "enrich"
+        mode = "enrich"
 
     _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     out.write_text(
-        json.dumps({"run_date": today, "mode": mode, "dry_run": dry_run, "results": results}, indent=2, ensure_ascii=False),
+        json.dumps(
+            {"run_date": today, "mode": mode, "dry_run": dry_run, "results": results},
+            indent=2,
+            ensure_ascii=False,
+        ),
         encoding="utf-8",
     )
     logger.info("Report → {}", out)
