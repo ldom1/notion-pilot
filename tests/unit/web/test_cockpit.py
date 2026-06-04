@@ -9,7 +9,6 @@ Design rules:
 
 from __future__ import annotations
 
-import asyncio
 import base64
 import json
 import pathlib
@@ -104,7 +103,7 @@ def test_cockpit_page_unauthenticated_redirects(tmp_path):
     settings = _make_settings()
     app = create_app(settings)
     # Create a minimal cockpit.html so the route can serve it
-    static = pathlib.Path(__file__).parents[3] / "web" / "static"
+    pathlib.Path(__file__).parents[3] / "web" / "static"
     client = TestClient(app, follow_redirects=False)
     r = client.get("/cockpit")
     assert r.status_code in (302, 307)
@@ -310,7 +309,7 @@ def test_stop_script_kills_process():
     from web.server import create_app
 
     settings = _make_settings()
-    app = create_app(settings)
+    create_app(settings)
 
     # Manually inject a fake process into _running_procs
     # Access the closure variable via the route function
@@ -319,9 +318,8 @@ def test_stop_script_kills_process():
 
     # Find the running procs dict via the app state — it's a closure, so we
     # reach it by calling the stop endpoint after injecting via patch
-    with patch("web.server.create_app") as mock_create:
+    with patch("web.server.create_app"):
         # Rebuild with direct dict injection
-        from web import server as server_module
 
         # We patch at module closure level by running the factory and injecting
         real_app = create_app(settings)
