@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import httpx
 from notion_client import AsyncClient
 
 from notion_pilot.shared.config import Settings
+
+_NOTION_BASE = "https://api.notion.com/v1"
 
 
 def _token(settings: Settings) -> str:
@@ -13,9 +16,17 @@ def _token(settings: Settings) -> str:
     return settings.notion_token.get_secret_value()
 
 
+def _headers(token: str) -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28",
+    }
+
+
 def _title(page: dict) -> str:
     for prop in page.get("properties", {}).values():
-        if "title" in prop:
+        if prop.get("type") == "title":
             parts = prop.get("title", [])
             return "".join(p.get("plain_text", "") for p in parts)
     return "(untitled)"
@@ -29,20 +40,24 @@ async def get_open_leads(settings: Settings) -> list[dict]:
     """Return open deals from the Deals DB (stage not Closed-Won/Lost)."""
     if not settings.notion_deals_database_id:
         return []
-    client = AsyncClient(auth=_token(settings))
-    resp = await client.databases.query(
-        database_id=settings.notion_deals_database_id,
-        filter={
-            "and": [
-                {"property": "Stage", "select": {"does_not_equal": "Closed - Won"}},
-                {"property": "Stage", "select": {"does_not_equal": "Closed - Lost"}},
-            ]
-        },
-        sorts=[{"timestamp": "last_edited_time", "direction": "descending"}],
-        page_size=50,
-    )
+    token = _token(settings)
+    async with httpx.AsyncClient(headers=_headers(token), timeout=30) as client:
+        resp = await client.post(
+            f"{_NOTION_BASE}/databases/{settings.notion_deals_database_id}/query",
+            json={
+                "filter": {
+                    "and": [
+                        {"property": "Stage", "select": {"does_not_equal": "Closed - Won"}},
+                        {"property": "Stage", "select": {"does_not_equal": "Closed - Lost"}},
+                    ]
+                },
+                "sorts": [{"timestamp": "last_edited_time", "direction": "descending"}],
+                "page_size": 50,
+            },
+        )
+    resp.raise_for_status()
     results = []
-    for page in resp.get("results", []):
+    for page in resp.json().get("results", []):
         props = page.get("properties", {})
         stage_prop = props.get("Stage", {})
         stage = (stage_prop.get("select") or {}).get("name", "")
@@ -57,23 +72,28 @@ async def get_open_leads(settings: Settings) -> list[dict]:
 
 async def get_inbox_items(settings: Settings) -> list[dict]:
     """Return knowledge items with status 'Not analysed'."""
-    client = AsyncClient(auth=_token(settings))
-    resp = await client.databases.query(
-        database_id=settings.notion_telegram_msg_database_id,
-        filter={"property": "Status", "status": {"equals": "Not analysed"}},
-        sorts=[{"timestamp": "created_time", "direction": "descending"}],
-        page_size=50,
-    )
-    return [{"title": _title(page)} for page in resp.get("results", [])]
+    token = _token(settings)
+    async with httpx.AsyncClient(headers=_headers(token), timeout=30) as client:
+        resp = await client.post(
+            f"{_NOTION_BASE}/databases/{settings.notion_telegram_msg_database_id}/query",
+            json={
+                "filter": {"property": "Status", "status": {"equals": "Not analysed"}},
+                "sorts": [{"timestamp": "created_time", "direction": "descending"}],
+                "page_size": 50,
+            },
+        )
+    resp.raise_for_status()
+    return [{"title": _title(page)} for page in resp.json().get("results", [])]
 
 
 async def get_recent_people(settings: Settings) -> list[dict]:
     """Return people added in the last 7 days."""
     if not settings.notion_people_data_source_id:
         return []
-    client = AsyncClient(auth=_token(settings))
-    resp = await client.databases.query(
-        database_id=settings.notion_people_data_source_id,
+    token = _token(settings)
+    client = AsyncClient(auth=token)
+    resp = await client.data_sources.query(
+        settings.notion_people_data_source_id,
         filter={"timestamp": "created_time", "created_time": {"past_week": {}}},
         sorts=[{"timestamp": "created_time", "direction": "descending"}],
         page_size=20,
