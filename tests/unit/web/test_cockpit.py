@@ -81,8 +81,10 @@ def _authed_client(settings=None, workspace_id: str = "ws_test", notion_token: s
 
 # ── Auth guard ────────────────────────────────────────────────────────────────
 
+
 def test_cockpit_status_unauthenticated():
     from web.server import create_app
+
     client = TestClient(create_app(_make_settings()))
     r = client.get("/api/cockpit/status")
     assert r.status_code == 401
@@ -90,6 +92,7 @@ def test_cockpit_status_unauthenticated():
 
 def test_cockpit_scripts_unauthenticated():
     from web.server import create_app
+
     client = TestClient(create_app(_make_settings()))
     r = client.get("/api/cockpit/scripts")
     assert r.status_code == 401
@@ -97,6 +100,7 @@ def test_cockpit_scripts_unauthenticated():
 
 def test_cockpit_page_unauthenticated_redirects(tmp_path):
     from web.server import create_app
+
     settings = _make_settings()
     app = create_app(settings)
     # Create a minimal cockpit.html so the route can serve it
@@ -108,6 +112,7 @@ def test_cockpit_page_unauthenticated_redirects(tmp_path):
 
 
 # ── /api/cockpit/scripts ──────────────────────────────────────────────────────
+
 
 def test_cockpit_scripts_returns_list(tmp_path):
     yaml_content = """
@@ -134,6 +139,7 @@ scripts:
 
 
 # ── /api/cockpit/status ───────────────────────────────────────────────────────
+
 
 @respx.mock
 def test_cockpit_status_with_unconfigured_dbs():
@@ -163,10 +169,15 @@ def test_cockpit_status_with_configured_db():
         return_value=Response(200, json={"results": [{}, {}], "has_more": False})
     )
     # Other DBs are None — no requests for them
-    for attr in ["notion_companies_data_source_id", "notion_deals_database_id",
-                 "notion_telegram_msg_database_id", "notion_notions_database_id",
-                 "notion_ideas_database_id", "notion_tools_database_id",
-                 "notion_data_tech_database_id"]:
+    for attr in [
+        "notion_companies_data_source_id",
+        "notion_deals_database_id",
+        "notion_telegram_msg_database_id",
+        "notion_notions_database_id",
+        "notion_ideas_database_id",
+        "notion_tools_database_id",
+        "notion_data_tech_database_id",
+    ]:
         setattr(settings, attr, None)
 
     with patch("web.config.load_cockpit_cfg", return_value={"databases": {}}):
@@ -182,6 +193,7 @@ def test_cockpit_status_with_configured_db():
 
 # ── /api/cockpit/config ───────────────────────────────────────────────────────
 
+
 def test_cockpit_config_save_and_load(tmp_path):
     # server.py imports save_cockpit_cfg / load_cockpit_cfg directly → patch there
     with (
@@ -189,9 +201,12 @@ def test_cockpit_config_save_and_load(tmp_path):
         patch("web.server.save_cockpit_cfg") as mock_save,
     ):
         client = _authed_client()
-        r = client.post("/api/cockpit/config", json={
-            "databases": {"notion_people_data_source_id": "abc-123"},
-        })
+        r = client.post(
+            "/api/cockpit/config",
+            json={
+                "databases": {"notion_people_data_source_id": "abc-123"},
+            },
+        )
 
     assert r.status_code == 200
     assert r.json()["ok"] is True
@@ -202,9 +217,12 @@ def test_cockpit_config_save_and_load(tmp_path):
 
 # ── /api/cockpit/run-script ───────────────────────────────────────────────────
 
+
 def test_run_script_not_found(tmp_path):
     scripts_yaml = tmp_path / "scripts.yaml"
-    scripts_yaml.write_text("scripts:\n  - id: exists\n    path: scripts/x.py\n    label: X\n    category: CRM\n")
+    scripts_yaml.write_text(
+        "scripts:\n  - id: exists\n    path: scripts/x.py\n    label: X\n    category: CRM\n"
+    )
     with patch("web.config.SCRIPTS_YAML_PATH", scripts_yaml):
         client = _authed_client()
         r = client.post("/api/cockpit/run-script", json={"script_id": "does_not_exist"})
@@ -281,6 +299,7 @@ def test_run_script_exit_nonzero(tmp_path):
 
 # ── /api/cockpit/stop-script ──────────────────────────────────────────────────
 
+
 def test_stop_script_not_running():
     client = _authed_client()
     r = client.post("/api/cockpit/stop-script", json={"script_id": "nothing_running"})
@@ -307,9 +326,9 @@ def test_stop_script_kills_process():
         # We patch at module closure level by running the factory and injecting
         real_app = create_app(settings)
         client = TestClient(real_app)
-        client.cookies.set("session", _signed_session({
-            "notion_token": "tok", "workspace_id": "ws1"
-        }))
+        client.cookies.set(
+            "session", _signed_session({"notion_token": "tok", "workspace_id": "ws1"})
+        )
 
         # There's no running proc — expect 404
         r = client.post("/api/cockpit/stop-script", json={"script_id": "myscript"})
@@ -318,25 +337,35 @@ def test_stop_script_kills_process():
 
 # ── /api/cockpit/deals-properties ────────────────────────────────────────────
 
+
 @respx.mock
 def test_deals_properties_returns_wizard_fields():
     settings = _make_settings()
     settings.notion_deals_database_id = "db-deals"
 
     notion_db_props = {
-        "Name":    {"type": "title"},
-        "Client":  {"type": "relation"},
-        "Contacts":{"type": "relation"},
-        "Stage":   {"type": "select",       "select":       {"options": [{"name": "Prospect"}, {"name": "Qualified"}]}},
-        "Product": {"type": "multi_select", "multi_select": {"options": [{"name": "HPC"}, {"name": "Consulting"}]}},
-        "Notes":   {"type": "rich_text"},
+        "Name": {"type": "title"},
+        "Client": {"type": "relation"},
+        "Contacts": {"type": "relation"},
+        "Stage": {
+            "type": "select",
+            "select": {"options": [{"name": "Prospect"}, {"name": "Qualified"}]},
+        },
+        "Product": {
+            "type": "multi_select",
+            "multi_select": {"options": [{"name": "HPC"}, {"name": "Consulting"}]},
+        },
+        "Notes": {"type": "rich_text"},
         "Value (euros)": {"type": "number"},
     }
     respx.get("https://api.notion.com/v1/databases/db-deals").mock(
         return_value=Response(200, json={"properties": notion_db_props})
     )
 
-    with patch("web.config.load_cockpit_cfg", return_value={"databases": {"notion_deals_database_id": "db-deals"}}):
+    with patch(
+        "web.config.load_cockpit_cfg",
+        return_value={"databases": {"notion_deals_database_id": "db-deals"}},
+    ):
         client = _authed_client(settings=settings)
         r = client.get("/api/cockpit/deals-properties")
 
@@ -373,6 +402,7 @@ def test_deals_properties_no_db_configured():
 
 # ── /api/cockpit/create-deal ──────────────────────────────────────────────────
 
+
 @respx.mock
 def test_create_deal_existing_contact():
     """Links deal to an existing People page — no new person created in Notion."""
@@ -384,14 +414,18 @@ def test_create_deal_existing_contact():
         return_value=Response(201, json={"id": new_page_id})
     )
 
-    with patch("web.config.load_cockpit_cfg", return_value={
-        "databases": {"notion_deals_database_id": "db-deals"}
-    }):
+    with patch(
+        "web.config.load_cockpit_cfg",
+        return_value={"databases": {"notion_deals_database_id": "db-deals"}},
+    ):
         client = _authed_client(settings=settings)
-        r = client.post("/api/cockpit/create-deal", json={
-            "deal_name": "Crystal HPC — Matthieu Tonso",
-            "notion_id": "person-page-id-123",
-        })
+        r = client.post(
+            "/api/cockpit/create-deal",
+            json={
+                "deal_name": "Crystal HPC — Matthieu Tonso",
+                "notion_id": "person-page-id-123",
+            },
+        )
 
     assert r.status_code == 200
     data = r.json()
@@ -403,7 +437,9 @@ def test_create_deal_existing_contact():
     calls = [c for c in respx.calls if "api.notion.com" in str(c.request.url)]
     assert len(calls) == 1
     body = json.loads(calls[0].request.content)
-    assert body["properties"]["Name"]["title"][0]["text"]["content"] == "Crystal HPC — Matthieu Tonso"
+    assert (
+        body["properties"]["Name"]["title"][0]["text"]["content"] == "Crystal HPC — Matthieu Tonso"
+    )
     assert body["properties"]["Contacts"]["relation"][0]["id"] == "person-page-id-123"
     assert body["properties"]["Stage"]["select"]["name"] == "Prospect"
 
@@ -416,9 +452,10 @@ def test_create_deal_new_contact_creates_person_first():
     settings.notion_people_data_source_id = "db-people"
 
     person_id = str(uuid.uuid4())
-    deal_id   = str(uuid.uuid4())
+    deal_id = str(uuid.uuid4())
 
     call_count = 0
+
     def _side_effect(request, **kwargs):
         nonlocal call_count
         call_count += 1
@@ -428,17 +465,23 @@ def test_create_deal_new_contact_creates_person_first():
 
     respx.post("https://api.notion.com/v1/pages").mock(side_effect=_side_effect)
 
-    with patch("web.config.load_cockpit_cfg", return_value={
-        "databases": {
-            "notion_deals_database_id": "db-deals",
-            "notion_people_data_source_id": "db-people",
-        }
-    }):
+    with patch(
+        "web.config.load_cockpit_cfg",
+        return_value={
+            "databases": {
+                "notion_deals_database_id": "db-deals",
+                "notion_people_data_source_id": "db-people",
+            }
+        },
+    ):
         client = _authed_client(settings=settings)
-        r = client.post("/api/cockpit/create-deal", json={
-            "deal_name": "Crystal HPC — New Lead",
-            "new_person": {"name": "Jean Dupont", "position": "CTO", "company": "Acme"},
-        })
+        r = client.post(
+            "/api/cockpit/create-deal",
+            json={
+                "deal_name": "Crystal HPC — New Lead",
+                "new_person": {"name": "Jean Dupont", "position": "CTO", "company": "Acme"},
+            },
+        )
 
     assert r.status_code == 200
     assert r.json()["page_id"] == deal_id
@@ -455,20 +498,24 @@ def test_create_deal_with_extra_fields():
         return_value=Response(201, json={"id": new_page_id})
     )
 
-    with patch("web.config.load_cockpit_cfg", return_value={
-        "databases": {"notion_deals_database_id": "db-deals"}
-    }):
+    with patch(
+        "web.config.load_cockpit_cfg",
+        return_value={"databases": {"notion_deals_database_id": "db-deals"}},
+    ):
         client = _authed_client(settings=settings)
-        r = client.post("/api/cockpit/create-deal", json={
-            "deal_name": "HPC Deal",
-            "notion_id": "person-id",
-            "extra_fields": {
-                "Product": ["HPC-as-a-service"],
-                "Type": "Prospection chaude",
-                "Value (euros)": 45000,
-                "Notes": "Strategic account",
+        r = client.post(
+            "/api/cockpit/create-deal",
+            json={
+                "deal_name": "HPC Deal",
+                "notion_id": "person-id",
+                "extra_fields": {
+                    "Product": ["HPC-as-a-service"],
+                    "Type": "Prospection chaude",
+                    "Value (euros)": 45000,
+                    "Notes": "Strategic account",
+                },
             },
-        })
+        )
 
     assert r.status_code == 200
     body = json.loads(respx.calls[0].request.content)
@@ -487,6 +534,7 @@ def test_create_deal_no_deals_db():
 
 
 # ── /api/cockpit/workflows ────────────────────────────────────────────────────
+
 
 def test_workflows_crud(tmp_path):
     wf_data = {
@@ -532,6 +580,7 @@ def test_workflows_crud(tmp_path):
 
 # ── /api/cockpit/run-workflow ─────────────────────────────────────────────────
 
+
 def test_run_workflow_not_found(tmp_path):
     with patch("web.config._workspace_dir", return_value=tmp_path / "ws_test"):
         client = _authed_client()
@@ -562,8 +611,10 @@ scripts:
     wf = {
         "id": "wf-topo",
         "name": "A then B",
-        "nodes": [{"id": "script_a", "position": {"x": 0, "y": 0}},
-                  {"id": "script_b", "position": {"x": 1, "y": 0}}],
+        "nodes": [
+            {"id": "script_a", "position": {"x": 0, "y": 0}},
+            {"id": "script_b", "position": {"x": 1, "y": 0}},
+        ],
         "edges": [{"id": "e1", "source": "script_a", "target": "script_b"}],
     }
 
@@ -610,6 +661,7 @@ scripts:
 
 # ── /api/cockpit/chat ─────────────────────────────────────────────────────────
 
+
 @respx.mock
 def test_chat_no_llm_key_returns_error():
     """When OPENROUTER_API_KEY is absent, chat returns an error event."""
@@ -635,29 +687,46 @@ def test_chat_suggest_action():
 
     # Mock People DB query
     respx.post("https://api.notion.com/v1/databases/db-people/query").mock(
-        return_value=Response(200, json={
-            "results": [{"id": "pid1", "properties": {
-                "Nom": {"type": "title", "title": [{"plain_text": "Alice"}]},
-                "Position": {"type": "rich_text", "rich_text": [{"plain_text": "CTO"}]},
-            }}],
-            "has_more": False,
-        })
+        return_value=Response(
+            200,
+            json={
+                "results": [
+                    {
+                        "id": "pid1",
+                        "properties": {
+                            "Nom": {"type": "title", "title": [{"plain_text": "Alice"}]},
+                            "Position": {"type": "rich_text", "rich_text": [{"plain_text": "CTO"}]},
+                        },
+                    }
+                ],
+                "has_more": False,
+            },
+        )
     )
     # Mock LLM response
     llm_payload = {
         "action": "suggest",
         "message": "Alice is a great fit",
-        "leads": [{"type": "existing", "name": "Alice", "notion_id": "pid1", "position": "CTO", "company": "Acme"}],
+        "leads": [
+            {
+                "type": "existing",
+                "name": "Alice",
+                "notion_id": "pid1",
+                "position": "CTO",
+                "company": "Acme",
+            }
+        ],
     }
     respx.post("https://openrouter.ai/api/v1/chat/completions").mock(
-        return_value=Response(200, json={
-            "choices": [{"message": {"content": json.dumps(llm_payload)}}]
-        })
+        return_value=Response(
+            200, json={"choices": [{"message": {"content": json.dumps(llm_payload)}}]}
+        )
     )
 
-    with patch("web.config.load_cockpit_cfg", return_value={
-        "databases": {"notion_people_data_source_id": "db-people"}
-    }):
+    with patch(
+        "web.config.load_cockpit_cfg",
+        return_value={"databases": {"notion_people_data_source_id": "db-people"}},
+    ):
         client = _authed_client(settings=settings)
         r = client.post("/api/cockpit/chat", json={"query": "find HPC leads", "history": []})
 
@@ -665,7 +734,9 @@ def test_chat_suggest_action():
     assert '"result"' in r.text
     assert "Alice is a great fit" in r.text
     # No pages created in Notion
-    assert not any("POST" in str(c.request.method) and "v1/pages" in str(c.request.url) for c in respx.calls)
+    assert not any(
+        "POST" in str(c.request.method) and "v1/pages" in str(c.request.url) for c in respx.calls
+    )
 
 
 @respx.mock
@@ -679,13 +750,19 @@ def test_chat_create_action_does_not_auto_create():
     llm_payload = {
         "action": "create",
         "message": "Ready to create a deal for Matthieu",
-        "leads": [{"type": "existing", "name": "Matthieu Tonso", "notion_id": "pid-mt",
-                   "deal_name": "Crystal HPC — Matthieu Tonso"}],
+        "leads": [
+            {
+                "type": "existing",
+                "name": "Matthieu Tonso",
+                "notion_id": "pid-mt",
+                "deal_name": "Crystal HPC — Matthieu Tonso",
+            }
+        ],
     }
     respx.post("https://openrouter.ai/api/v1/chat/completions").mock(
-        return_value=Response(200, json={
-            "choices": [{"message": {"content": json.dumps(llm_payload)}}]
-        })
+        return_value=Response(
+            200, json={"choices": [{"message": {"content": json.dumps(llm_payload)}}]}
+        )
     )
 
     with patch("web.config.load_cockpit_cfg", return_value={"databases": {}}):
@@ -712,9 +789,18 @@ def test_chat_passes_history_to_llm():
 
     def _capture_request(request, **kwargs):
         captured_payload.update(json.loads(request.content))
-        return Response(200, json={
-            "choices": [{"message": {"content": json.dumps({"action": "info", "message": "ok", "leads": []})}}]
-        })
+        return Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps({"action": "info", "message": "ok", "leads": []})
+                        }
+                    }
+                ]
+            },
+        )
 
     respx.post("https://openrouter.ai/api/v1/chat/completions").mock(side_effect=_capture_request)
 
@@ -736,6 +822,7 @@ def test_chat_passes_history_to_llm():
 
 
 # ── crm_chat module ───────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_chat_crm_no_api_key():
@@ -760,12 +847,20 @@ async def test_chat_crm_suggest():
     settings.openrouter_http_referer = None
     settings.openrouter_app_title = "Test"
 
-    response_body = {"action": "suggest", "message": "Try Alice", "leads": [{"type": "new", "name": "Alice"}]}
+    response_body = {
+        "action": "suggest",
+        "message": "Try Alice",
+        "leads": [{"type": "new", "name": "Alice"}],
+    }
     respx.post("https://openrouter.ai/api/v1/chat/completions").mock(
-        return_value=Response(200, json={"choices": [{"message": {"content": json.dumps(response_body)}}]})
+        return_value=Response(
+            200, json={"choices": [{"message": {"content": json.dumps(response_body)}}]}
+        )
     )
 
-    result = await chat_crm(settings, "find leads", [], [{"id": "p1", "name": "Bob", "position": "CEO", "company": "X"}])
+    result = await chat_crm(
+        settings, "find leads", [], [{"id": "p1", "name": "Bob", "position": "CEO", "company": "X"}]
+    )
     assert result["action"] == "suggest"
     assert result["message"] == "Try Alice"
     assert len(result["leads"]) == 1
@@ -790,7 +885,9 @@ async def test_chat_crm_detect_create_intent():
         "leads": [{"type": "existing", "name": "Bob", "notion_id": "p1", "deal_name": "HPC — Bob"}],
     }
     respx.post("https://openrouter.ai/api/v1/chat/completions").mock(
-        return_value=Response(200, json={"choices": [{"message": {"content": json.dumps(response_body)}}]})
+        return_value=Response(
+            200, json={"choices": [{"message": {"content": json.dumps(response_body)}}]}
+        )
     )
 
     result = await chat_crm(settings, "crée le lead", [], [])
@@ -815,7 +912,12 @@ async def test_chat_crm_history_included_in_request():
 
     def _capture(request, **kwargs):
         captured["payload"] = json.loads(request.content)
-        return Response(200, json={"choices": [{"message": {"content": '{"action":"info","message":"ok","leads":[]}'}}]})
+        return Response(
+            200,
+            json={
+                "choices": [{"message": {"content": '{"action":"info","message":"ok","leads":[]}'}}]
+            },
+        )
 
     respx.post("https://openrouter.ai/api/v1/chat/completions").mock(side_effect=_capture)
 
@@ -853,3 +955,388 @@ async def test_chat_crm_handles_json_fence():
     result = await chat_crm(settings, "q", [], [])
     assert result["action"] == "suggest"
     assert result["message"] == "hi"
+
+
+# ── Conversations persistence ─────────────────────────────────────────────────
+
+
+def test_conversations_list_empty(tmp_path):
+    from web.config import list_conversations
+
+    assert list_conversations("ws_test") == []
+
+
+def test_conversations_crud(tmp_path):
+    from web.config import (
+        delete_conversation,
+        list_conversations,
+        load_conversation,
+        save_conversation,
+    )
+
+    with patch("web.config._workspace_dir", return_value=tmp_path / "ws"):
+        session = {
+            "id": "sess-001",
+            "title": "Find HPC leads",
+            "created_at": "2026-06-04T10:00:00Z",
+            "updated_at": "2026-06-04T10:01:00Z",
+            "messages": [{"role": "user", "content": "find leads", "ts": "2026-06-04T10:00:00Z"}],
+            "history": [{"role": "user", "content": "find leads"}],
+        }
+        save_conversation("ws", session)
+
+        loaded = load_conversation("ws", "sess-001")
+        assert loaded is not None
+        assert loaded["title"] == "Find HPC leads"
+        assert len(loaded["messages"]) == 1
+
+        listed = list_conversations("ws")
+        assert len(listed) == 1
+        assert listed[0]["id"] == "sess-001"
+        assert listed[0]["message_count"] == 1
+
+        assert delete_conversation("ws", "sess-001") is True
+        assert load_conversation("ws", "sess-001") is None
+        assert delete_conversation("ws", "sess-001") is False
+
+
+def test_conversation_api_list_and_get(tmp_path):
+    from web.config import save_conversation
+
+    session = {
+        "id": "abc123",
+        "title": "Test conversation",
+        "created_at": "2026-06-04T10:00:00Z",
+        "updated_at": "2026-06-04T10:01:00Z",
+        "messages": [],
+        "history": [],
+    }
+    with patch("web.config._workspace_dir", return_value=tmp_path / "ws_test"):
+        save_conversation("ws_test", session)
+
+        with patch("web.server.load_conversation", return_value=session):
+            client = _authed_client()
+            r = client.get("/api/cockpit/conversations/abc123")
+            assert r.status_code == 200
+            assert r.json()["session"]["title"] == "Test conversation"
+
+
+def test_conversation_api_get_404():
+    client = _authed_client()
+    with patch("web.server.load_conversation", return_value=None):
+        r = client.get("/api/cockpit/conversations/does-not-exist")
+    assert r.status_code == 404
+
+
+def test_conversation_api_invalid_session_id():
+    """Session IDs with non-alphanumeric characters are rejected.
+
+    Path traversal with raw/encoded slashes is resolved away by the router → 404.
+    A session_id containing ';' or '!' hits the handler but fails the regex → 400.
+    """
+    client = _authed_client()
+
+    # Path traversal: SPA catch-all serves index.html (no sensitive file exposed)
+    r = client.get("/api/cockpit/conversations/../../etc/passwd")
+    assert r.status_code in (200, 404)  # SPA or not-found; never a raw file read
+    assert "root:" not in r.text  # definitely not /etc/passwd content
+
+    # Too-long ID (65 chars) hits the handler and fails the length constraint → 400
+    long_id = "a" * 65
+    r2 = client.get(f"/api/cockpit/conversations/{long_id}")
+    assert r2.status_code == 400
+
+
+def test_session_id_regex_directly():
+    """Unit-test the session_id regex used in the conversation endpoints."""
+    import re
+
+    pattern = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+    assert pattern.match("abc-123_XYZ")  # valid UUID-style
+    assert pattern.match("a" * 64)  # max length
+    assert not pattern.match("")  # empty
+    assert not pattern.match("a" * 65)  # too long
+    assert not pattern.match("abc/def")  # slash
+    assert not pattern.match("abc;drop")  # semicolon
+    assert not pattern.match("../etc/passwd")  # traversal
+
+
+def test_conversation_api_delete(tmp_path):
+    with patch("web.server.delete_conversation", return_value=True):
+        client = _authed_client()
+        r = client.delete("/api/cockpit/conversations/abc123")
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+
+
+def test_conversation_api_delete_404():
+    with patch("web.server.delete_conversation", return_value=False):
+        client = _authed_client()
+        r = client.delete("/api/cockpit/conversations/missing")
+    assert r.status_code == 404
+
+
+# ── Workspace memory ──────────────────────────────────────────────────────────
+
+
+def test_memory_get_empty():
+    with patch("web.server.load_memory", return_value=""):
+        client = _authed_client()
+        r = client.get("/api/cockpit/memory")
+    assert r.status_code == 200
+    assert r.json() == {"text": ""}
+
+
+def test_memory_save_and_get():
+    saved = {}
+    with patch("web.server.load_memory", return_value="I sell Crystal HPC"):
+        with patch("web.server.save_memory", side_effect=lambda wid, t: saved.update({"text": t})):
+            client = _authed_client()
+            r_put = client.put("/api/cockpit/memory", json={"text": "I sell Crystal HPC"})
+            r_get = client.get("/api/cockpit/memory")
+
+    assert r_put.status_code == 200
+    assert r_get.json()["text"] == "I sell Crystal HPC"
+
+
+# ── run-script extra_args ─────────────────────────────────────────────────────
+
+
+def test_run_script_extra_args_appended(tmp_path):
+    """extra_args are appended to the subprocess command."""
+    script_file = tmp_path / "dummy.py"
+    script_file.write_text("print('hello')")
+    scripts_yaml = tmp_path / "scripts.yaml"
+    scripts_yaml.write_text(f"""
+scripts:
+  - id: dummy
+    label: Dummy
+    path: {script_file}
+    category: CRM
+""")
+    captured_cmd = {}
+    mock_proc = _make_mock_proc([b""])
+
+    async def _capture(*cmd, **kwargs):
+        captured_cmd["cmd"] = list(cmd)
+        return mock_proc
+
+    with (
+        patch("web.utils.SCRIPTS_YAML_PATH", scripts_yaml),
+        patch("web.server.load_cockpit_cfg", return_value={"databases": {}}),
+        patch("web.server.resolve_db_ids", return_value={}),
+        patch("asyncio.create_subprocess_exec", side_effect=_capture),
+    ):
+        client = _authed_client()
+        client.post(
+            "/api/cockpit/run-script",
+            json={"script_id": "dummy", "extra_args": ["--since-days=7", "--limit=10"]},
+        )
+
+    assert "--since-days=7" in captured_cmd["cmd"]
+    assert "--limit=10" in captured_cmd["cmd"]
+
+
+def test_run_script_unsafe_extra_args_filtered(tmp_path):
+    """Shell-injection patterns in extra_args are silently dropped."""
+    script_file = tmp_path / "dummy.py"
+    script_file.write_text("print('hello')")
+    scripts_yaml = tmp_path / "scripts.yaml"
+    scripts_yaml.write_text(f"""
+scripts:
+  - id: dummy
+    label: Dummy
+    path: {script_file}
+    category: CRM
+""")
+    captured_cmd = {}
+    mock_proc = _make_mock_proc([b""])
+
+    async def _capture(*cmd, **kwargs):
+        captured_cmd["cmd"] = list(cmd)
+        return mock_proc
+
+    malicious = ["; rm -rf /", "--flag=$(evil)", "-x", "--ok=value"]
+    with (
+        patch("web.utils.SCRIPTS_YAML_PATH", scripts_yaml),
+        patch("web.server.load_cockpit_cfg", return_value={"databases": {}}),
+        patch("web.server.resolve_db_ids", return_value={}),
+        patch("asyncio.create_subprocess_exec", side_effect=_capture),
+    ):
+        client = _authed_client()
+        client.post(
+            "/api/cockpit/run-script",
+            json={"script_id": "dummy", "extra_args": malicious},
+        )
+
+    cmd = captured_cmd["cmd"]
+    assert "; rm -rf /" not in cmd
+    assert "--flag=$(evil)" not in cmd
+    assert "-x" not in cmd
+    assert "--ok=value" in cmd  # safe flag passes through
+
+
+# ── detect_data_source ────────────────────────────────────────────────────────
+
+
+def test_detect_data_source_people_default():
+    from notion_pilot.shared.llm.crm_chat import detect_data_source
+
+    assert detect_data_source("find me 3 leads for Crystal HPC") == "people"
+    assert detect_data_source("qui peut acheter notre logiciel") == "people"
+
+
+def test_detect_data_source_companies():
+    from notion_pilot.shared.llm.crm_chat import detect_data_source
+
+    assert detect_data_source("quelle typologie d'entreprise contacter") == "companies"
+    assert detect_data_source("quelles sociétés cibler dans l'énergie") == "companies"
+    assert detect_data_source("quel secteur d'industrie") == "companies"
+
+
+def test_detect_data_source_both():
+    from notion_pilot.shared.llm.crm_chat import detect_data_source
+
+    # Query mentioning both leads and companies
+    result = detect_data_source("trouve des leads dans ces entreprises du secteur énergie")
+    assert result == "both"
+
+
+# ── _safe_parse_json ──────────────────────────────────────────────────────────
+
+
+def test_safe_parse_json_plain():
+    from notion_pilot.shared.llm.crm_chat import _safe_parse_json
+
+    raw = '{"action": "suggest", "message": "ok", "leads": []}'
+    result = _safe_parse_json(raw)
+    assert result["action"] == "suggest"
+
+
+def test_safe_parse_json_with_fence():
+    from notion_pilot.shared.llm.crm_chat import _safe_parse_json
+
+    raw = '```json\n{"action": "info", "message": "hi", "leads": []}\n```'
+    result = _safe_parse_json(raw)
+    assert result["action"] == "info"
+
+
+def test_safe_parse_json_with_prefix_text():
+    from notion_pilot.shared.llm.crm_chat import _safe_parse_json
+
+    raw = 'Here is the result: {"action": "suggest", "message": "done", "leads": []}'
+    result = _safe_parse_json(raw)
+    assert result["action"] == "suggest"
+
+
+def test_safe_parse_json_raises_on_garbage():
+    from notion_pilot.shared.llm.crm_chat import _safe_parse_json
+
+    with pytest.raises(ValueError):
+        _safe_parse_json("this is not json at all")
+
+
+# ── chat with companies DB ────────────────────────────────────────────────────
+
+
+@respx.mock
+def test_chat_fetches_companies_for_company_query():
+    """A company-type query should fetch from the Companies DB, not People."""
+    settings = _make_settings()
+    settings.notion_companies_data_source_id = "db-companies"
+    settings.openrouter_api_key = MagicMock()
+    settings.openrouter_api_key.get_secret_value.return_value = "key-test"
+
+    companies_req = respx.post("https://api.notion.com/v1/databases/db-companies/query").mock(
+        return_value=Response(
+            200,
+            json={
+                "results": [
+                    {
+                        "id": "co1",
+                        "properties": {
+                            "Name": {"type": "title", "title": [{"plain_text": "EDF"}]},
+                            "Sector": {"type": "select", "select": {"name": "Energy"}},
+                        },
+                    }
+                ],
+                "has_more": False,
+            },
+        )
+    )
+    people_req = respx.post("https://api.notion.com/v1/databases/db-people/query")
+
+    llm_payload = {"action": "info", "message": "EDF est dans le secteur énergie", "leads": []}
+    respx.post("https://openrouter.ai/api/v1/chat/completions").mock(
+        return_value=Response(
+            200, json={"choices": [{"message": {"content": json.dumps(llm_payload)}}]}
+        )
+    )
+
+    with patch(
+        "web.config.load_cockpit_cfg",
+        return_value={"databases": {"notion_companies_data_source_id": "db-companies"}},
+    ):
+        client = _authed_client(settings=settings)
+        r = client.post(
+            "/api/cockpit/chat",
+            json={"query": "quelle typologie d'entreprise cibler", "history": []},
+        )
+
+    assert r.status_code == 200
+    assert companies_req.called
+    assert not people_req.called
+
+
+@respx.mock
+def test_chat_followup_skips_notion_fetch():
+    """Second message in a session reuses cached people, no Notion re-fetch."""
+    settings = _make_settings()
+    settings.notion_people_data_source_id = "db-people"
+    settings.openrouter_api_key = MagicMock()
+    settings.openrouter_api_key.get_secret_value.return_value = "key-test"
+
+    people_req = respx.post("https://api.notion.com/v1/databases/db-people/query")
+
+    llm_payload = {"action": "info", "message": "Laure est ingénieure énergie", "leads": []}
+    respx.post("https://openrouter.ai/api/v1/chat/completions").mock(
+        return_value=Response(
+            200, json={"choices": [{"message": {"content": json.dumps(llm_payload)}}]}
+        )
+    )
+
+    # Simulate a follow-up: history is non-empty AND session has a people_cache
+    cached_people = [
+        {"id": "p1", "name": "Laure Cadec", "position": "Ingénieure", "company": "Artelys"}
+    ]
+    session_with_cache = {
+        "id": "sess-followup",
+        "title": "Find leads",
+        "messages": [],
+        "history": [],
+        "people_cache": cached_people,
+    }
+    with (
+        patch(
+            "web.config.load_cockpit_cfg",
+            return_value={"databases": {"notion_people_data_source_id": "db-people"}},
+        ),
+        patch("web.server.load_conversation", return_value=session_with_cache),
+        patch("web.server.save_conversation"),
+    ):
+        client = _authed_client(settings=settings)
+        r = client.post(
+            "/api/cockpit/chat",
+            json={
+                "query": "que fait Laure Cadec",
+                "history": [
+                    {"role": "user", "content": "find leads"},
+                    {"role": "assistant", "content": "Found some"},
+                ],
+                "session_id": "sess-followup",
+            },
+        )
+
+    assert r.status_code == 200
+    # Notion People DB was NOT called — cached data was used instead
+    assert not people_req.called

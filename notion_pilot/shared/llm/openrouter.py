@@ -64,7 +64,9 @@ async def interpret_message(
         return base
 
 
-async def suggest_leads(settings: Settings, query: str, people: list[dict]) -> dict:
+async def suggest_leads(
+    settings: Settings, query: str, people: list[dict[str, Any]]
+) -> dict[str, Any]:
     """Query CRM contacts to suggest leads matching a sales objective.
 
     Returns a dict with keys ``message`` (str) and ``leads`` (list).
@@ -75,10 +77,13 @@ async def suggest_leads(settings: Settings, query: str, people: list[dict]) -> d
     if key is None or not key.get_secret_value().strip():
         raise ValueError("OPENROUTER_API_KEY not configured")
 
-    people_ctx = "\n".join(
-        f"- {p['name']} | {p.get('position', '')} @ {p.get('company', '')} | id:{p['id']}"
-        for p in people[:80]
-    ) or "(CRM is empty or not configured)"
+    people_ctx = (
+        "\n".join(
+            f"- {p['name']} | {p.get('position', '')} @ {p.get('company', '')} | id:{p['id']}"
+            for p in people[:80]
+        )
+        or "(CRM is empty or not configured)"
+    )
 
     system_prompt = (
         "You are a CRM assistant for Notion Pilot. "
@@ -103,8 +108,16 @@ async def suggest_leads(settings: Settings, query: str, people: list[dict]) -> d
             headers={
                 "Authorization": f"Bearer {key.get_secret_value()}",
                 "Content-Type": "application/json",
-                **({"HTTP-Referer": settings.openrouter_http_referer} if settings.openrouter_http_referer else {}),
-                **({"X-Title": settings.openrouter_app_title} if settings.openrouter_app_title else {}),
+                **(
+                    {"HTTP-Referer": settings.openrouter_http_referer}
+                    if settings.openrouter_http_referer
+                    else {}
+                ),
+                **(
+                    {"X-Title": settings.openrouter_app_title}
+                    if settings.openrouter_app_title
+                    else {}
+                ),
             },
             json={
                 "model": settings.openrouter_model,

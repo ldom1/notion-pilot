@@ -24,10 +24,11 @@ class CockpitConfigRequest(BaseModel):
 
 class RunScriptRequest(BaseModel):
     script_id: str
+    extra_args: list[str] = []
 
 
 class ChatMessage(BaseModel):
-    role: str   # "user" | "assistant"
+    role: str  # "user" | "assistant"
     content: str
 
 
@@ -49,16 +50,19 @@ class CreateLeadRequest(BaseModel):
 
 class CreateDealRequest(BaseModel):
     deal_name: str
-    notion_id: str | None = None          # existing People page to link
+    notion_id: str | None = None  # existing People page to link
     new_person: CreateLeadRequest | None = None  # create person first if no notion_id
-    extra_fields: dict | None = None      # wizard-collected property values
+    extra_fields: dict | None = None  # wizard-collected property values
+    summary: str | None = None  # chat analysis that led to this deal
+    company_name: str | None = None  # company to link as relation
 
 
 # ── Workflow composition ──────────────────────────────────────────────────────
 
+
 class WorkflowNode(BaseModel):
-    id: str           # matches a script id from scripts.yaml
-    position: dict    # {x, y} for React Flow layout
+    id: str  # matches a script id from scripts.yaml
+    position: dict  # {x, y} for React Flow layout
 
 
 class WorkflowEdge(BaseModel):
@@ -68,7 +72,7 @@ class WorkflowEdge(BaseModel):
 
 
 class WorkflowDef(BaseModel):
-    id: str           # uuid generated client-side
+    id: str  # uuid generated client-side
     name: str
     nodes: list[WorkflowNode]
     edges: list[WorkflowEdge]

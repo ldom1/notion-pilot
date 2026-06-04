@@ -21,9 +21,23 @@ One-command bootstrap on virgin Notion for both products.
 
 ## Phase 2 — Email "à relire"
 
-- [ ] Email pipeline: scan inbox → classify (newsletter / contact / transactional) via LLM
-- [ ] Auto-tag newsletters and unread knowledge as `À relire` in Knowledge DB
-- [ ] Skip already-processed messages (idempotent)
+- [x] Email pipeline: scan inbox → classify (newsletter / contact / transactional) via LLM
+- [x] Auto-tag newsletters and unread knowledge as `À relire` in Knowledge DB
+- [x] Skip already-processed messages (idempotent)
+
+## Phase 2b — Knowledge Triage (in progress)
+
+Batch enrichment script that replicates the Notion agent logic locally (no Notion AI credits needed).
+
+Source: Dom Telegram Bot DB (`NOTION_TELEGRAM_MSG_DATABASE_ID`) — pages with `Status = Not analysed`.
+Target: 4 custom knowledge DBs — Notions, Ideas, Tools, Data & Technology.
+
+**Flow:** read source page → LLM identifies subject entity + target DB → find or create meta-page → append dated note section → write summary back → mark `Analysed`.
+**Lifecycle:** `--purge` archives `Analysed` source pages older than 14 days.
+
+- [ ] `scripts/inbox/enrich_knowledge.py` — batch triage script (dry-run, limit, JSON output)
+- [ ] Add to `config/scripts.yaml` for cockpit visibility
+- [ ] Open questions to resolve before writing: target DB title property names, properties to populate on meta-pages, multi-entity handling per message, dedup strategy
 
 ## Phase 3 — Telegram Recap Commands
 

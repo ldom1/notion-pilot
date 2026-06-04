@@ -22,24 +22,41 @@ _WEB_DIR = pathlib.Path(__file__).parent
 SCRIPTS_YAML_PATH = _REPO_ROOT / "config" / "scripts.yaml"
 
 DB_DEFS: list[dict] = [
-    {"key": "notion_people_data_source_id",    "label": "People",     "icon": "👥", "category": "crm"},
-    {"key": "notion_companies_data_source_id", "label": "Companies",  "icon": "🏭", "category": "crm"},
-    {"key": "notion_deals_database_id",        "label": "Deals",      "icon": "💼", "category": "crm"},
-    {"key": "notion_telegram_msg_database_id", "label": "Messages",   "icon": "💬", "category": "inbox"},
-    {"key": "notion_notions_database_id",      "label": "Notions",    "icon": "💡", "category": "inbox"},
-    {"key": "notion_ideas_database_id",        "label": "Ideas",      "icon": "🧠", "category": "inbox"},
-    {"key": "notion_tools_database_id",        "label": "Tools",      "icon": "🛠️", "category": "inbox"},
-    {"key": "notion_data_tech_database_id",    "label": "Data & Tech","icon": "📊", "category": "inbox"},
+    {"key": "notion_people_data_source_id", "label": "People", "icon": "👥", "category": "crm"},
+    {
+        "key": "notion_companies_data_source_id",
+        "label": "Companies",
+        "icon": "🏭",
+        "category": "crm",
+    },
+    {"key": "notion_deals_database_id", "label": "Leads", "icon": "💼", "category": "crm"},
+    {
+        "key": "notion_telegram_msg_database_id",
+        "label": "Messages",
+        "icon": "💬",
+        "category": "inbox",
+    },
+    {"key": "notion_notions_database_id", "label": "Notions", "icon": "💡", "category": "inbox"},
+    {"key": "notion_ideas_database_id", "label": "Ideas", "icon": "🧠", "category": "inbox"},
+    {"key": "notion_tools_database_id", "label": "Tools", "icon": "🛠️", "category": "inbox"},
+    {
+        "key": "notion_data_tech_database_id",
+        "label": "Data & Tech",
+        "icon": "📊",
+        "category": "inbox",
+    },
 ]
 
 
 # ── Per-workspace config directory ────────────────────────────────────────────
+
 
 def _workspace_dir(workspace_id: str) -> pathlib.Path:
     return _WEB_DIR / "workspaces" / workspace_id
 
 
 # ── Cockpit config (DB pointers + workspace_url) ──────────────────────────────
+
 
 def _cockpit_cfg_path(workspace_id: str) -> pathlib.Path:
     return _workspace_dir(workspace_id) / "cockpit_config.json"
@@ -61,20 +78,21 @@ def save_cockpit_cfg(workspace_id: str, cfg: dict) -> None:
 def resolve_db_ids(settings: Settings, workspace_id: str) -> dict:
     """Cockpit config overrides .env values; cockpit config takes precedence."""
     base: dict[str, str | None] = {
-        "notion_people_data_source_id":    settings.notion_people_data_source_id,
+        "notion_people_data_source_id": settings.notion_people_data_source_id,
         "notion_companies_data_source_id": settings.notion_companies_data_source_id,
-        "notion_deals_database_id":        settings.notion_deals_database_id,
+        "notion_deals_database_id": settings.notion_deals_database_id,
         "notion_telegram_msg_database_id": settings.notion_telegram_msg_database_id,
-        "notion_notions_database_id":      settings.notion_notions_database_id,
-        "notion_ideas_database_id":        settings.notion_ideas_database_id,
-        "notion_tools_database_id":        settings.notion_tools_database_id,
-        "notion_data_tech_database_id":    settings.notion_data_tech_database_id,
+        "notion_notions_database_id": settings.notion_notions_database_id,
+        "notion_ideas_database_id": settings.notion_ideas_database_id,
+        "notion_tools_database_id": settings.notion_tools_database_id,
+        "notion_data_tech_database_id": settings.notion_data_tech_database_id,
     }
     overrides = load_cockpit_cfg(workspace_id).get("databases", {})
     return {k: overrides.get(k) or v for k, v in base.items()}
 
 
 # ── Workflows (user-composed pipelines) ───────────────────────────────────────
+
 
 def _workflows_path(workspace_id: str) -> pathlib.Path:
     return _workspace_dir(workspace_id) / "workflows.json"
@@ -95,6 +113,7 @@ def save_workflows(workspace_id: str, workflows: list[dict]) -> None:
 
 # ── Conversations (chat session persistence) ──────────────────────────────────
 
+
 def _conversations_dir(workspace_id: str) -> pathlib.Path:
     return _workspace_dir(workspace_id) / "conversations"
 
@@ -107,13 +126,22 @@ def list_conversations(workspace_id: str) -> list[dict]:
     for f in sorted(d.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
         try:
             data = json.loads(f.read_text())
-            sessions.append({
-                "id": data["id"],
-                "title": data.get("title", "Conversation"),
-                "created_at": data.get("created_at", ""),
-                "updated_at": data.get("updated_at", ""),
-                "message_count": len(data.get("messages", [])),
-            })
+            messages = data.get("messages", [])
+            # First user message as context preview
+            preview = next(
+                (m["content"][:80] for m in messages if m.get("role") == "user"),
+                "",
+            )
+            sessions.append(
+                {
+                    "id": data["id"],
+                    "title": data.get("title", "Conversation"),
+                    "created_at": data.get("created_at", ""),
+                    "updated_at": data.get("updated_at", ""),
+                    "message_count": len(messages),
+                    "preview": preview,
+                }
+            )
         except Exception:
             pass
     return sessions
@@ -142,6 +170,7 @@ def delete_conversation(workspace_id: str, session_id: str) -> bool:
 
 # ── Workspace memory (injected into every LLM chat call) ─────────────────────
 
+
 def _memory_path(workspace_id: str) -> pathlib.Path:
     return _workspace_dir(workspace_id) / "memory.txt"
 
@@ -158,6 +187,7 @@ def save_memory(workspace_id: str, text: str) -> None:
 
 
 # ── Notion API helpers ────────────────────────────────────────────────────────
+
 
 def notion_headers(token: str) -> dict:
     return {

@@ -7,6 +7,13 @@ scripts:
     path: scripts/crm/crm_refresh_people.py
     args: []
     category: CRM
+    params:
+      - id: dry_run
+        label: Dry run (preview only, no writes)
+        type: boolean
+        flag: --dry-run
+        default: false
+        help: "Preview duplicates and enrichment results without modifying Notion"
 
   - id: refresh_companies
     label: Refresh Companies
@@ -14,19 +21,27 @@ scripts:
     path: scripts/crm/crm_refresh_companies.py
     args: []
     category: CRM
+    params:
+      - id: dry_run
+        label: Dry run (preview only, no writes)
+        type: boolean
+        flag: --dry-run
+        default: false
+        help: "Preview duplicates and enrichment results without modifying Notion"
 
   - id: import_linkedin
     label: Import LinkedIn
-    # How to get your LinkedIn data:
-    #   1. Go to https://www.linkedin.com/mypreferences/d/download-my-data
-    #      (Settings → Data Privacy → Get a copy of your data → select "Connections")
-    #   2. LinkedIn emails a ZIP within ~10 minutes
-    #   3. Unzip it and copy Connections.csv to:  data/crm/linkedin/Connections.csv
-    #   4. Run this script (--dry-run first to preview, then without to import)
     description: Import LinkedIn Connections.csv — place file at data/crm/linkedin/Connections.csv first
     path: scripts/crm/crm_import_linkedin.py
     args: []
     category: CRM
+    params:
+      - id: dry_run
+        label: Dry run (preview only, no writes)
+        type: boolean
+        flag: --dry-run
+        default: true
+        help: "Recommended: preview the import first. Uncheck to write directly to Notion.\nFile expected at: data/crm/linkedin/Connections.csv"
 
   # ── Inbox ──────────────────────────────────────────────────────────────────
 
@@ -36,6 +51,15 @@ scripts:
     path: scripts/inbox/process_email.py
     args: ["--dry-run"]
     category: Inbox
+    params:
+      - id: since_days
+        label: Last N days
+        type: number
+        flag: --since-days
+        default: 30
+        min: 1
+        max: 365
+        help: "Scan emails received in the last N days"
 
   - id: retrieve_email
     label: Retrieve Emails
@@ -43,3 +67,20 @@ scripts:
     path: scripts/inbox/process_email.py
     args: []
     category: Inbox
+    params:
+      - id: since_days
+        label: Last N days
+        type: number
+        flag: --since-days
+        default: 7
+        min: 1
+        max: 365
+        help: "Only fetch emails received in the last N days"
+      - id: limit
+        label: Max emails
+        type: number
+        flag: --limit
+        default: 0
+        min: 0
+        max: 500
+        help: "Cap the number of emails processed (0 = no limit)"

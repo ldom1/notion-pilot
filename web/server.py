@@ -17,7 +17,9 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import Response
 
 from notion_pilot.shared.config import Settings
 from notion_pilot.shared.llm.crm_chat import chat_crm, detect_data_source
@@ -73,12 +75,31 @@ def create_app(settings: Settings) -> FastAPI:
     )
     app.add_middleware(SessionMiddleware, secret_key=session_secret, https_only=False)
 
+    _CSP = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "font-src 'self'"
+    )
+
+    class _CSPMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request: Request, call_next: object) -> Response:
+            response: Response = await call_next(request)  # type: ignore[operator]
+            response.headers["Content-Security-Policy"] = _CSP
+            return response
+
+    app.add_middleware(_CSPMiddleware)
+
     # ── Session helpers ───────────────────────────────────────────────────────
 
     def _require_token(request: Request) -> str:
         token = request.session.get("notion_token")
         if not token:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+            )
         return str(token)
 
     def _workspace_id(request: Request) -> str:
@@ -123,11 +144,17 @@ def create_app(settings: Settings) -> FastAPI:
         except httpx.HTTPStatusError as exc:
             raise HTTPException(status_code=400, detail=f"Notion OAuth error: {exc.response.text}")
         request.session["notion_token"] = token_data["access_token"]
-        request.session["workspace_id"] = token_data.get("workspace_id", "default")
+        wid = token_data.get("workspace_id", "default")
+        request.session["workspace_id"] = wid
         request.session["workspace_name"] = token_data.get("workspace_name", "My Workspace")
         owner = token_data.get("owner", {})
         if owner.get("type") == "user":
             request.session["user_name"] = owner["user"].get("name", "")
+        # Persist workspace_url if not already set (use Notion workspace root as fallback)
+        cfg = load_cockpit_cfg(wid)
+        if not cfg.get("workspace_url") and token_data.get("workspace_id"):
+            cfg.setdefault("workspace_url", "https://notion.so")
+            save_cockpit_cfg(wid, cfg)
         request.session.pop("oauth_state", None)
         next_url = request.session.pop("oauth_next", "/")
         return RedirectResponse("/?connected=1" if next_url == "/" else next_url)
@@ -143,7 +170,9 @@ def create_app(settings: Settings) -> FastAPI:
     async def run_setup(req: SetupRequest, request: Request) -> SetupResponse:
         token = req.notion_token or request.session.get("notion_token")
         if not token:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not connected to Notion")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Not connected to Notion"
+            )
         try:
             async with httpx.AsyncClient(headers=notion_headers(token), timeout=60) as client:
                 root_page_id = await create_workspace_root_page(client, req.workspace_name)
@@ -159,7 +188,9 @@ def create_app(settings: Settings) -> FastAPI:
     async def run_setup_stream(req: SetupRequest, request: Request) -> StreamingResponse:
         token = req.notion_token or request.session.get("notion_token")
         if not token:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not connected to Notion")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Not connected to Notion"
+            )
 
         async def _generate() -> AsyncGenerator[str, None]:
             def sse(msg_type: str, **kwargs: object) -> str:
@@ -212,19 +243,27 @@ def create_app(settings: Settings) -> FastAPI:
             if not db_id:
                 return {"count": None, "configured": False, "notion_name": None}
             try:
-                async with httpx.AsyncClient(headers=hdrs, timeout=15) as client:
-                    db_r, q_r = await asyncio.gather(
-                        client.get(f"{NOTION_API}/databases/{db_id}"),
-                        client.post(f"{NOTION_API}/databases/{db_id}/query", json={"page_size": 100}),
-                    )
+                async with httpx.AsyncClient(headers=hdrs, timeout=30) as client:
+                    db_r = await client.get(f"{NOTION_API}/databases/{db_id}")
                     db_r.raise_for_status()
-                    q_r.raise_for_status()
                     title_parts = db_r.json().get("title", [])
                     notion_name = "".join(t.get("plain_text", "") for t in title_parts) or None
-                    data = q_r.json()
+                    # paginate to get real count
+                    total, cursor = 0, None
+                    while True:
+                        body: dict = {"page_size": 100}
+                        if cursor:
+                            body["start_cursor"] = cursor
+                        q_r = await client.post(f"{NOTION_API}/databases/{db_id}/query", json=body)
+                        q_r.raise_for_status()
+                        data = q_r.json()
+                        total += len(data.get("results", []))
+                        if not data.get("has_more"):
+                            break
+                        cursor = data.get("next_cursor")
                     return {
-                        "count": len(data.get("results", [])),
-                        "has_more": data.get("has_more", False),
+                        "count": total,
+                        "has_more": False,
                         "configured": True,
                         "notion_name": notion_name,
                     }
@@ -234,11 +273,62 @@ def create_app(settings: Settings) -> FastAPI:
 
         results = await asyncio.gather(*[_count_db(db_ids.get(d["key"])) for d in DB_DEFS])
         return {
-            "databases": [{**d, "db_id": db_ids.get(d["key"]), **results[i]} for i, d in enumerate(DB_DEFS)],
+            "databases": [
+                {**d, "db_id": db_ids.get(d["key"]), **results[i]} for i, d in enumerate(DB_DEFS)
+            ],
             "workspace_name": request.session.get("workspace_name", ""),
             "user_name": request.session.get("user_name", ""),
             "workspace_url": load_cockpit_cfg(wid).get("workspace_url", ""),
         }
+
+    @app.get("/api/cockpit/status/{key}")
+    async def cockpit_status_single(key: str, request: Request) -> dict:
+        """Return status for a single database key (used after re-linking to avoid full reload)."""
+        token = _require_token(request)
+        wid = _workspace_id(request)
+        db_ids = resolve_db_ids(settings, wid)
+        hdrs = notion_headers(token)
+        defn = next((d for d in DB_DEFS if d["key"] == key), None)
+        if not defn:
+            raise HTTPException(status_code=404, detail=f"Unknown key: {key}")
+        db_id = db_ids.get(key)
+        if not db_id:
+            return {**defn, "db_id": None, "count": None, "configured": False, "notion_name": None}
+        try:
+            async with httpx.AsyncClient(headers=hdrs, timeout=30) as client:
+                db_r = await client.get(f"{NOTION_API}/databases/{db_id}")
+                db_r.raise_for_status()
+                title_parts = db_r.json().get("title", [])
+                notion_name = "".join(t.get("plain_text", "") for t in title_parts) or None
+                total, cursor = 0, None
+                while True:
+                    body: dict = {"page_size": 100}
+                    if cursor:
+                        body["start_cursor"] = cursor
+                    q_r = await client.post(f"{NOTION_API}/databases/{db_id}/query", json=body)
+                    q_r.raise_for_status()
+                    data = q_r.json()
+                    total += len(data.get("results", []))
+                    if not data.get("has_more"):
+                        break
+                    cursor = data.get("next_cursor")
+            return {
+                **defn,
+                "db_id": db_id,
+                "count": total,
+                "configured": True,
+                "notion_name": notion_name,
+            }
+        except Exception as exc:
+            logger.warning("single status query failed for {}: {}", key, exc)
+            return {
+                **defn,
+                "db_id": db_id,
+                "count": None,
+                "configured": True,
+                "error": str(exc),
+                "notion_name": None,
+            }
 
     @app.get("/api/cockpit/notion-databases")
     async def cockpit_notion_databases(request: Request) -> dict:
@@ -257,7 +347,10 @@ def create_app(settings: Settings) -> FastAPI:
                 r.raise_for_status()
                 data = r.json()
                 for db in data.get("results", []):
-                    name = "".join(t.get("plain_text", "") for t in db.get("title", [])) or "(Untitled)"
+                    name = (
+                        "".join(t.get("plain_text", "") for t in db.get("title", []))
+                        or "(Untitled)"
+                    )
                     databases.append({"id": db["id"], "name": name})
                 if not data.get("has_more"):
                     break
@@ -268,7 +361,10 @@ def create_app(settings: Settings) -> FastAPI:
     @app.get("/api/cockpit/config")
     async def cockpit_get_config(request: Request) -> dict:
         _require_token(request)
-        return {"databases": resolve_db_ids(settings, _workspace_id(request)), "definitions": DB_DEFS}
+        return {
+            "databases": resolve_db_ids(settings, _workspace_id(request)),
+            "definitions": DB_DEFS,
+        }
 
     @app.post("/api/cockpit/config")
     async def cockpit_save_config(req: CockpitConfigRequest, request: Request) -> dict:
@@ -308,15 +404,17 @@ def create_app(settings: Settings) -> FastAPI:
             if v:
                 env[k.upper()] = v
 
-        cmd = [sys.executable, str(script_path)] + list(script.get("args") or [])
+        # Validate extra_args: only allow safe --flag or --flag=value patterns
+        _safe_arg_re = re.compile(r"^--[a-z][a-z0-9-]*(=[\w.,/-]*)?$")
+        extra = [a for a in (req.extra_args or []) if _safe_arg_re.match(a)]
+        cmd = [sys.executable, str(script_path)] + list(script.get("args") or []) + extra
 
         async def _generate() -> AsyncGenerator[str, None]:
             def sse(msg_type: str, **kwargs: object) -> str:
                 return f"data: {_json.dumps({'type': msg_type, **kwargs})}\n\n"
 
-            display = f"$ python {script['path']}" + (
-                " " + " ".join(script.get("args") or []) if script.get("args") else ""
-            )
+            all_args = list(script.get("args") or []) + extra
+            display = f"$ python {script['path']}" + (" " + " ".join(all_args) if all_args else "")
             yield sse("log", message=display)
             try:
                 proc = await asyncio.create_subprocess_exec(
@@ -365,7 +463,7 @@ def create_app(settings: Settings) -> FastAPI:
 
         # Validate session_id — must be safe for use as a filename
         sid = req.session_id
-        if sid and not re.match(r'^[a-zA-Z0-9_-]{1,64}$', sid):
+        if sid and not re.match(r"^[a-zA-Z0-9_-]{1,64}$", sid):
             sid = None
 
         # Decide which Notion DB(s) to query based on query intent
@@ -373,8 +471,12 @@ def create_app(settings: Settings) -> FastAPI:
 
         # Load session cache — reuse fetched data for follow-ups
         existing_session = load_conversation(wid, sid) if sid else None
-        cached_people: list[dict] | None = existing_session.get("people_cache") if existing_session else None
-        cached_companies: list[dict] | None = existing_session.get("companies_cache") if existing_session else None
+        cached_people: list[dict] | None = (
+            existing_session.get("people_cache") if existing_session else None
+        )
+        cached_companies: list[dict] | None = (
+            existing_session.get("companies_cache") if existing_session else None
+        )
 
         need_people = data_source in ("people", "both") and cached_people is None
         need_companies = data_source in ("companies", "both") and cached_companies is None
@@ -415,12 +517,14 @@ def create_app(settings: Settings) -> FastAPI:
                             try:
                                 for row in await _fetch_all_pages(client, people_db_id):
                                     props = row.get("properties", {})
-                                    people.append({
-                                        "id": row["id"],
-                                        "name": extract_title_prop(props),
-                                        "position": extract_text_prop(props, "Position"),
-                                        "company": extract_text_prop(props, "Company"),
-                                    })
+                                    people.append(
+                                        {
+                                            "id": row["id"],
+                                            "name": extract_title_prop(props),
+                                            "position": extract_text_prop(props, "Position"),
+                                            "company": extract_text_prop(props, "Company"),
+                                        }
+                                    )
                             except Exception as exc:
                                 logger.warning("people fetch failed: {}", exc)
 
@@ -433,11 +537,13 @@ def create_app(settings: Settings) -> FastAPI:
                                     sector = ""
                                     if props.get("Sector", {}).get("select"):
                                         sector = props["Sector"]["select"]["name"]
-                                    companies.append({
-                                        "id": row["id"],
-                                        "name": extract_title_prop(props),
-                                        "sector": sector,
-                                    })
+                                    companies.append(
+                                        {
+                                            "id": row["id"],
+                                            "name": extract_title_prop(props),
+                                            "sector": sector,
+                                        }
+                                    )
                             except Exception as exc:
                                 logger.warning("companies fetch failed: {}", exc)
 
@@ -451,7 +557,9 @@ def create_app(settings: Settings) -> FastAPI:
             history = [{"role": m.role, "content": m.content} for m in req.history]
             try:
                 result = await chat_crm(
-                    settings, req.query, history,
+                    settings,
+                    req.query,
+                    history,
                     people=people,
                     companies=companies if companies else None,
                     workspace_memory=workspace_memory,
@@ -490,10 +598,11 @@ def create_app(settings: Settings) -> FastAPI:
                     session["updated_at"] = now
                     session["messages"].append({"role": "user", "content": req.query, "ts": now})
                     assistant_msg = result.get("message", "")
-                    session["messages"].append({"role": "assistant", "content": assistant_msg, "data": result, "ts": now})
+                    session["messages"].append(
+                        {"role": "assistant", "content": assistant_msg, "data": result, "ts": now}
+                    )
                     session["history"] = [
-                        {"role": m["role"], "content": m["content"]}
-                        for m in session["messages"]
+                        {"role": m["role"], "content": m["content"]} for m in session["messages"]
                     ]
                     save_conversation(wid, session)
                 except Exception as exc:
@@ -516,7 +625,7 @@ def create_app(settings: Settings) -> FastAPI:
     @app.get("/api/cockpit/conversations/{session_id}")
     async def cockpit_get_conversation(session_id: str, request: Request) -> dict:
         _require_token(request)
-        if not re.match(r'^[a-zA-Z0-9_-]{1,64}$', session_id):
+        if not re.match(r"^[a-zA-Z0-9_-]{1,64}$", session_id):
             raise HTTPException(status_code=400, detail="Invalid session_id")
         wid = _workspace_id(request)
         session = load_conversation(wid, session_id)
@@ -527,7 +636,7 @@ def create_app(settings: Settings) -> FastAPI:
     @app.delete("/api/cockpit/conversations/{session_id}")
     async def cockpit_delete_conversation(session_id: str, request: Request) -> dict:
         _require_token(request)
-        if not re.match(r'^[a-zA-Z0-9_-]{1,64}$', session_id):
+        if not re.match(r"^[a-zA-Z0-9_-]{1,64}$", session_id):
             raise HTTPException(status_code=400, detail="Invalid session_id")
         wid = _workspace_id(request)
         if not delete_conversation(wid, session_id):
@@ -601,13 +710,46 @@ def create_app(settings: Settings) -> FastAPI:
                     "Nom": {"title": [{"text": {"content": req.new_person.name}}]},
                 }
                 if req.new_person.position:
-                    person_props["Position"] = {"rich_text": [{"text": {"content": req.new_person.position}}]}
-                p_r = await client.post(f"{NOTION_API}/pages", json={
-                    "parent": {"database_id": people_db_id},
-                    "properties": person_props,
-                })
+                    person_props["Position"] = {
+                        "rich_text": [{"text": {"content": req.new_person.position}}]
+                    }
+                p_r = await client.post(
+                    f"{NOTION_API}/pages",
+                    json={
+                        "parent": {"database_id": people_db_id},
+                        "properties": person_props,
+                    },
+                )
                 p_r.raise_for_status()
                 contact_id = p_r.json()["id"]
+
+            # Resolve company page ID + the Deals DB property that points to Companies
+            company_id: str | None = None
+            company_prop_key: str | None = None
+            companies_db_id = db_ids.get("notion_companies_data_source_id")
+            if req.company_name and companies_db_id:
+                # Find the company page by title
+                cq = await client.post(
+                    f"{NOTION_API}/databases/{companies_db_id}/query",
+                    json={
+                        "filter": {
+                            "property": "title",
+                            "title": {"equals": req.company_name},
+                        },
+                        "page_size": 1,
+                    },
+                )
+                if cq.is_success and cq.json().get("results"):
+                    company_id = cq.json()["results"][0]["id"]
+                    # Find the relation property in Deals DB that targets Companies DB
+                    db_schema = await client.get(f"{NOTION_API}/databases/{deals_db_id}")
+                    if db_schema.is_success:
+                        for prop_name, prop in db_schema.json().get("properties", {}).items():
+                            if prop.get("type") == "relation" and prop.get("relation", {}).get(
+                                "database_id", ""
+                            ).replace("-", "") == companies_db_id.replace("-", ""):
+                                company_prop_key = prop_name
+                                break
 
             deal_props: dict = {
                 "Name": {"title": [{"text": {"content": req.deal_name}}]},
@@ -615,6 +757,8 @@ def create_app(settings: Settings) -> FastAPI:
             }
             if contact_id:
                 deal_props["Contacts"] = {"relation": [{"id": contact_id}]}
+            if company_id and company_prop_key:
+                deal_props[company_prop_key] = {"relation": [{"id": company_id}]}
             # Merge extra fields from wizard answers
             for key, val in (req.extra_fields or {}).items():
                 if isinstance(val, list):
@@ -628,11 +772,26 @@ def create_app(settings: Settings) -> FastAPI:
                     else:
                         deal_props[key] = {"rich_text": [{"text": {"content": str(val)}}]}
 
-            logger.info("create-deal: posting to DB {} props={}", deals_db_id, list(deal_props.keys()))
-            d_r = await client.post(f"{NOTION_API}/pages", json={
-                "parent": {"database_id": deals_db_id},
-                "properties": deal_props,
-            })
+            logger.info(
+                "create-deal: posting to DB {} props={}", deals_db_id, list(deal_props.keys())
+            )
+            page_body: dict = {"parent": {"database_id": deals_db_id}, "properties": deal_props}
+            if req.summary:
+                # Split into ≤2000-char chunks (Notion rich_text limit per block)
+                chunks = [req.summary[i : i + 2000] for i in range(0, len(req.summary), 2000)]
+                page_body["children"] = [
+                    {
+                        "object": "block",
+                        "type": "callout",
+                        "callout": {
+                            "icon": {"type": "emoji", "emoji": "🤖"},
+                            "rich_text": [{"type": "text", "text": {"content": chunk}}],
+                            "color": "purple_background",
+                        },
+                    }
+                    for chunk in chunks
+                ]
+            d_r = await client.post(f"{NOTION_API}/pages", json=page_body)
             if not d_r.is_success:
                 logger.error("create-deal Notion error {}: {}", d_r.status_code, d_r.text[:400])
                 raise HTTPException(status_code=400, detail=f"Notion API error: {d_r.text[:200]}")
@@ -736,11 +895,17 @@ def create_app(settings: Settings) -> FastAPI:
             for script_id in ordered:
                 script = scripts_by_id.get(script_id)
                 if not script:
-                    yield sse("log", message=f"⚠ Script '{script_id}' not found, skipping", script_id=script_id)
+                    yield sse(
+                        "log",
+                        message=f"⚠ Script '{script_id}' not found, skipping",
+                        script_id=script_id,
+                    )
                     continue
                 script_path = repo_root / script["path"]
                 if not script_path.exists():
-                    yield sse("log", message=f"⚠ File not found: {script['path']}", script_id=script_id)
+                    yield sse(
+                        "log", message=f"⚠ File not found: {script['path']}", script_id=script_id
+                    )
                     continue
 
                 cmd = [sys.executable, str(script_path)] + list(script.get("args") or [])
@@ -765,7 +930,11 @@ def create_app(settings: Settings) -> FastAPI:
                     if proc.returncode == 0:
                         yield sse("step_done", script_id=script_id, message="✓ Done")
                     else:
-                        yield sse("step_error", script_id=script_id, message=f"Exited with code {proc.returncode}")
+                        yield sse(
+                            "step_error",
+                            script_id=script_id,
+                            message=f"Exited with code {proc.returncode}",
+                        )
                         break  # stop workflow on first failure
                 except Exception as exc:
                     logger.error("workflow step {} failed: {}", script_id, exc)
@@ -782,21 +951,43 @@ def create_app(settings: Settings) -> FastAPI:
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
-    # ── Static files + pages ──────────────────────────────────────────────────
+    # ── Static files + SPA ───────────────────────────────────────────────────
 
     _static = pathlib.Path(__file__).parent / "static"
     if _static.exists():
+        # Vite bundles assets to /assets/ — mount before the catch-all
+        _assets_dir = _static / "assets"
+        if _assets_dir.exists():
+            app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="assets")
+
         app.mount("/static", StaticFiles(directory=str(_static)), name="static")
+
+        def _serve_spa() -> HTMLResponse:
+            index = _static / "index.html"
+            if not index.exists():
+                return HTMLResponse(
+                    "<h1>Frontend not built</h1><p>Run <code>make build-frontend</code></p>",
+                    status_code=503,
+                )
+            return HTMLResponse(
+                index.read_text(),
+                headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+            )
 
         @app.get("/", response_class=HTMLResponse)
         async def index() -> HTMLResponse:
-            return HTMLResponse((_static / "index.html").read_text())
+            return _serve_spa()
 
         @app.get("/cockpit", response_class=HTMLResponse, response_model=None)
         async def cockpit_page(request: Request) -> HTMLResponse | RedirectResponse:
             if not request.session.get("notion_token"):
                 return RedirectResponse("/auth/notion?next=/cockpit")
-            return HTMLResponse((_static / "cockpit.html").read_text())
+            return _serve_spa()
+
+        # SPA catch-all: any non-API, non-auth, non-asset path → index.html
+        @app.get("/{full_path:path}", response_class=HTMLResponse, include_in_schema=False)
+        async def spa_fallback(full_path: str) -> HTMLResponse:
+            return _serve_spa()
 
     return app
 
@@ -804,4 +995,5 @@ def create_app(settings: Settings) -> FastAPI:
 def app_factory() -> FastAPI:
     """Factory for uvicorn --factory mode."""
     from notion_pilot.shared.config import load_settings
+
     return create_app(load_settings())
