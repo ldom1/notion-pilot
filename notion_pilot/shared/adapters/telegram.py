@@ -1,10 +1,13 @@
 """Telegram source adapter — long-polling via python-telegram-bot async API."""
 
 import asyncio
+import json
 import tempfile
 from datetime import timezone
 from pathlib import Path
 from typing import Any
+
+import httpx
 
 from loguru import logger
 from telegram import Message, Update
@@ -103,6 +106,79 @@ async def _to_incoming(settings: Settings, msg: Message) -> IncomingMessage:
         media=None,
         source_adapter="telegram",
     )
+
+
+_INFER_PROMPT = (
+    "Classify the following message into exactly one category: people, company, deal, knowledge.\n"
+    "- people: mentions a specific person (name + context)\n"
+    "- company: mentions a company without a specific contact\n"
+    "- deal: mentions a sales opportunity, project, or client deal\n"
+    "- knowledge: everything else (notes, articles, ideas, reflections)\n\n"
+    "Return JSON with keys: type (one of the 4 categories), "
+    "name, company, position, email, linkedin_url, title, stage, notes. "
+    "Use empty string for fields that don't apply.\n\nMessage: "
+)
+
+_TYPE_LABEL: dict[str, str] = {
+    "people": "person",
+    "company": "company",
+    "deal": "deal",
+}
+
+
+async def infer_and_confirm(
+    text: str, settings: Settings
+) -> tuple[str, str, dict[str, str]] | None:
+    """Classify text via LLM. Returns (inferred_type, confirmation_text, extracted) or None for knowledge."""
+    if not settings.openrouter_api_key:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+            resp = await client.post(
+                f"{settings.openrouter_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.openrouter_api_key.get_secret_value()}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": settings.openrouter_model,
+                    "messages": [{"role": "user", "content": _INFER_PROMPT + text}],
+                    "response_format": {"type": "json_object"},
+                },
+            )
+        resp.raise_for_status()
+        data = json.loads(resp.json()["choices"][0]["message"]["content"])
+        inferred_type = str(data.get("type", "knowledge")).lower()
+        if inferred_type not in ("people", "company", "deal"):
+            return None
+        extracted = {k: str(v) for k, v in data.items() if v and k != "type"}
+        label = _TYPE_LABEL[inferred_type]
+        name = extracted.get("name") or extracted.get("title") or "this entry"
+        company = extracted.get("company", "")
+        position = extracted.get("position", "")
+        details = name
+        if company:
+            details += f" @ {company}"
+        if position:
+            details += f" ({position})"
+        confirmation = (
+            f"Looks like a {label} — {details}.\n"
+            f"Save to {label.capitalize()}s? Reply yes or /knowledge to file as a note."
+        )
+        return inferred_type, confirmation, extracted
+    except Exception:  # noqa: BLE001
+        logger.warning("telegram: LLM inference failed, falling back to knowledge pipeline")
+        return None
+
+
+def _resolve_confirmation(text: str) -> str:
+    """Return 'yes', 'no', or 'unknown' based on user reply."""
+    t = text.strip().lower()
+    if t in ("yes", "oui", "y", "o"):
+        return "yes"
+    if t in ("no", "non", "n") or t.startswith("/knowledge"):
+        return "no"
+    return "unknown"
 
 
 class TelegramAdapter:
@@ -206,6 +282,54 @@ class TelegramAdapter:
 
                 # Priority 1: active conversation state → route by command type
                 state = state_store.get(chat_id)
+                if state is not None and state.command == "infer_confirm":
+                    resolution = _resolve_confirmation(text)
+                    if resolution == "yes":
+                        state_store.clear(chat_id)
+                        inferred_type = state.collected.get("inferred_type", "")
+                        extracted = json.loads(state.collected.get("extracted", "{}"))
+                        cmd = COMMANDS.get(inferred_type)
+                        if cmd:
+                            try:
+                                result = await cmd.handler(extracted, settings)
+                                await _send_reply(msg, result)
+                            except Exception:  # noqa: BLE001
+                                logger.exception("telegram: inferred handler failed")
+                                await _send_reply(msg, "Failed to save. See server logs.")
+                        else:
+                            await _send_reply(msg, "Unknown type — saved nothing.")
+                    elif resolution == "no":
+                        state_store.clear(chat_id)
+                        original_text = state.collected.get("original_text", text)
+                        current = await _to_incoming(settings, msg)
+                        original_incoming = IncomingMessage(
+                            text=original_text,
+                            caption=None,
+                            sender=current.sender,
+                            sent_at=current.sent_at,
+                            media_type=MediaType.TEXT,
+                            media=None,
+                            source_adapter="telegram",
+                        )
+                        page_id = await handler(original_incoming)
+                        reply = f"Saved to Notion.\nTitle: {original_incoming.name[:120]}"
+                        if page_id:
+                            reply += f"\nPage id: {page_id}"
+                        await _send_reply(msg, reply)
+                    else:
+                        # Unknown reply: retry once, then fall back to knowledge
+                        retry = int(state.collected.get("retry", "0"))
+                        if retry < 1:
+                            state.collected["retry"] = str(retry + 1)
+                            state_store.set(state)
+                            await _send_reply(msg, state.collected.get("confirmation", "Reply yes or /knowledge."))
+                        else:
+                            state_store.clear(chat_id)
+                            current = await _to_incoming(settings, msg)
+                            await handler(current)
+                            await _send_reply(msg, f"Saved to Notion as a note.\nTitle: {current.name[:120]}")
+                    return
+
                 if state is not None and state.command == "setup":
                     new_state, reply = await advance_setup(state, text, settings)
                     if new_state is None:
@@ -239,13 +363,29 @@ class TelegramAdapter:
                             await _dispatch_crm(msg, cmd_name, text)
                             return
 
-                # Priority 3: knowledge pipeline (default)
+                # Priority 5: plain text → try LLM inference, else knowledge pipeline
                 incoming = await _to_incoming(settings, msg)
-                page_id = await handler(incoming)
-                reply = f"Saved to Notion.\nTitle: {incoming.name[:120]}"
-                if page_id:
-                    reply += f"\nPage id: {page_id}"
-                await _send_reply(msg, reply)
+                infer_result = await infer_and_confirm(incoming.text or "", settings)
+                if infer_result is not None:
+                    inferred_type, confirmation, extracted = infer_result
+                    state_store.set(ConvState(
+                        chat_id=chat_id,
+                        command="infer_confirm",
+                        collected={
+                            "inferred_type": inferred_type,
+                            "original_text": incoming.text or "",
+                            "extracted": json.dumps(extracted),
+                            "confirmation": confirmation,
+                            "retry": "0",
+                        },
+                    ))
+                    await _send_reply(msg, confirmation)
+                else:
+                    page_id = await handler(incoming)
+                    reply = f"Saved to Notion.\nTitle: {incoming.name[:120]}"
+                    if page_id:
+                        reply += f"\nPage id: {page_id}"
+                    await _send_reply(msg, reply)
 
             except Exception:  # noqa: BLE001
                 logger.exception("telegram: failed to forward message")
