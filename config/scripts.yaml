@@ -84,3 +84,37 @@ scripts:
         min: 0
         max: 500
         help: "Cap the number of emails processed (0 = no limit)"
+
+  - id: enrich_knowledge
+    label: Enrich Knowledge
+    description: Triage Telegram messages → structured meta-pages in 4 knowledge databases (Notions, Idées, Tools, Data & Tech)
+    path: scripts/inbox/enrich_knowledge.py
+    args: []
+    category: Inbox
+    params:
+      - id: dry_run
+        label: Dry run (preview only, no writes)
+        type: boolean
+        flag: --dry-run
+        default: true
+        help: "Preview what would be created/enriched without modifying Notion"
+      - id: limit
+        label: Max pages
+        type: number
+        flag: --limit
+        default: 5
+        min: 1
+        max: 200
+        help: "Cap the number of source pages to process (0 = no limit)"
+      - id: dedup
+        label: Dedup mode (scan all IA pages for duplicates)
+        type: boolean
+        flag: --dedup
+        default: false
+        help: "Scan all IA-authored pages in the 4 target DBs and auto-merge confirmed duplicates"
+      - id: purge
+        label: Purge old Analysed pages (> 14 days)
+        type: boolean
+        flag: --purge
+        default: false
+        help: "Archive source pages with Status=Analysed that are older than 14 days"

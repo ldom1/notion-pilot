@@ -102,3 +102,18 @@
 **Decision:** Automation panel has two views: List (default, Operations + Workflows sub-tabs) and Graph (React Flow, connectable for workflow composition). Workflows saved from Graph appear in the List Workflows tab.  
 **Rejected:** Graph-only view, or hiding workflow management in a separate page  
 **Rationale:** Most interactions are single-script runs (list view is faster). Graph is an advanced feature for composing sequential pipelines. Separating by view keeps the default UX uncluttered.
+
+### 2026-06-04 — Lead creation modal: single form, not step-by-step wizard
+**Decision:** Deal/Lead creation modal shows all fields at once. Select-type fields render as chip buttons; text/number fields as plain inputs. Single "Create lead" button.  
+**Rejected:** Step-by-step wizard (one question per screen with progress bar)  
+**Rationale:** Wizard UX felt like a quiz for a simple form. Single-screen form is standard and faster. Fields are few enough (3-5 typically) that one screen is fine.
+
+### 2026-06-04 — Workspace single-DB refresh after re-link
+**Decision:** After saving a new DB link, only the changed DB is re-fetched via `GET /api/cockpit/status/{key}`, not all 8.  
+**Rejected:** Full `loadStatus()` reload on every save  
+**Rationale:** With pagination enabled (up to 18 Notion API calls for a 1800-row DB × 8 DBs), full reload after every edit was too slow. Single-key endpoint makes re-linking snappy.
+
+### 2026-06-04 — Company auto-linking on lead creation
+**Decision:** When creating a lead, `company_name` is sent to the backend. Backend searches Companies DB by exact title, auto-detects the relation property in Deals DB pointing to Companies DB, and sets the relation silently.  
+**Rejected:** Requiring the user to manually select the company in the modal  
+**Rationale:** The company name is already on the lead card. Auto-detection of the relation property avoids hardcoding property names. Silent failure (skip, don't error) if name doesn't match exactly.

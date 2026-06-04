@@ -11,56 +11,69 @@
 
 ## Current Branch
 
-`feat/notion-pilot-cockpit` — Phase 4 complete.
+`feat/notion-pilot-cockpit` — Phase 4 + UX polish complete.
 
-## What's New (2026-06-03, iteration 2)
+## What's New (2026-06-04, UX polish)
 
-### Automation panel (React Flow)
-- `web/static/cockpit.html` — Automation section rebuilt: **List view** (default, Operations + Workflows tabs) and **Graph view** (React Flow canvas, connectable nodes, workflow composition)
-- `web/server.py` — 20 routes total; new: stop-script, deals-properties, create-deal (wizard fields), workflows CRUD, run-workflow (topological SSE)
-- `_running_procs` dict enables stop-script from cockpit
+### Cockpit layout
+- Panel order: Chat → Workspace → Automation
+- Workspace panel moved above Automation for discoverability
 
-### Chat ("Ask your data")
-- `notion_pilot/shared/llm/crm_chat.py` — NEW: `chat_crm()` with multi-turn history + intent detection (`suggest`|`create`|`info`)
-- Deal creation is now a **client-side wizard**: fetches Deals DB schema → asks Product/Type/Stage/etc. as clickable options → creates deal on confirm
-- Bug fixed: false "✓ created" badge replaced with "📋 confirm below"
-- Chat history persisted in `localStorage`; sent to LLM for context on follow-ups
+### Ask your data (ChatPanel)
+- Chat input anchored to bottom of fixed-height (280px) card via `historyRef.scrollTop` (no page scroll hijack)
+- Example prompt buttons (light violet chips) shown when chat is empty; clicking auto-sends
+- "Deal" renamed to "Lead" throughout visible UI
+- Lead creation modal rewritten: single form showing all fields at once (no step-by-step wizard)
+- On lead creation: last assistant message written as purple 🤖 callout block on Notion page
+- On lead creation: company auto-linked via relation (exact title match in Companies DB + auto-detected relation property in Deals DB)
+- Success screen shows "Open in Notion ↗" link
 
-### Config/layout
-- `web/config.py` (was `web/cfg.py`) — restored natural name
-- `web/workspaces/{workspace_id}/` (was `web/creds/`) — avoids name collision; stores `cockpit_config.json` + `workflows.json`
-- `web/models.py` — `ChatMessage`, `CreateDealRequest(extra_fields)`, workflow models
+### Workspace panel
+- Linking a DB shows per-card loading state (dim + spinner + "loading" label) while single-key refresh runs
+- After re-link, only the changed DB is re-fetched (`/api/cockpit/status/{key}`) — not all 8
+- Error footer shows "⚠ check access" when Notion API returns error
 
-### Tests
-- `tests/unit/web/test_cockpit.py` — 30 new tests; 172 total unit tests passing
+### Backend fixes
+- `filter_properties: []` removed from Notion query pagination (was causing 400 on all DBs)
+- `CreateDealRequest` gains `summary` and `company_name` fields
+- DB_DEFS: `"Deals"` label renamed to `"Leads"`
+- New endpoint: `GET /api/cockpit/status/{key}` — single-DB status refresh
 
 ## Open Decisions
 
 - Notion conversation history persistence (log chat to a Notion page) — not yet implemented
 - Notion OAuth: currently using public integration (client_id + secret from env)
+- Company linking uses exact title match — fuzzy match not implemented
 
 ## Next Steps
 
-1. End-to-end test: sign-out → OAuth → cockpit → run script → compose workflow → save → run from list
-2. Add `crm_prospect.py` to `config/scripts.yaml` once CLI args confirmed
-3. Phase 5: `data/{workspace_id}/` namespacing, LinkedIn upload endpoint, shared bot dispatcher
-4. Notion conversation history (log chat sessions to Notion — roadmap item)
-5. Phase 2: email "à relire" pipeline
+1. Fix Telegram conflict error (two getUpdates pollers running simultaneously)
+2. Improve LLM prompt to prevent fictional/unknown contacts in lead suggestions
+3. End-to-end test: sign-out → OAuth → cockpit → run script → compose workflow → save → run from list
+4. Add `crm_prospect.py` to `config/scripts.yaml` once CLI args confirmed
+5. Phase 5: `data/{workspace_id}/` namespacing, LinkedIn upload endpoint, shared bot dispatcher
+6. Notion conversation history (log chat sessions to Notion — roadmap item)
+7. Phase 2: email "à relire" pipeline
 
 ## Web module layout
 
 ```
 web/
-  config.py          ← constants, DB helpers, workflow helpers
-  server.py          ← FastAPI router (20 routes)
-  models.py          ← Pydantic models
+  config.py          ← constants, DB helpers, workflow helpers; DB_DEFS label "Leads" (was "Deals")
+  server.py          ← FastAPI router (21 routes incl. /api/cockpit/status/{key})
+  models.py          ← Pydantic models; CreateDealRequest has summary + company_name
   utils.py           ← load_scripts, extract_*_prop, notion_page_url
   oauth.py           ← Notion OAuth helpers
   workspaces/        ← gitignored, per-workspace runtime data
     {workspace_id}/
       cockpit_config.json   ← DB ID pointers + workspace_url
       workflows.json        ← user-composed automation workflows
-  static/
-    index.html        ← landing + deploy wizard
-    cockpit.html      ← cockpit UI (React Flow, chat, workspace panel)
+  static/            ← Vite build output (index.html + assets/)
+  frontend/
+    src/
+      pages/Cockpit.tsx          ← panel layout, savingDbId state
+      features/chat/ChatPanel.tsx ← Ask your data, example prompts, lead modal
+      features/workspace/WorkspacePanel.tsx ← per-card save loading state
+      features/automation/AutomationPanel.tsx ← scripts + graph view
+      styles/globals.css         ← all UI styles
 ```
