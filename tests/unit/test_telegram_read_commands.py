@@ -16,8 +16,11 @@ _BASE = dict(
 @pytest.mark.asyncio
 async def test_dispatch_read_leads():
     from notion_pilot.shared.adapters.telegram import dispatch_read
+
     s = Settings(**_BASE, notion_deals_database_id="deals-db")
-    with patch("notion_pilot.shared.adapters.telegram.get_open_leads", new_callable=AsyncMock) as mock_leads:
+    with patch(
+        "notion_pilot.shared.adapters.telegram.get_open_leads", new_callable=AsyncMock
+    ) as mock_leads:
         mock_leads.return_value = [{"title": "Big Deal", "stage": "Prospect", "next_action": ""}]
         result = await dispatch_read("leads", s)
     assert "Big Deal" in result
@@ -26,8 +29,11 @@ async def test_dispatch_read_leads():
 @pytest.mark.asyncio
 async def test_dispatch_read_inbox():
     from notion_pilot.shared.adapters.telegram import dispatch_read
+
     s = Settings(**_BASE)
-    with patch("notion_pilot.shared.adapters.telegram.get_inbox_items", new_callable=AsyncMock) as mock_inbox:
+    with patch(
+        "notion_pilot.shared.adapters.telegram.get_inbox_items", new_callable=AsyncMock
+    ) as mock_inbox:
         mock_inbox.return_value = [{"title": "RAG article"}]
         result = await dispatch_read("inbox", s)
     assert "RAG article" in result
@@ -36,11 +42,24 @@ async def test_dispatch_read_inbox():
 @pytest.mark.asyncio
 async def test_dispatch_read_recap():
     from notion_pilot.shared.adapters.telegram import dispatch_read
+
     s = Settings(**_BASE)
     with (
-        patch("notion_pilot.shared.adapters.telegram.get_open_leads", new_callable=AsyncMock, return_value=[]),
-        patch("notion_pilot.shared.adapters.telegram.get_inbox_items", new_callable=AsyncMock, return_value=[]),
-        patch("notion_pilot.shared.adapters.telegram.get_recent_people", new_callable=AsyncMock, return_value=[]),
+        patch(
+            "notion_pilot.shared.adapters.telegram.get_open_leads",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "notion_pilot.shared.adapters.telegram.get_inbox_items",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "notion_pilot.shared.adapters.telegram.get_recent_people",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
     ):
         result = await dispatch_read("recap", s)
     assert "leads" in result.lower() or "Leads" in result

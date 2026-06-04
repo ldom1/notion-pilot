@@ -314,7 +314,11 @@ class TelegramAdapter:
                         original_text = state.collected.get("original_text", text)
                         current = await _to_incoming(settings, msg)
                         _original_sent_at_str = state.collected.get("original_sent_at")
-                        _original_sent_at = _dt.datetime.fromisoformat(_original_sent_at_str) if _original_sent_at_str else current.sent_at
+                        _original_sent_at = (
+                            _dt.datetime.fromisoformat(_original_sent_at_str)
+                            if _original_sent_at_str
+                            else current.sent_at
+                        )
                         original_incoming = IncomingMessage(
                             text=original_text,
                             caption=None,
@@ -335,13 +339,19 @@ class TelegramAdapter:
                         if retry < 1:
                             state.collected["retry"] = str(retry + 1)
                             state_store.set(state)
-                            await _send_reply(msg, state.collected.get("confirmation", "Reply yes or /knowledge."))
+                            await _send_reply(
+                                msg, state.collected.get("confirmation", "Reply yes or /knowledge.")
+                            )
                         else:
                             state_store.clear(chat_id)
                             original_text = state.collected.get("original_text", text)
                             current = await _to_incoming(settings, msg)
                             _original_sent_at_str = state.collected.get("original_sent_at")
-                            _original_sent_at = _dt.datetime.fromisoformat(_original_sent_at_str) if _original_sent_at_str else current.sent_at
+                            _original_sent_at = (
+                                _dt.datetime.fromisoformat(_original_sent_at_str)
+                                if _original_sent_at_str
+                                else current.sent_at
+                            )
                             original_incoming = IncomingMessage(
                                 text=original_text,
                                 caption=None,
@@ -352,7 +362,10 @@ class TelegramAdapter:
                                 source_adapter="telegram",
                             )
                             await handler(original_incoming)
-                            await _send_reply(msg, f"Saved to Notion as a note.\nTitle: {original_incoming.name[:120]}")
+                            await _send_reply(
+                                msg,
+                                f"Saved to Notion as a note.\nTitle: {original_incoming.name[:120]}",
+                            )
                     return
 
                 if state is not None and state.command == "setup":
@@ -393,18 +406,20 @@ class TelegramAdapter:
                 infer_result = await infer_and_confirm(incoming.text or "", settings)
                 if infer_result is not None:
                     inferred_type, confirmation, extracted = infer_result
-                    state_store.set(ConvState(
-                        chat_id=chat_id,
-                        command="infer_confirm",
-                        collected={
-                            "inferred_type": inferred_type,
-                            "original_text": incoming.text or "",
-                            "extracted": json.dumps(extracted),
-                            "confirmation": confirmation,
-                            "retry": "0",
-                            "original_sent_at": incoming.sent_at.isoformat(),
-                        },
-                    ))
+                    state_store.set(
+                        ConvState(
+                            chat_id=chat_id,
+                            command="infer_confirm",
+                            collected={
+                                "inferred_type": inferred_type,
+                                "original_text": incoming.text or "",
+                                "extracted": json.dumps(extracted),
+                                "confirmation": confirmation,
+                                "retry": "0",
+                                "original_sent_at": incoming.sent_at.isoformat(),
+                            },
+                        )
+                    )
                     await _send_reply(msg, confirmation)
                 else:
                     page_id = await handler(incoming)

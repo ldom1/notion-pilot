@@ -62,11 +62,13 @@ async def get_open_leads(settings: Settings) -> list[dict]:
         stage_prop = props.get("Stage", {})
         stage = (stage_prop.get("select") or {}).get("name", "")
         next_action = _rich_text(props.get("Next action", {}))
-        results.append({
-            "title": _title(page),
-            "stage": stage,
-            "next_action": next_action,
-        })
+        results.append(
+            {
+                "title": _title(page),
+                "stage": stage,
+                "next_action": next_action,
+            }
+        )
     return results
 
 

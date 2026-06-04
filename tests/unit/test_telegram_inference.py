@@ -18,8 +18,11 @@ _BASE = dict(
 @pytest.mark.asyncio
 async def test_infer_type_people_returns_confirmation():
     from notion_pilot.shared.adapters.telegram import infer_and_confirm
+
     s = Settings(**_BASE)
-    llm_payload = json.dumps({"type": "people", "name": "Jean Dupont", "company": "Artelys", "position": "CTO"})
+    llm_payload = json.dumps(
+        {"type": "people", "name": "Jean Dupont", "company": "Artelys", "position": "CTO"}
+    )
     mock_resp = MagicMock()
     mock_resp.raise_for_status = MagicMock()
     mock_resp.json.return_value = {"choices": [{"message": {"content": llm_payload}}]}
@@ -41,6 +44,7 @@ async def test_infer_type_people_returns_confirmation():
 @pytest.mark.asyncio
 async def test_infer_type_knowledge_returns_none():
     from notion_pilot.shared.adapters.telegram import infer_and_confirm
+
     s = Settings(**_BASE)
     llm_payload = json.dumps({"type": "knowledge", "name": ""})
     mock_resp = MagicMock()
@@ -60,6 +64,7 @@ async def test_infer_type_knowledge_returns_none():
 @pytest.mark.asyncio
 async def test_infer_no_llm_key_returns_none():
     from notion_pilot.shared.adapters.telegram import infer_and_confirm
+
     s = Settings(**{**_BASE, "openrouter_api_key": None})
     result = await infer_and_confirm("Some text", s)
     assert result is None
@@ -67,6 +72,7 @@ async def test_infer_no_llm_key_returns_none():
 
 def test_handle_confirm_yes():
     from notion_pilot.shared.adapters.telegram import _resolve_confirmation
+
     assert _resolve_confirmation("yes") == "yes"
     assert _resolve_confirmation("oui") == "yes"
     assert _resolve_confirmation("YES") == "yes"
@@ -74,6 +80,7 @@ def test_handle_confirm_yes():
 
 def test_handle_confirm_no():
     from notion_pilot.shared.adapters.telegram import _resolve_confirmation
+
     assert _resolve_confirmation("no") == "no"
     assert _resolve_confirmation("non") == "no"
     assert _resolve_confirmation("/knowledge") == "no"
@@ -81,4 +88,5 @@ def test_handle_confirm_no():
 
 def test_handle_confirm_unknown():
     from notion_pilot.shared.adapters.telegram import _resolve_confirmation
+
     assert _resolve_confirmation("maybe") == "unknown"

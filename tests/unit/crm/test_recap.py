@@ -11,7 +11,9 @@ from notion_pilot.crm.recap import (
 
 
 def _make_leads(n: int) -> list[dict]:
-    return [{"title": f"Deal {i}", "stage": "Prospect", "next_action": f"Action {i}"} for i in range(n)]
+    return [
+        {"title": f"Deal {i}", "stage": "Prospect", "next_action": f"Action {i}"} for i in range(n)
+    ]
 
 
 def _make_inbox(n: int) -> list[dict]:

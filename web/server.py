@@ -970,6 +970,7 @@ def create_app(settings: Settings) -> FastAPI:
             connected = False
             bot_name = None
         from notion_pilot.shared.adapters.telegram import get_last_seen
+
         last_seen_dt = get_last_seen()
         last_seen = last_seen_dt.isoformat() if last_seen_dt else None
         return {"connected": connected, "bot_name": bot_name, "last_seen": last_seen}
