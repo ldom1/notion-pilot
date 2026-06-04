@@ -72,6 +72,8 @@ async def get_open_leads(settings: Settings) -> list[dict]:
 
 async def get_inbox_items(settings: Settings) -> list[dict]:
     """Return knowledge items with status 'Not analysed'."""
+    if not settings.notion_token:
+        return []
     token = _token(settings)
     async with httpx.AsyncClient(headers=_headers(token), timeout=30) as client:
         resp = await client.post(

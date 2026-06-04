@@ -313,11 +313,13 @@ class TelegramAdapter:
                         state_store.clear(chat_id)
                         original_text = state.collected.get("original_text", text)
                         current = await _to_incoming(settings, msg)
+                        _original_sent_at_str = state.collected.get("original_sent_at")
+                        _original_sent_at = _dt.datetime.fromisoformat(_original_sent_at_str) if _original_sent_at_str else current.sent_at
                         original_incoming = IncomingMessage(
                             text=original_text,
                             caption=None,
                             sender=current.sender,
-                            sent_at=current.sent_at,
+                            sent_at=_original_sent_at,
                             media_type=MediaType.TEXT,
                             media=None,
                             source_adapter="telegram",
@@ -338,11 +340,13 @@ class TelegramAdapter:
                             state_store.clear(chat_id)
                             original_text = state.collected.get("original_text", text)
                             current = await _to_incoming(settings, msg)
+                            _original_sent_at_str = state.collected.get("original_sent_at")
+                            _original_sent_at = _dt.datetime.fromisoformat(_original_sent_at_str) if _original_sent_at_str else current.sent_at
                             original_incoming = IncomingMessage(
                                 text=original_text,
                                 caption=None,
                                 sender=current.sender,
-                                sent_at=current.sent_at,
+                                sent_at=_original_sent_at,
                                 media_type=MediaType.TEXT,
                                 media=None,
                                 source_adapter="telegram",
@@ -384,7 +388,7 @@ class TelegramAdapter:
                             await _dispatch_crm(msg, cmd_name, text)
                             return
 
-                # Priority 5: plain text → try LLM inference, else knowledge pipeline
+                # Priority 3: plain text → try LLM inference, else knowledge pipeline
                 incoming = await _to_incoming(settings, msg)
                 infer_result = await infer_and_confirm(incoming.text or "", settings)
                 if infer_result is not None:
@@ -398,6 +402,7 @@ class TelegramAdapter:
                             "extracted": json.dumps(extracted),
                             "confirmation": confirmation,
                             "retry": "0",
+                            "original_sent_at": incoming.sent_at.isoformat(),
                         },
                     ))
                     await _send_reply(msg, confirmation)
