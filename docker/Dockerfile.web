@@ -1,0 +1,39 @@
+# Stage 1: build the frontend
+FROM node:22-slim AS node-builder
+
+WORKDIR /build
+
+# Install dependencies first for layer caching
+COPY web/frontend/package.json web/frontend/package-lock.json* ./
+RUN npm ci
+
+# Copy frontend source; vite.config outDir is '../static' so output lands at /static
+COPY web/frontend/ .
+RUN npm run build && ls /static
+
+# Stage 2: Python runtime
+FROM python:3.12-slim AS runtime
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+WORKDIR /app
+
+# Prevents hatch-vcs from failing when there is no git history in the build context
+ENV SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0
+
+# Install dependencies only first (cached layer — rebuilds only when pyproject.toml / uv.lock change)
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+
+# Copy source and install the project itself
+COPY . .
+RUN uv sync --frozen --no-dev
+
+# Overlay built frontend assets — Vite outputs to /static (outDir: '../static' from /build)
+COPY --from=node-builder /static /app/web/static
+
+EXPOSE 8080
+
+CMD ["uv", "run", "uvicorn", "web.server:app_factory", "--factory", \
+     "--host", "0.0.0.0", "--port", "8080"]

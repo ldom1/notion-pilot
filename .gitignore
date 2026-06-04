@@ -72,3 +72,9 @@ data/
 
 # --- Claude ---
 .superpowers
+# Per-workspace data (DB pointers, workflows — not committed)
+web/workspaces/
+
+# Frontend build
+web/dist/
+web/frontend/node_modules/

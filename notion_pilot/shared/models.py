@@ -119,7 +119,10 @@ class NotionDatabaseProperties(BaseModel):
         alias="Interest",
         description=(
             "Exactly one of: Low | Medium | High. "
-            "Assess based on apparent novelty, actionability, or personal relevance."
+            "High: novel insight, urgent direct question, or a concrete action required from the recipient. "
+            "Medium: useful reference, interesting but not urgent, worth reading later. "
+            "Low: routine update, newsletter, marketing, FYI, or automated notification. "
+            "Default to Medium when uncertain; only use High for genuinely time-sensitive or rare content."
         ),
     )
     status: str = "Not analysed"

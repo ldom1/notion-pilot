@@ -1,0 +1,27 @@
+services:
+
+  # ── Web server: landing page + deploy wizard + cockpit ─────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    ports:
+      - "${PORT:-8080}:8080"
+    env_file: .env
+    volumes:
+      - ./data:/app/data      # scripts write here (LinkedIn CSV, SQLite state, review CSVs)
+      - ./config:/app/config  # scripts.yaml, email-senders.yaml
+    restart: unless-stopped
+
+  # ── Telegram bot: long-polling adapter ─────────────────────────────────────
+  # Only starts when TELEGRAM_BOT_TOKEN is set in .env.
+  # Comment out this service if you only need the web wizard/cockpit.
+  bot:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bot
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+    restart: unless-stopped

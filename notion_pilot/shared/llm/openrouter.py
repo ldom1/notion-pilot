@@ -1,4 +1,4 @@
-"""Interpret Telegram payloads for Notion rows via OpenRouter chat completions."""
+"""OpenRouter chat completions — Telegram enrichment and cockpit CRM queries."""
 
 import json
 import re
@@ -62,3 +62,72 @@ async def interpret_message(
     except Exception as exc:  # pylint: disable=broad-exception-caught
         logger.warning("OpenRouter enrichment failed, using heuristics: {}", exc)
         return base
+
+
+async def suggest_leads(
+    settings: Settings, query: str, people: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Query CRM contacts to suggest leads matching a sales objective.
+
+    Returns a dict with keys ``message`` (str) and ``leads`` (list).
+    Raises ``ValueError`` if no API key is configured.
+    Raises ``httpx.HTTPStatusError`` on API errors.
+    """
+    key = settings.openrouter_api_key
+    if key is None or not key.get_secret_value().strip():
+        raise ValueError("OPENROUTER_API_KEY not configured")
+
+    people_ctx = (
+        "\n".join(
+            f"- {p['name']} | {p.get('position', '')} @ {p.get('company', '')} | id:{p['id']}"
+            for p in people[:80]
+        )
+        or "(CRM is empty or not configured)"
+    )
+
+    system_prompt = (
+        "You are a CRM assistant for Notion Pilot. "
+        "Given a sales objective and a list of CRM contacts, suggest the best leads. "
+        "For contacts already in the CRM use type 'existing' and include their id. "
+        "For new suggested leads not in the CRM use type 'new' with a reason why they fit. "
+        "Reply with ONLY a raw JSON object — no markdown, no code fences, no text outside the JSON. "
+        'Schema: {"message":"one sentence summary","leads":['
+        '{"type":"existing","name":"...","position":"...","company":"...","notion_id":"<id>"},'
+        '{"type":"new","name":"...","position":"...","company":"...","reason":"..."}'
+        "]}"
+    )
+    user_prompt = (
+        f"Sales objective: {query}\n\n"
+        f"CRM contacts:\n{people_ctx}\n\n"
+        "Prefer existing CRM contacts first; add new suggestions only when the CRM lacks good matches."
+    )
+
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(
+            f"{settings.openrouter_url}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {key.get_secret_value()}",
+                "Content-Type": "application/json",
+                **(
+                    {"HTTP-Referer": settings.openrouter_http_referer}
+                    if settings.openrouter_http_referer
+                    else {}
+                ),
+                **(
+                    {"X-Title": settings.openrouter_app_title}
+                    if settings.openrouter_app_title
+                    else {}
+                ),
+            },
+            json={
+                "model": settings.openrouter_model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            },
+        )
+        resp.raise_for_status()
+
+    raw = resp.json()["choices"][0]["message"]["content"]
+    return dict(json.loads(_strip_json_fence(raw)))
