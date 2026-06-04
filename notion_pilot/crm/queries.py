@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import httpx
 from notion_client import AsyncClient
 
@@ -24,7 +26,7 @@ def _headers(token: str) -> dict[str, str]:
     }
 
 
-def _title(page: dict) -> str:
+def _title(page: dict[str, Any]) -> str:
     for prop in page.get("properties", {}).values():
         if prop.get("type") == "title":
             parts = prop.get("title", [])
@@ -32,11 +34,11 @@ def _title(page: dict) -> str:
     return "(untitled)"
 
 
-def _rich_text(prop: dict) -> str:
+def _rich_text(prop: dict[str, Any]) -> str:
     return "".join(p.get("plain_text", "") for p in prop.get("rich_text", []))
 
 
-async def get_open_leads(settings: Settings) -> list[dict]:
+async def get_open_leads(settings: Settings) -> list[dict[str, Any]]:
     """Return open deals from the Deals DB (stage not Closed-Won/Lost)."""
     if not settings.notion_deals_database_id:
         return []
@@ -72,7 +74,7 @@ async def get_open_leads(settings: Settings) -> list[dict]:
     return results
 
 
-async def get_inbox_items(settings: Settings) -> list[dict]:
+async def get_inbox_items(settings: Settings) -> list[dict[str, Any]]:
     """Return knowledge items with status 'Not analysed'."""
     if not settings.notion_token:
         return []
@@ -90,7 +92,7 @@ async def get_inbox_items(settings: Settings) -> list[dict]:
     return [{"title": _title(page)} for page in resp.json().get("results", [])]
 
 
-async def get_recent_people(settings: Settings) -> list[dict]:
+async def get_recent_people(settings: Settings) -> list[dict[str, Any]]:
     """Return people added in the last 7 days."""
     if not settings.notion_people_data_source_id:
         return []

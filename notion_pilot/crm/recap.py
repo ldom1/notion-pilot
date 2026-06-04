@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 CAP_LEADS = 10
 CAP_INBOX = 10
 CAP_RECAP_SECTION = 5
 
 
-def _overflow(items: list[dict], cap: int, fmt: Callable[[dict], str]) -> str:
+def _overflow(items: list[dict[str, Any]], cap: int, fmt: Callable[[dict[str, Any]], str]) -> str:
     visible = items[:cap]
     overflow = len(items) - cap
     lines = [fmt(i) for i in visible]
@@ -18,27 +19,29 @@ def _overflow(items: list[dict], cap: int, fmt: Callable[[dict], str]) -> str:
     return "\n".join(lines)
 
 
-def format_leads(leads: list[dict]) -> str:
+def format_leads(leads: list[dict[str, Any]]) -> str:
     if not leads:
         return "No open leads."
     body = _overflow(leads, CAP_LEADS, lambda d: f"• {d['title']} — {d['stage']}")
     return f"*Active Leads*\n{body}"
 
 
-def format_inbox(items: list[dict]) -> str:
+def format_inbox(items: list[dict[str, Any]]) -> str:
     if not items:
         return "Nothing to review."
     body = _overflow(items, CAP_INBOX, lambda i: f"• {i['title']}")
     return f"*À relire*\n{body}"
 
 
-def format_recap(leads: list[dict], people: list[dict], inbox: list[dict]) -> str:
+def format_recap(
+    leads: list[dict[str, Any]], people: list[dict[str, Any]], inbox: list[dict[str, Any]]
+) -> str:
     sections = []
 
     # Leads
     if leads:
 
-        def _fmt_lead(d: dict) -> str:
+        def _fmt_lead(d: dict[str, Any]) -> str:
             return f"• {d['title']} — {d['stage']}"
 
         body = _overflow(leads, CAP_RECAP_SECTION, _fmt_lead)
@@ -50,7 +53,7 @@ def format_recap(leads: list[dict], people: list[dict], inbox: list[dict]) -> st
     actions = [d for d in leads if d.get("next_action")]
     if actions:
 
-        def _fmt_action(d: dict) -> str:
+        def _fmt_action(d: dict[str, Any]) -> str:
             return f"• {d['title']}: {d['next_action']}"
 
         body = _overflow(actions, CAP_RECAP_SECTION, _fmt_action)
@@ -59,7 +62,7 @@ def format_recap(leads: list[dict], people: list[dict], inbox: list[dict]) -> st
     # Recent people
     if people:
 
-        def _fmt_person(p: dict) -> str:
+        def _fmt_person(p: dict[str, Any]) -> str:
             company = p.get("company")
             if company:
                 return f"• {p['name']} @ {company}"
