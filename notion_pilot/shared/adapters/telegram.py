@@ -19,12 +19,39 @@ from telegram.ext import (
 
 from notion_pilot.crm.commands import COMMANDS, extract_fields_from_text, get_next_prompt
 from notion_pilot.crm.conv_state import ConvState, ConvStateStore
+from notion_pilot.crm.queries import get_inbox_items, get_open_leads, get_recent_people
+from notion_pilot.crm.recap import format_inbox, format_leads, format_recap
 from notion_pilot.crm.setup_wizard import advance_setup, start_setup
 from notion_pilot.shared.adapters import MessageHandler as PipelineHandler
 from notion_pilot.shared.config import Settings
 from notion_pilot.shared.media import extract_photo, extract_voice
 from notion_pilot.shared.media.transcribe_voice import transcribe_file
 from notion_pilot.shared.models import IncomingMessage, MediaType
+
+
+READ_COMMANDS: frozenset[str] = frozenset({"recap", "leads", "inbox"})
+
+
+async def dispatch_read(cmd_name: str, settings: Settings) -> str:
+    """Query Notion and return a formatted string for a read command."""
+    try:
+        if cmd_name == "leads":
+            leads = await get_open_leads(settings)
+            return format_leads(leads)
+        if cmd_name == "inbox":
+            items = await get_inbox_items(settings)
+            return format_inbox(items)
+        if cmd_name == "recap":
+            leads, items, people = await asyncio.gather(
+                get_open_leads(settings),
+                get_inbox_items(settings),
+                get_recent_people(settings),
+            )
+            return format_recap(leads=leads, people=people, inbox=items)
+    except Exception:  # noqa: BLE001
+        logger.exception("telegram: read command /{} failed", cmd_name)
+        return f"Could not fetch data for /{cmd_name}. Check server logs."
+    return "Unknown read command."
 
 
 async def _to_incoming(settings: Settings, msg: Message) -> IncomingMessage:
@@ -200,6 +227,11 @@ class TelegramAdapter:
                         if cmd_name == "setup":
                             new_state, reply = await start_setup(chat_id, settings)
                             state_store.set(new_state)
+                            await _send_reply(msg, reply)
+                            return
+
+                        if cmd_name in READ_COMMANDS:
+                            reply = await dispatch_read(cmd_name, settings)
                             await _send_reply(msg, reply)
                             return
 
