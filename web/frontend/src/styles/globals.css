@@ -64,6 +64,15 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f5f4ff; c
 .db-edit-save { background: #6e56cf; color: #fff; border: none; font-size: 0.72rem; font-weight: 600; padding: 0.3rem 0.65rem; border-radius: 4px; cursor: pointer; }
 .db-edit-cancel { background: none; border: 1px solid #e5e5e5; color: #666; font-size: 0.72rem; padding: 0.3rem 0.65rem; border-radius: 4px; cursor: pointer; }
 
+/* ── Telegram Bot card ── */
+.tg-bot-card { border: 1px solid #ece8ff; border-radius: 9px; padding: 1rem; background: #fdfcff; margin-top: 1rem; }
+.tg-bot-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.tg-bot-label { font-size: 0.82rem; font-weight: 600; color: #3d2e7c; flex: 1; }
+.tg-bot-dot { font-size: 0.7rem; }
+.tg-bot-meta { display: flex; gap: 1rem; font-size: 0.75rem; color: #9ca3af; margin-bottom: 0.5rem; }
+.tg-bot-actions { display: flex; align-items: center; gap: 0.75rem; }
+.tg-bot-ping-result { font-size: 0.75rem; color: #9ca3af; }
+
 /* ── Automation view toggle ── */
 .auto-view-toggle { display: flex; gap: 0; border: 1px solid #e5e5e5; border-radius: 6px; overflow: hidden; }
 .view-btn { background: none; border: none; color: #888; font-size: 0.74rem; font-weight: 600; padding: 0.28rem 0.85rem; cursor: pointer; border-right: 1px solid #e5e5e5; white-space: nowrap; }
