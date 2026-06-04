@@ -31,7 +31,7 @@ def test_format_leads_within_cap():
 
 def test_format_leads_overflow():
     result = format_leads(_make_leads(CAP_LEADS + 5))
-    assert f"…and 5 more" in result
+    assert "…and 5 more" in result
 
 
 def test_format_leads_empty():
