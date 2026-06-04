@@ -35,9 +35,11 @@ Target: 4 custom knowledge DBs — Notions, Ideas, Tools, Data & Technology.
 **Flow:** read source page → LLM identifies subject entity + target DB → find or create meta-page → append dated note section → write summary back → mark `Analysed`.
 **Lifecycle:** `--purge` archives `Analysed` source pages older than 14 days.
 
-- [ ] `scripts/inbox/enrich_knowledge.py` — batch triage script (dry-run, limit, JSON output)
-- [ ] Add to `config/scripts.yaml` for cockpit visibility
-- [ ] Open questions to resolve before writing: target DB title property names, properties to populate on meta-pages, multi-entity handling per message, dedup strategy
+- [x] `scripts/inbox/enrich_knowledge.py` — batch triage script (dry-run, limit, dedup, purge, JSON output)
+- [x] Add to `config/scripts.yaml` for cockpit visibility
+- [x] Correct DB IDs in `.env` (page IDs → actual DB IDs for Notions, Tools, Data & Tech)
+- [ ] E2E test with `--limit=5` (no dry-run) to validate Notion writes
+- [ ] Tune LLM granularity: crypto roundup produces 7 entities — may need a `max_entities_per_page` guard
 
 ## Phase 3 — Telegram Recap Commands
 
