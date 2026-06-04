@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 CAP_LEADS = 10
 CAP_INBOX = 10
 CAP_RECAP_SECTION = 5
 
 
-def _overflow(items: list, cap: int, fmt: callable) -> str:
+def _overflow(items: list[dict], cap: int, fmt: Callable[[dict], str]) -> str:
     visible = items[:cap]
     overflow = len(items) - cap
     lines = [fmt(i) for i in visible]
@@ -35,7 +37,11 @@ def format_recap(leads: list[dict], people: list[dict], inbox: list[dict]) -> st
 
     # Leads
     if leads:
-        body = _overflow(leads, CAP_RECAP_SECTION, lambda d: f"• {d['title']} — {d['stage']}")
+
+        def _fmt_lead(d: dict) -> str:
+            return f"• {d['title']} — {d['stage']}"
+
+        body = _overflow(leads, CAP_RECAP_SECTION, _fmt_lead)
         sections.append(f"*Active Leads*\n{body}")
     else:
         sections.append("*Active Leads*\nNone.")
@@ -43,12 +49,23 @@ def format_recap(leads: list[dict], people: list[dict], inbox: list[dict]) -> st
     # Next actions (from leads that have one)
     actions = [d for d in leads if d.get("next_action")]
     if actions:
-        body = _overflow(actions, CAP_RECAP_SECTION, lambda d: f"• {d['title']}: {d['next_action']}")
+
+        def _fmt_action(d: dict) -> str:
+            return f"• {d['title']}: {d['next_action']}"
+
+        body = _overflow(actions, CAP_RECAP_SECTION, _fmt_action)
         sections.append(f"*Next Actions*\n{body}")
 
     # Recent people
     if people:
-        body = _overflow(people, CAP_RECAP_SECTION, lambda p: f"• {p['name']} @ {p['company']}" if p.get("company") else f"• {p['name']}")
+
+        def _fmt_person(p: dict) -> str:
+            company = p.get("company")
+            if company:
+                return f"• {p['name']} @ {company}"
+            return f"• {p['name']}"
+
+        body = _overflow(people, CAP_RECAP_SECTION, _fmt_person)
         sections.append(f"*People Added*\n{body}")
 
     # À relire
