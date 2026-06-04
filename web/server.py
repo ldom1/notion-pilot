@@ -10,6 +10,7 @@ import pathlib
 import re
 import secrets
 import sys
+import time as _time
 from typing import AsyncGenerator
 
 import httpx
@@ -950,6 +951,45 @@ def create_app(settings: Settings) -> FastAPI:
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    # ── Telegram ─────────────────────────────────────────────────────────────
+
+    @app.get("/api/telegram/status")
+    async def telegram_status(request: Request) -> dict:  # type: ignore[type-arg]
+        _require_token(request)
+        if not settings.telegram_bot_token:
+            return {"connected": False, "bot_name": None, "last_seen": None}
+        token = settings.telegram_bot_token.get_secret_value()
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(f"https://api.telegram.org/bot{token}/getMe")
+            data = resp.json()
+            connected = data.get("ok", False)
+            bot_name = data.get("result", {}).get("username") if connected else None
+        except Exception:  # noqa: BLE001
+            connected = False
+            bot_name = None
+        from notion_pilot.shared.adapters.telegram import get_last_seen
+        last_seen_dt = get_last_seen()
+        last_seen = last_seen_dt.isoformat() if last_seen_dt else None
+        return {"connected": connected, "bot_name": bot_name, "last_seen": last_seen}
+
+    @app.post("/api/telegram/ping")
+    async def telegram_ping(request: Request) -> dict:  # type: ignore[type-arg]
+        _require_token(request)
+        if not settings.telegram_bot_token:
+            raise HTTPException(status_code=400, detail="Telegram bot token not configured")
+        token = settings.telegram_bot_token.get_secret_value()
+        t0 = _time.monotonic()
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(f"https://api.telegram.org/bot{token}/getMe")
+            latency_ms = int((_time.monotonic() - t0) * 1000)
+            ok = resp.json().get("ok", False)
+        except Exception:  # noqa: BLE001
+            latency_ms = int((_time.monotonic() - t0) * 1000)
+            ok = False
+        return {"ok": ok, "latency_ms": latency_ms}
 
     # ── Static files + SPA ───────────────────────────────────────────────────
 

@@ -1,6 +1,7 @@
 """Telegram source adapter — long-polling via python-telegram-bot async API."""
 
 import asyncio
+import datetime as _dt
 import json
 import tempfile
 from datetime import timezone
@@ -30,6 +31,14 @@ from notion_pilot.shared.config import Settings
 from notion_pilot.shared.media import extract_photo, extract_voice
 from notion_pilot.shared.media.transcribe_voice import transcribe_file
 from notion_pilot.shared.models import IncomingMessage, MediaType
+
+
+_last_seen: _dt.datetime | None = None
+
+
+def get_last_seen() -> _dt.datetime | None:
+    """Return the timestamp of the last successfully handled Telegram message."""
+    return _last_seen
 
 
 READ_COMMANDS: frozenset[str] = frozenset({"recap", "leads", "inbox"})
@@ -274,6 +283,8 @@ class TelegramAdapter:
             chat_id = msg.chat_id
 
             try:
+                global _last_seen
+                _last_seen = _dt.datetime.now(_dt.timezone.utc)
                 logger.info(
                     "telegram: incoming chat_id={} from_user={}",
                     chat_id,
