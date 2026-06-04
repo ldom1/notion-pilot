@@ -325,9 +325,19 @@ class TelegramAdapter:
                             await _send_reply(msg, state.collected.get("confirmation", "Reply yes or /knowledge."))
                         else:
                             state_store.clear(chat_id)
+                            original_text = state.collected.get("original_text", text)
                             current = await _to_incoming(settings, msg)
-                            await handler(current)
-                            await _send_reply(msg, f"Saved to Notion as a note.\nTitle: {current.name[:120]}")
+                            original_incoming = IncomingMessage(
+                                text=original_text,
+                                caption=None,
+                                sender=current.sender,
+                                sent_at=current.sent_at,
+                                media_type=MediaType.TEXT,
+                                media=None,
+                                source_adapter="telegram",
+                            )
+                            await handler(original_incoming)
+                            await _send_reply(msg, f"Saved to Notion as a note.\nTitle: {original_incoming.name[:120]}")
                     return
 
                 if state is not None and state.command == "setup":
