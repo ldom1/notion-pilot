@@ -33,6 +33,20 @@ async def exchange_code_for_token(
     redirect_uri: str,
 ) -> str:
     """Exchange an OAuth code for a Notion access token. Returns the access_token string."""
+    data = await exchange_code_for_token_full(
+        code=code, client_id=client_id, client_secret=client_secret, redirect_uri=redirect_uri
+    )
+    return str(data["access_token"])
+
+
+async def exchange_code_for_token_full(
+    *,
+    code: str,
+    client_id: str,
+    client_secret: str,
+    redirect_uri: str,
+) -> dict:
+    """Exchange an OAuth code for a Notion access token. Returns the full response dict."""
     credentials = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
     async with httpx.AsyncClient() as client:
         r = await client.post(
@@ -48,4 +62,4 @@ async def exchange_code_for_token(
             },
         )
         r.raise_for_status()
-        return str(r.json()["access_token"])
+        return dict(r.json())

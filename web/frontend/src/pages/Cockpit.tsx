@@ -1,0 +1,154 @@
+import React, { useEffect, useState, useCallback } from "react";
+
+import Header from "../components/Header";
+import AutomationPanel from "../features/automation/AutomationPanel";
+import { ChatPanel } from "../features/chat/ChatPanel";
+import { WorkspacePanel, DatabaseEntry } from "../features/workspace/WorkspacePanel";
+
+import { fetchStatus, fetchSingleDbStatus, saveCockpitConfig, CockpitStatus, DatabaseStatus } from "../api/client";
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+function toDbEntry(ds: DatabaseStatus): DatabaseEntry {
+  return {
+    count: ds.count,
+    label: ds.label,
+    icon: ds.icon,
+    category: ds.category,
+    db_id: ds.db_id,
+    notion_name: ds.notion_name,
+    error: ds.error,
+  };
+}
+
+function toDatabasesMap(
+  statuses: DatabaseStatus[],
+): Record<string, DatabaseEntry> {
+  return Object.fromEntries(statuses.map((ds) => [ds.key, toDbEntry(ds)]));
+}
+
+// ── Cockpit page ──────────────────────────────────────────────────────────────
+
+const Cockpit: React.FC = () => {
+  const [status, setStatus] = useState<CockpitStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // WorkspacePanel editing state
+  const [editingDbId, setEditingDbId] = useState<string | null>(null);
+  const [savingDbId, setSavingDbId] = useState<string | null>(null);
+
+  const loadStatus = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchStatus();
+      setStatus(data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // 401 → redirect to Notion OAuth
+      if (msg.includes("401") || msg.toLowerCase().includes("unauthorized")) {
+        window.location.href = `/auth/notion?next=/cockpit`;
+        return;
+      }
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStatus();
+  }, [loadStatus]);
+
+  // ── WorkspacePanel handlers ─────────────────────────────────────────────────
+
+  function handleEditDb(key: string) {
+    setEditingDbId(key);
+  }
+
+  function handleCancelEdit() {
+    setEditingDbId(null);
+  }
+
+  async function handleSaveDb(key: string, newId: string) {
+    if (!status) return;
+    const updatedDbs: Record<string, string> = {};
+    for (const ds of status.databases) {
+      updatedDbs[ds.key] = ds.key === key ? newId : (ds.db_id ?? "");
+    }
+    await saveCockpitConfig({ databases: updatedDbs });
+    setEditingDbId(null);
+    setSavingDbId(key);
+    try {
+      const updated = await fetchSingleDbStatus(key);
+      setStatus((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          databases: prev.databases.map((ds) =>
+            ds.key === key ? { ...ds, ...updated } : ds
+          ),
+        };
+      });
+    } catch {
+      await loadStatus();
+    } finally {
+      setSavingDbId(null);
+    }
+  }
+
+  // ── render ──────────────────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <>
+        <Header workspaceName="" userName="" notionUrl="" />
+        <div className="main" style={{ alignItems: 'center', padding: '4rem 0' }}>
+          <div className="log-spinner" style={{ width: 32, height: 32, borderWidth: 3 }} />
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <Header workspaceName="" userName="" notionUrl="" />
+        <div className="main">
+          <p style={{ color: '#dc2626', padding: '2rem 0', fontSize: '0.88rem' }}>{error}</p>
+        </div>
+      </>
+    );
+  }
+
+  const workspaceName = status?.workspace_name ?? "";
+  const userName = status?.user_name ?? "";
+  const notionUrl = status?.workspace_url ?? "";
+  const databases = status ? toDatabasesMap(status.databases) : {};
+
+  return (
+    <>
+      <Header
+        workspaceName={workspaceName}
+        userName={userName}
+        notionUrl={notionUrl}
+      />
+      <div className="main">
+        <ChatPanel />
+        <WorkspacePanel
+          databases={databases}
+          onRefresh={loadStatus}
+          editingDbId={editingDbId}
+          savingDbId={savingDbId}
+          onEditDb={handleEditDb}
+          onSaveDb={handleSaveDb}
+          onCancelEdit={handleCancelEdit}
+        />
+        <AutomationPanel />
+      </div>
+    </>
+  );
+};
+
+export default Cockpit;

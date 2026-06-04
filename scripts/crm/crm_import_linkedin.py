@@ -22,7 +22,7 @@ from notion_pilot.shared.config import load_settings
 from notion_pilot.shared.utils.dedup import DedupStatus, find_match
 from notion_pilot.shared.utils.enrichment import enrich_person
 
-_DEFAULT_CSV = Path("data/crm/Basic_LinkedInDataExport_05-20-2026.zip/Connections.csv")
+_DEFAULT_CSV = Path("data/crm/linkedin/Connections.csv")
 _REVIEW_CSV = Path("data/crm/import-review.csv")
 _SKIPED_CSV = Path("data/crm/import-skiped.csv")
 
