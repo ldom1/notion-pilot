@@ -935,20 +935,69 @@ def create_app(settings: Settings) -> FastAPI:
     async def cockpit_create_lead(req: CreateLeadRequest, request: Request) -> dict:
         token = _require_token(request)
         wid = _workspace_id(request)
-        people_db_id = resolve_db_ids(settings, wid).get("notion_people_data_source_id")
+        db_ids = resolve_db_ids(settings, wid)
+        people_db_id = db_ids.get("notion_people_data_source_id")
+        deals_db_id = db_ids.get("notion_deals_database_id")
+        companies_db_id = db_ids.get("notion_companies_data_source_id")
         if not people_db_id:
             raise HTTPException(status_code=400, detail="People database not configured")
-        props: dict = {"Nom": {"title": [{"text": {"content": req.name}}]}}
+
+        person_props: dict = {"Nom": {"title": [{"text": {"content": req.name}}]}}
         if req.position:
-            props["Position"] = {"rich_text": [{"text": {"content": req.position}}]}
+            person_props["Position"] = {"rich_text": [{"text": {"content": req.position}}]}
+        if req.company and companies_db_id:
+            # Link company relation on the People page too
+            cq_people = None  # resolved below
+
         async with httpx.AsyncClient(headers=notion_headers(token), timeout=20) as client:
+            # 1. Create the People page
             r = await client.post(
                 f"{NOTION_API}/pages",
-                json={"parent": {"database_id": people_db_id}, "properties": props},
+                json={"parent": {"database_id": people_db_id}, "properties": person_props},
             )
             r.raise_for_status()
-            page_id = r.json()["id"]
-        return {"page_id": page_id, "url": notion_page_url(page_id)}
+            person_page_id = r.json()["id"]
+
+            if not deals_db_id:
+                return {"page_id": person_page_id, "url": notion_page_url(person_page_id)}
+
+            # 2. Optionally resolve company
+            company_id: str | None = None
+            company_prop_key: str | None = None
+            if req.company and companies_db_id:
+                cq = await client.post(
+                    f"{NOTION_API}/databases/{companies_db_id}/query",
+                    json={"filter": {"property": "title", "title": {"equals": req.company}}, "page_size": 1},
+                )
+                if cq.is_success and cq.json().get("results"):
+                    company_id = cq.json()["results"][0]["id"]
+                    db_schema = await client.get(f"{NOTION_API}/databases/{deals_db_id}")
+                    if db_schema.is_success:
+                        for prop_name, prop in db_schema.json().get("properties", {}).items():
+                            if prop.get("type") == "relation" and prop.get("relation", {}).get(
+                                "database_id", ""
+                            ).replace("-", "") == companies_db_id.replace("-", ""):
+                                company_prop_key = prop_name
+                                break
+
+            # 3. Create Deal linking the new person + company
+            deal_props: dict = {
+                "Name": {"title": [{"text": {"content": f"Lead: {req.name}"}}]},
+                "Stage": {"select": {"name": "Prospect"}},
+                "Contacts": {"relation": [{"id": person_page_id}]},
+            }
+            if company_id and company_prop_key:
+                deal_props[company_prop_key] = {"relation": [{"id": company_id}]}
+
+            d_r = await client.post(
+                f"{NOTION_API}/pages",
+                json={"parent": {"database_id": deals_db_id}, "properties": deal_props},
+            )
+            if d_r.is_success:
+                deal_page_id = d_r.json()["id"]
+                return {"page_id": deal_page_id, "url": notion_page_url(deal_page_id)}
+
+        return {"page_id": person_page_id, "url": notion_page_url(person_page_id)}
 
     # ── Workflows ─────────────────────────────────────────────────────────────
 

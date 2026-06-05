@@ -20,10 +20,11 @@ def _overflow(items: list[dict[str, Any]], cap: int, fmt: Callable[[dict[str, An
 
 
 def _fmt_lead(d: dict[str, Any]) -> str:
-    title = d["title"]
+    person = d.get("person_name", "")
     stage = d.get("stage") or "—"
     url = d.get("url")
-    label = f"[{title}]({url})" if url else title
+    name = person or d["title"]
+    label = f"[{name}]({url})" if url else name
     return f"• {label} — {stage}"
 
 
