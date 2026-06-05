@@ -66,6 +66,109 @@ from web.utils import (
 )
 
 
+def _oauth_error_page() -> str:
+    return """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Access denied — Notion Pilot</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f4ff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    nav {
+      display: flex;
+      align-items: center;
+      padding: 0 2rem;
+      height: 54px;
+      background: #fff;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .logo {
+      font-size: 1rem;
+      font-weight: 800;
+      color: #6e56cf;
+      letter-spacing: -0.3px;
+    }
+    main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 1.5rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid #e8e8e8;
+      padding: 3rem 2.5rem;
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.25rem;
+    }
+    .icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      background: #f5f4ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.75rem;
+    }
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #1a1a1a;
+    }
+    p {
+      font-size: 0.9rem;
+      color: #666;
+      line-height: 1.6;
+      max-width: 320px;
+    }
+    a.btn {
+      display: inline-block;
+      margin-top: 0.5rem;
+      padding: 0.65rem 1.5rem;
+      background: #6e56cf;
+      color: #fff;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    a.btn:hover { background: #5a45b0; }
+  </style>
+</head>
+<body>
+  <nav><span class="logo">Notion Pilot</span></nav>
+  <main>
+    <div class="card">
+      <div class="icon">🔒</div>
+      <h1>Access denied</h1>
+      <p>
+        The Notion authorisation was cancelled or the connection was rejected.
+        You can try again from the home page.
+      </p>
+      <a class="btn" href="/">Back to home</a>
+    </div>
+  </main>
+</body>
+</html>"""
+
+
 def create_app(settings: Settings) -> FastAPI:
     app = FastAPI(title="Notion Pilot", docs_url=None, redoc_url=None)
 
@@ -130,7 +233,16 @@ def create_app(settings: Settings) -> FastAPI:
         return RedirectResponse(url)
 
     @app.get("/auth/notion/callback")
-    async def auth_notion_callback(request: Request, code: str, state: str) -> RedirectResponse:
+    async def auth_notion_callback(
+        request: Request,
+        code: str | None = None,
+        state: str | None = None,
+        error: str | None = None,
+    ) -> RedirectResponse | HTMLResponse:
+        if error or not code or not state:
+            request.session.pop("oauth_state", None)
+            request.session.pop("oauth_next", None)
+            return HTMLResponse(_oauth_error_page(), status_code=200)
         if not settings.notion_oauth_client_id or not settings.notion_oauth_client_secret:
             raise HTTPException(status_code=500, detail="OAuth not configured")
         if request.session.get("oauth_state") != state:
