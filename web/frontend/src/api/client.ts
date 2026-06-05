@@ -430,3 +430,13 @@ export async function saveCockpitConfig(
 ): Promise<void> {
   await _json<{ ok: boolean }>("POST", "/api/cockpit/config", req);
 }
+
+/** POST /api/setup/stream — SSE stream for workspace deployment */
+export interface SetupRequest {
+  scope: "crm" | "inbox" | "both";
+  workspace_name: string;
+}
+
+export function runSetup(req: SetupRequest): AsyncGenerator<SSEEvent> {
+  return _sse("POST", "/api/setup/stream", req);
+}

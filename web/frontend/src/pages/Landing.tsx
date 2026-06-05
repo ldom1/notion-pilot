@@ -1,29 +1,218 @@
 import React, { useEffect, useState } from "react";
-import { fetchStatus } from "../api/client";
+import { fetchStatus, runSetup } from "../api/client";
+import type { SSEEvent } from "../api/client";
 import { Spinner } from "../components/Spinner";
 
-type CheckState = "idle" | "checking" | "authenticated" | "unauthenticated";
+type CheckState = "idle" | "checking" | "authenticated" | "unauthenticated" | "setup";
+type DeployState = "idle" | "deploying" | "done" | "error";
+
+// ── Setup Wizard ──────────────────────────────────────────────────────────────
+
+function SetupWizard(): React.ReactElement {
+  const [workspaceName, setWorkspaceName] = useState("My Notion Workspace");
+  const [scope, setScope] = useState<"crm" | "inbox" | "both">("crm");
+  const [deployState, setDeployState] = useState<DeployState>("idle");
+  const [logs, setLogs] = useState<string[]>([]);
+  const [notionUrl, setNotionUrl] = useState<string | null>(null);
+
+  async function handleDeploy(): Promise<void> {
+    if (!workspaceName.trim() || deployState === "deploying") return;
+    setDeployState("deploying");
+    setLogs([]);
+    try {
+      const stream = runSetup({ scope, workspace_name: workspaceName.trim() });
+      for await (const event of stream as AsyncIterable<SSEEvent>) {
+        if (event.type === "log") {
+          setLogs((prev) => [...prev, String(event.message ?? "")]);
+        } else if (event.type === "done") {
+          setNotionUrl(event.url ?? null);
+          setDeployState("done");
+        } else if (event.type === "error") {
+          setLogs((prev) => [...prev, `✗ ${String(event.message ?? "Unknown error")}`]);
+          setDeployState("error");
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setLogs((prev) => [...prev, `✗ ${msg}`]);
+      setDeployState("error");
+    }
+  }
+
+  if (deployState === "done") {
+    return (
+      <div style={wizardStyles.card}>
+        <div style={wizardStyles.successIcon}>✓</div>
+        <h2 style={wizardStyles.title}>Workspace ready!</h2>
+        <p style={wizardStyles.sub}>Your Notion databases have been created.</p>
+        <div style={wizardStyles.actions}>
+          {notionUrl && (
+            <a
+              className="btn-primary"
+              href={notionUrl}
+              target="_blank"
+              rel="noreferrer"
+              style={{ textDecoration: "none" }}
+            >
+              Open in Notion ↗
+            </a>
+          )}
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => { window.location.href = "/cockpit"; }}
+          >
+            Go to Cockpit →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={wizardStyles.card}>
+      <h2 style={wizardStyles.title}>Set up your workspace</h2>
+      <p style={wizardStyles.sub}>
+        We'll create the Notion databases for you. Takes about 10 seconds.
+      </p>
+
+      <div style={wizardStyles.field}>
+        <label style={wizardStyles.label}>Workspace name</label>
+        <input
+          className="modal-param-input"
+          style={{ width: "100%", boxSizing: "border-box" }}
+          value={workspaceName}
+          onChange={(e) => setWorkspaceName(e.target.value)}
+          disabled={deployState === "deploying"}
+          placeholder="My Notion Workspace"
+        />
+      </div>
+
+      <div style={wizardStyles.field}>
+        <label style={wizardStyles.label}>What do you need?</label>
+        <div style={wizardStyles.scopeRow}>
+          {(["crm", "inbox", "both"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`deal-wizard-opt${scope === s ? " selected" : ""}`}
+              onClick={() => setScope(s)}
+              disabled={deployState === "deploying"}
+              style={{ flex: 1 }}
+            >
+              {s === "crm" ? "CRM" : s === "inbox" ? "Knowledge inbox" : "Both"}
+            </button>
+          ))}
+        </div>
+        <div style={wizardStyles.scopeDesc}>
+          {scope === "crm" && "People, Companies, Leads — full CRM with demo data"}
+          {scope === "inbox" && "Notions, Ideas, Tools, Data & Tech databases"}
+          {scope === "both" && "CRM + Knowledge inbox — the full Notion Pilot suite"}
+        </div>
+      </div>
+
+      {(deployState === "deploying" || deployState === "error") && logs.length > 0 && (
+        <div style={wizardStyles.logBox}>
+          {logs.map((l, i) => <div key={i} style={wizardStyles.logLine}>{l}</div>)}
+          {deployState === "deploying" && <div style={wizardStyles.logLine}>…</div>}
+        </div>
+      )}
+
+      <div style={wizardStyles.actions}>
+        <button
+          type="button"
+          className="modal-cancel-btn"
+          onClick={() => { window.location.href = "/cockpit"; }}
+          disabled={deployState === "deploying"}
+        >
+          Skip, go to cockpit
+        </button>
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => void handleDeploy()}
+          disabled={deployState === "deploying" || !workspaceName.trim()}
+        >
+          {deployState === "deploying" ? "Creating…" : deployState === "error" ? "Retry" : "Deploy"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const wizardStyles: Record<string, React.CSSProperties> = {
+  card: {
+    background: "#fff",
+    borderRadius: "12px",
+    border: "1px solid #e8e8e8",
+    padding: "2rem",
+    maxWidth: "480px",
+    width: "100%",
+    display: "flex",
+    flexDirection: "column",
+    gap: "1.25rem",
+  },
+  title: { fontSize: "1.4rem", fontWeight: 800, color: "#1a1a1a", margin: 0 },
+  sub: { fontSize: "0.9rem", color: "#666", margin: 0, lineHeight: 1.5 },
+  field: { display: "flex", flexDirection: "column", gap: "0.5rem" },
+  label: { fontSize: "0.85rem", fontWeight: 600, color: "#444" },
+  scopeRow: { display: "flex", gap: "0.5rem" },
+  scopeDesc: { fontSize: "0.8rem", color: "#888", minHeight: "1.2em" },
+  logBox: {
+    background: "#f7f7f7",
+    borderRadius: "6px",
+    padding: "0.75rem",
+    fontSize: "0.78rem",
+    fontFamily: "monospace",
+    maxHeight: "160px",
+    overflowY: "auto",
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.2rem",
+  },
+  logLine: { color: "#333" },
+  actions: { display: "flex", gap: "0.75rem", justifyContent: "flex-end", marginTop: "0.25rem" },
+  successIcon: { fontSize: "2.5rem", textAlign: "center" },
+};
+
+// ── Landing page ──────────────────────────────────────────────────────────────
 
 export default function Landing() {
   const [checkState, setCheckState] = useState<CheckState>("idle");
+  const isSetup = new URLSearchParams(window.location.search).get("connected") === "1";
 
   useEffect(() => {
     setCheckState("checking");
     fetchStatus()
       .then(() => {
-        setCheckState("authenticated");
-        window.location.href = "/cockpit";
+        // Authenticated — show setup wizard if coming from OAuth, else go straight to cockpit
+        setCheckState(isSetup ? "setup" : "authenticated");
+        if (!isSetup) window.location.href = "/cockpit";
       })
       .catch(() => {
         setCheckState("unauthenticated");
       });
-  }, []);
+  }, [isSetup]);
 
   if (checkState === "idle" || checkState === "checking" || checkState === "authenticated") {
     return <Spinner fullPage />;
   }
 
-  const startDeploy = () => { window.location.href = "/auth/notion?next=/cockpit"; };
+  if (checkState === "setup") {
+    return (
+      <div style={styles.page}>
+        <nav style={styles.nav}>
+          <span className="hdr-logo">Notion Pilot</span>
+          <a href="/auth/logout" style={{ fontSize: "0.85rem", color: "#888" }}>Sign out</a>
+        </nav>
+        <main style={{ ...styles.hero, alignItems: "flex-start", paddingTop: "3rem" }}>
+          <div style={{ maxWidth: "480px", width: "100%", margin: "0 auto" }}>
+            <SetupWizard />
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   // unauthenticated — show landing hero
   return (
@@ -33,7 +222,7 @@ export default function Landing() {
           <span className="hdr-logo">Notion Pilot</span>
         </div>
         <div style={styles.navRight}>
-          <button className="nav-deploy" onClick={startDeploy}>
+          <button className="nav-deploy" onClick={() => { window.location.href = "/auth/notion"; }}>
             Deploy to Notion
           </button>
           <a className="nav-login" href="/auth/notion?next=/cockpit">
@@ -52,9 +241,7 @@ export default function Landing() {
           <button
             className="btn-primary"
             style={styles.cta}
-            onClick={() => {
-              window.location.href = "/auth/notion?next=/cockpit";
-            }}
+            onClick={() => { window.location.href = "/auth/notion"; }}
           >
             Deploy your workspace
           </button>
