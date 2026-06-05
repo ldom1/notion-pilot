@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 
 import Header from "../components/Header";
+import { Spinner } from "../components/Spinner";
 import AutomationPanel from "../features/automation/AutomationPanel";
 import { ChatPanel } from "../features/chat/ChatPanel";
 import { WorkspacePanel, DatabaseEntry } from "../features/workspace/WorkspacePanel";
@@ -12,6 +13,7 @@ import { fetchStatus, fetchSingleDbStatus, saveCockpitConfig, CockpitStatus, Dat
 function toDbEntry(ds: DatabaseStatus): DatabaseEntry {
   return {
     count: ds.count,
+    has_more: ds.has_more,
     label: ds.label,
     icon: ds.icon,
     category: ds.category,
@@ -31,34 +33,35 @@ function toDatabasesMap(
 
 const Cockpit: React.FC = () => {
   const [status, setStatus] = useState<CockpitStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);   // initial mount only
+  const [refreshing, setRefreshing] = useState(false); // user-triggered refresh
   const [error, setError] = useState<string | null>(null);
 
   // WorkspacePanel editing state
   const [editingDbId, setEditingDbId] = useState<string | null>(null);
   const [savingDbId, setSavingDbId] = useState<string | null>(null);
 
-  const loadStatus = useCallback(async () => {
+  const loadStatus = useCallback(async (opts?: { initial?: boolean }) => {
+    const isInitial = opts?.initial ?? false;
+    if (isInitial) setLoading(true); else setRefreshing(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
       const data = await fetchStatus();
       setStatus(data);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      // 401 → redirect to Notion OAuth
       if (msg.includes("401") || msg.toLowerCase().includes("unauthorized")) {
         window.location.href = `/auth/notion?next=/cockpit`;
         return;
       }
       setError(msg);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false); else setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    loadStatus();
+    loadStatus({ initial: true });
   }, [loadStatus]);
 
   // ── WorkspacePanel handlers ─────────────────────────────────────────────────
@@ -101,14 +104,7 @@ const Cockpit: React.FC = () => {
   // ── render ──────────────────────────────────────────────────────────────────
 
   if (loading) {
-    return (
-      <>
-        <Header workspaceName="" userName="" notionUrl="" />
-        <div className="main" style={{ alignItems: 'center', padding: '4rem 0' }}>
-          <div className="log-spinner" style={{ width: 32, height: 32, borderWidth: 3 }} />
-        </div>
-      </>
-    );
+    return <Spinner fullPage />;
   }
 
   if (error) {
@@ -138,7 +134,8 @@ const Cockpit: React.FC = () => {
         <ChatPanel />
         <WorkspacePanel
           databases={databases}
-          onRefresh={loadStatus}
+          onRefresh={() => { void loadStatus(); }}
+          isRefreshing={refreshing}
           editingDbId={editingDbId}
           savingDbId={savingDbId}
           onEditDb={handleEditDb}

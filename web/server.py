@@ -240,39 +240,36 @@ def create_app(settings: Settings) -> FastAPI:
         db_ids = resolve_db_ids(settings, wid)
         hdrs = notion_headers(token)
 
-        async def _count_db(db_id: str | None) -> dict:
+        async def _count_db(client: httpx.AsyncClient, db_id: str | None) -> dict:  # type: ignore[type-arg]
             if not db_id:
                 return {"count": None, "configured": False, "notion_name": None}
             try:
-                async with httpx.AsyncClient(headers=hdrs, timeout=30) as client:
-                    db_r = await client.get(f"{NOTION_API}/databases/{db_id}")
-                    db_r.raise_for_status()
-                    title_parts = db_r.json().get("title", [])
-                    notion_name = "".join(t.get("plain_text", "") for t in title_parts) or None
-                    # paginate to get real count
-                    total, cursor = 0, None
-                    while True:
-                        body: dict = {"page_size": 100}
-                        if cursor:
-                            body["start_cursor"] = cursor
-                        q_r = await client.post(f"{NOTION_API}/databases/{db_id}/query", json=body)
-                        q_r.raise_for_status()
-                        data = q_r.json()
-                        total += len(data.get("results", []))
-                        if not data.get("has_more"):
-                            break
-                        cursor = data.get("next_cursor")
-                    return {
-                        "count": total,
-                        "has_more": False,
-                        "configured": True,
-                        "notion_name": notion_name,
-                    }
+                db_r = await client.get(f"{NOTION_API}/databases/{db_id}")
+                db_r.raise_for_status()
+                title_parts = db_r.json().get("title", [])
+                notion_name = "".join(t.get("plain_text", "") for t in title_parts) or None
+                # Single page query — no pagination; shows count up to 100, then "100+"
+                q_r = await client.post(
+                    f"{NOTION_API}/databases/{db_id}/query", json={"page_size": 100}
+                )
+                q_r.raise_for_status()
+                data = q_r.json()
+                count = len(data.get("results", []))
+                has_more = bool(data.get("has_more"))
+                return {
+                    "count": count,
+                    "has_more": has_more,
+                    "configured": True,
+                    "notion_name": notion_name,
+                }
             except Exception as exc:
                 logger.warning("status query failed for {}: {}", db_id, exc)
                 return {"count": None, "configured": True, "error": str(exc), "notion_name": None}
 
-        results = await asyncio.gather(*[_count_db(db_ids.get(d["key"])) for d in DB_DEFS])
+        async with httpx.AsyncClient(headers=hdrs, timeout=15) as client:
+            results = await asyncio.gather(
+                *[_count_db(client, db_ids.get(d["key"])) for d in DB_DEFS]
+            )
         return {
             "databases": [
                 {**d, "db_id": db_ids.get(d["key"]), **results[i]} for i, d in enumerate(DB_DEFS)
@@ -296,27 +293,23 @@ def create_app(settings: Settings) -> FastAPI:
         if not db_id:
             return {**defn, "db_id": None, "count": None, "configured": False, "notion_name": None}
         try:
-            async with httpx.AsyncClient(headers=hdrs, timeout=30) as client:
+            async with httpx.AsyncClient(headers=hdrs, timeout=15) as client:
                 db_r = await client.get(f"{NOTION_API}/databases/{db_id}")
                 db_r.raise_for_status()
                 title_parts = db_r.json().get("title", [])
                 notion_name = "".join(t.get("plain_text", "") for t in title_parts) or None
-                total, cursor = 0, None
-                while True:
-                    body: dict = {"page_size": 100}
-                    if cursor:
-                        body["start_cursor"] = cursor
-                    q_r = await client.post(f"{NOTION_API}/databases/{db_id}/query", json=body)
-                    q_r.raise_for_status()
-                    data = q_r.json()
-                    total += len(data.get("results", []))
-                    if not data.get("has_more"):
-                        break
-                    cursor = data.get("next_cursor")
+                q_r = await client.post(
+                    f"{NOTION_API}/databases/{db_id}/query", json={"page_size": 100}
+                )
+                q_r.raise_for_status()
+                data = q_r.json()
+                count = len(data.get("results", []))
+                has_more = bool(data.get("has_more"))
             return {
                 **defn,
                 "db_id": db_id,
-                "count": total,
+                "count": count,
+                "has_more": has_more,
                 "configured": True,
                 "notion_name": notion_name,
             }
