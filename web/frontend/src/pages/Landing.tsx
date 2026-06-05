@@ -43,7 +43,6 @@ export default function Landing() {
       <nav style={styles.nav}>
         <div style={styles.navLeft}>
           <span className="hdr-logo">Notion Pilot</span>
-          <span className="hdr-badge">BETA</span>
         </div>
         <div style={styles.navRight}>
           <button className="nav-deploy" onClick={startDeploy}>
