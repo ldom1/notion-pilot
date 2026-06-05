@@ -981,7 +981,7 @@ async def create_inbox_workspace(
             "Name": {"title": {}},
             "URL": {"url": {}},
             "Description": {"rich_text": {}},
-            "Tags": {"multi_select": {}},
+            "Tags": {"multi_select": {"options": []}},
             "Source": {
                 "select": {
                     "options": [
@@ -1022,7 +1022,7 @@ async def create_inbox_workspace(
         {
             "Name": {"title": {}},
             "Description": {"rich_text": {}},
-            "Tags": {"multi_select": {}},
+            "Tags": {"multi_select": {"options": []}},
             "Priority": {
                 "select": {
                     "options": [
@@ -1053,7 +1053,7 @@ async def create_inbox_workspace(
             "Name": {"title": {}},
             "URL": {"url": {}},
             "Description": {"rich_text": {}},
-            "Tags": {"multi_select": {}},
+            "Tags": {"multi_select": {"options": []}},
             "Pricing": {
                 "select": {
                     "options": [
@@ -1073,7 +1073,7 @@ async def create_inbox_workspace(
                 }
             },
         },
-        "🛠️",
+        "🔧",
     )
 
     data_tech_id = await _create_db(
@@ -1084,7 +1084,7 @@ async def create_inbox_workspace(
             "Name": {"title": {}},
             "URL": {"url": {}},
             "Description": {"rich_text": {}},
-            "Tags": {"multi_select": {}},
+            "Tags": {"multi_select": {"options": []}},
             "Domain": {
                 "select": {
                     "options": [

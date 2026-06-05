@@ -38,7 +38,7 @@ DB_DEFS: list[dict] = [
     },
     {"key": "notion_notions_database_id", "label": "Notions", "icon": "💡", "category": "inbox"},
     {"key": "notion_ideas_database_id", "label": "Ideas", "icon": "🧠", "category": "inbox"},
-    {"key": "notion_tools_database_id", "label": "Tools", "icon": "🛠️", "category": "inbox"},
+    {"key": "notion_tools_database_id", "label": "Tools", "icon": "🔧", "category": "inbox"},
     {
         "key": "notion_data_tech_database_id",
         "label": "Data & Tech",
