@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 
 import Header from "../components/Header";
+import { Spinner } from "../components/Spinner";
 import AutomationPanel from "../features/automation/AutomationPanel";
 import { ChatPanel } from "../features/chat/ChatPanel";
 import { WorkspacePanel, DatabaseEntry } from "../features/workspace/WorkspacePanel";
@@ -101,14 +102,7 @@ const Cockpit: React.FC = () => {
   // ── render ──────────────────────────────────────────────────────────────────
 
   if (loading) {
-    return (
-      <>
-        <Header workspaceName="" userName="" notionUrl="" />
-        <div className="main" style={{ alignItems: 'center', padding: '4rem 0' }}>
-          <div className="log-spinner" style={{ width: 32, height: 32, borderWidth: 3 }} />
-        </div>
-      </>
-    );
+    return <Spinner fullPage />;
   }
 
   if (error) {

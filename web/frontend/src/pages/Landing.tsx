@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { fetchStatus } from "../api/client";
+import { Spinner } from "../components/Spinner";
 
 type CheckState = "idle" | "checking" | "authenticated" | "unauthenticated";
 
@@ -18,21 +19,8 @@ export default function Landing() {
       });
   }, []);
 
-  if (checkState === "idle" || checkState === "checking") {
-    return (
-      <div style={styles.center}>
-        <div style={styles.spinner} />
-      </div>
-    );
-  }
-
-  if (checkState === "authenticated") {
-    // Will redirect via window.location — show spinner while navigating
-    return (
-      <div style={styles.center}>
-        <div style={styles.spinner} />
-      </div>
-    );
+  if (checkState === "idle" || checkState === "checking" || checkState === "authenticated") {
+    return <Spinner fullPage />;
   }
 
   const startDeploy = () => { window.location.href = "/auth/notion?next=/cockpit"; };
@@ -125,20 +113,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     gap: "0.75rem",
-  },
-  center: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  spinner: {
-    width: "32px",
-    height: "32px",
-    border: "3px solid #ece8ff",
-    borderTopColor: "#6e56cf",
-    borderRadius: "50%",
-    animation: "spin 0.7s linear infinite",
   },
   hero: {
     flex: 1,

@@ -1,4 +1,23 @@
-.PHONY: up down dev build-frontend install-frontend
+.PHONY: up down dev build-frontend install-frontend deploy
+
+DEVBOX_HOST  ?= 100.64.162.103
+DEVBOX_PORT  ?= 16152
+DEVBOX_USER  ?= lgiron
+DEVBOX_PATH  ?= /home/lgiron/Lab/notion-pilot
+DEVBOX_SSH_KEY ?= ~/.ssh/notion-pilot-gha
+BRANCH       ?= $(shell git rev-parse --abbrev-ref HEAD)
+
+deploy:
+	@echo "→ Deploying branch '$(BRANCH)' to devbox $(DEVBOX_HOST)..."
+	@git push origin $(BRANCH) 2>/dev/null || true
+	ssh -i $(DEVBOX_SSH_KEY) -p $(DEVBOX_PORT) $(DEVBOX_USER)@$(DEVBOX_HOST) \
+	  "set -euo pipefail; \
+	   cd $(DEVBOX_PATH); \
+	   git fetch origin; \
+	   git checkout $(BRANCH); \
+	   git reset --hard origin/$(BRANCH); \
+	   docker compose up --build -d; \
+	   echo '✓ deployed $(BRANCH)'"
 
 up:
 	docker compose up --build -d
@@ -35,3 +54,4 @@ help:
 	@echo "make dev-frontend      - Vite dev server only (port 5173, proxies to :8080)"
 	@echo "make up                - Start with Docker Compose"
 	@echo "make down              - Stop Docker Compose"
+	@echo "make deploy            - Deploy current branch to devbox (BRANCH=name to override)"
