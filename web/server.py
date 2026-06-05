@@ -232,7 +232,7 @@ def create_app(settings: Settings) -> FastAPI:
         )
         return RedirectResponse(url)
 
-    @app.get("/auth/notion/callback")
+    @app.get("/auth/notion/callback", response_model=None)
     async def auth_notion_callback(
         request: Request,
         code: str | None = None,
