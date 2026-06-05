@@ -13,7 +13,7 @@ deploy:
 	ssh -i $(DEVBOX_SSH_KEY) -p $(DEVBOX_PORT) $(DEVBOX_USER)@$(DEVBOX_HOST) \
 	  "set -euo pipefail; \
 	   cd $(DEVBOX_PATH); \
-	   git fetch origin; \
+	   GIT_SSH_COMMAND='ssh -i ~/.ssh/notion-pilot-deploy -o StrictHostKeyChecking=no' git fetch origin; \
 	   git checkout $(BRANCH); \
 	   git reset --hard origin/$(BRANCH); \
 	   docker compose up --build -d; \
