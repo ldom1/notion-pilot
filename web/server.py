@@ -305,6 +305,8 @@ def create_app(settings: Settings) -> FastAPI:
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Not connected to Notion"
             )
 
+        wid = _workspace_id(request)
+
         async def _generate() -> AsyncGenerator[str, None]:
             def sse(msg_type: str, **kwargs: object) -> str:
                 return f"data: {_json.dumps({'type': msg_type, **kwargs})}\n\n"
@@ -314,22 +316,37 @@ def create_app(settings: Settings) -> FastAPI:
                     yield sse("log", message="Creating root page…")
                     root_page_id = await create_workspace_root_page(client, req.workspace_name)
                     yield sse("log", message="✓ Root page created")
+
+                    db_ids: dict[str, str] = {}
+
                     if req.scope in ("crm", "both"):
                         yield sse("log", message="Creating CRM page…")
                         yield sse("log", message="  → Companies database")
                         yield sse("log", message="  → People database")
                         yield sse("log", message="  → Deals database")
-                        await create_crm_workspace(client, root_page_id)
+                        crm = await create_crm_workspace(client, root_page_id)
+                        db_ids["notion_companies_data_source_id"] = crm.companies_id
+                        db_ids["notion_people_data_source_id"] = crm.people_id
+                        db_ids["notion_deals_database_id"] = crm.deals_id
                         yield sse("log", message="✓ CRM ready (with demo data)")
+
                     if req.scope in ("inbox", "both"):
                         yield sse("log", message="Creating Knowledge page…")
                         yield sse("log", message="  → Notions database")
                         yield sse("log", message="  → Ideas database")
                         yield sse("log", message="  → Tools database")
                         yield sse("log", message="  → Data & Technology database")
-                        await create_inbox_workspace(client, root_page_id)
+                        inbox = await create_inbox_workspace(client, root_page_id)
+                        db_ids["notion_notions_database_id"] = inbox.notions_id
+                        db_ids["notion_ideas_database_id"] = inbox.ideas_id
+                        db_ids["notion_tools_database_id"] = inbox.tools_id
+                        db_ids["notion_data_tech_database_id"] = inbox.data_tech_id
                         yield sse("log", message="✓ Knowledge ready (with demo data)")
-                    yield sse("done", url=notion_page_url(root_page_id))
+
+                    root_url = notion_page_url(root_page_id)
+                    save_cockpit_cfg(wid, {"databases": db_ids, "workspace_url": root_url})
+                    yield sse("log", message="✓ Cockpit configured")
+                    yield sse("done", url=root_url)
             except httpx.HTTPStatusError as exc:
                 logger.error("setup failed: {} {}", exc.response.status_code, exc.response.text)
                 yield sse("error", message=f"Notion API error: {exc.response.text}")

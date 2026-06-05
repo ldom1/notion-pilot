@@ -52,9 +52,24 @@ function SetupWizard(): React.ReactElement {
         <h2 style={wizardStyles.title}>Workspace ready!</h2>
         {logs.length > 0 && (
           <div style={{ ...wizardStyles.logBox, maxHeight: "200px" }} ref={logRef}>
-            {logs.map((l, i) => (
-              <div key={i} style={wizardStyles.logLine}>{l}</div>
-            ))}
+            {logs.map((l, i) => {
+              const isSuccess = l.startsWith("✓");
+              const isSubStep = l.startsWith("  →");
+              const isError = l.startsWith("✗");
+              return (
+                <div
+                  key={i}
+                  style={{
+                    ...wizardStyles.logLine,
+                    color: isError ? "#c0392b" : isSuccess ? "#1e7e34" : isSubStep ? "#888" : "#333",
+                    fontWeight: isSuccess ? 700 : "normal",
+                    paddingLeft: isSubStep ? "0.75rem" : undefined,
+                  }}
+                >
+                  {l}
+                </div>
+              );
+            })}
           </div>
         )}
         <div style={wizardStyles.actions}>
@@ -127,9 +142,28 @@ function SetupWizard(): React.ReactElement {
         <div style={wizardStyles.logBox} ref={logRef}>
           {logs.length === 0
             ? <div style={{ ...wizardStyles.logLine, color: "#999" }}>Connecting to Notion…</div>
-            : logs.map((l, i) => <div key={i} style={wizardStyles.logLine}>{l}</div>)
+            : logs.map((l, i) => {
+                const isLast = deployState === "deploying" && i === logs.length - 1;
+                const isSuccess = l.startsWith("✓");
+                const isSubStep = l.startsWith("  →");
+                const isError = l.startsWith("✗");
+                const lineStyle: React.CSSProperties = {
+                  ...wizardStyles.logLine,
+                  color: isError ? "#c0392b" : isSuccess ? "#1e7e34" : isSubStep ? "#888" : "#333",
+                  fontWeight: isSuccess ? 700 : "normal",
+                  paddingLeft: isSubStep ? "0.75rem" : undefined,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                };
+                return (
+                  <div key={i} style={lineStyle}>
+                    {isLast && <span className="log-spinner" />}
+                    {l}
+                  </div>
+                );
+              })
           }
-          {deployState === "deploying" && <div style={{ ...wizardStyles.logLine, color: "#999" }}>▌</div>}
         </div>
       )}
 
