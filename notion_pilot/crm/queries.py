@@ -64,11 +64,14 @@ async def get_open_leads(settings: Settings) -> list[dict[str, Any]]:
         stage_prop = props.get("Stage", {})
         stage = (stage_prop.get("select") or {}).get("name", "")
         next_action = _rich_text(props.get("Next action", {}))
+        page_id = page.get("id", "").replace("-", "")
+        url = f"https://notion.so/{page_id}" if page_id else None
         results.append(
             {
                 "title": _title(page),
                 "stage": stage,
                 "next_action": next_action,
+                "url": url,
             }
         )
     return results

@@ -44,8 +44,44 @@ def get_last_seen() -> _dt.datetime | None:
 READ_COMMANDS: frozenset[str] = frozenset({"recap", "leads", "inbox"})
 
 
+def _enrich_settings_from_cockpit(settings: Settings) -> Settings:
+    """Return settings patched with DB IDs from the first available cockpit_config.json."""
+    workspaces_dir = Path(__file__).parent.parent.parent.parent / "web" / "workspaces"
+    if not workspaces_dir.exists():
+        return settings
+    overrides: dict[str, str] = {}
+    for ws_dir in sorted(workspaces_dir.iterdir()):
+        cfg_path = ws_dir / "cockpit_config.json"
+        if not cfg_path.exists():
+            continue
+        try:
+            cfg = json.loads(cfg_path.read_text())
+            overrides = cfg.get("databases", {})
+            break
+        except Exception:
+            continue
+    if not overrides:
+        return settings
+    # Build a new settings instance with cockpit values filling in missing env values
+    data = settings.model_dump()
+    for field, env_key in (
+        ("notion_deals_database_id", "notion_deals_database_id"),
+        ("notion_people_data_source_id", "notion_people_data_source_id"),
+        ("notion_companies_data_source_id", "notion_companies_data_source_id"),
+        ("notion_telegram_msg_database_id", "notion_telegram_msg_database_id"),
+        ("notion_notions_database_id", "notion_notions_database_id"),
+        ("notion_ideas_database_id", "notion_ideas_database_id"),
+        ("notion_tools_database_id", "notion_tools_database_id"),
+        ("notion_data_tech_database_id", "notion_data_tech_database_id"),
+    ):
+        if not data.get(field) and overrides.get(env_key):
+            data[field] = overrides[env_key]
+    return Settings.model_validate(data)
+
+
 async def dispatch_read(cmd_name: str, settings: Settings) -> str:
     """Query Notion and return a formatted string for a read command."""
+    settings = _enrich_settings_from_cockpit(settings)
     try:
         if cmd_name == "leads":
             leads = await get_open_leads(settings)

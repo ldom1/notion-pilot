@@ -12,15 +12,15 @@ from notion_pilot.shared.config import Settings
 
 _SCHEMA = (
     '{"action":"suggest"|"create"|"info",'
-    '"message":"one sentence summary",'
+    '"message":"Found 3 contacts that match your query.",'
     '"leads":[{'
     '"type":"existing"|"new",'
-    '"name":"...",'
-    '"position":"...",'
-    '"company":"...",'
-    '"notion_id":"<page-id for existing contacts or companies>",'
-    '"reason":"<why they fit>",'
-    '"deal_name":"<suggested deal title, for create action>"'
+    '"name":"Marie Dupont",'
+    '"position":"Head of Product",'
+    '"company":"Acme Corp",'
+    '"notion_id":"abc123-...",'
+    '"reason":"Her role focuses on product strategy, which aligns with the pitch.",'
+    '"deal_name":"Acme Corp — Q3 pilot"'
     "}]}"
 )
 
@@ -37,8 +37,10 @@ _SYSTEM_PROMPT = (
     "- For suggested entries not in the CRM set type='new' and include a reason.\n"
     "- For 'create' action include deal_name on every lead.\n"
     "- When the question is about company types or sectors, use the Companies list if provided.\n"
+    "- NEVER use placeholder text like [PERSON_NAME], [COMPANY], <name>, etc. "
+    "Always use the real name from the data, or omit the field if unknown.\n"
     "- Reply with ONLY a raw JSON object — no markdown, no code fences.\n"
-    f"Schema: {_SCHEMA}"
+    f"Example schema (values are illustrative, replace with real data): {_SCHEMA}"
 )
 
 # Keywords that signal the user is asking about company profiles/types, not contacts
