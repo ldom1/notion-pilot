@@ -4,6 +4,7 @@ import Header from "../components/Header";
 import { Spinner } from "../components/Spinner";
 import AutomationPanel from "../features/automation/AutomationPanel";
 import { ChatPanel } from "../features/chat/ChatPanel";
+import { SetupWizard } from "../features/setup/SetupWizard";
 import { WorkspacePanel, DatabaseEntry } from "../features/workspace/WorkspacePanel";
 
 import { fetchStatus, fetchSingleDbStatus, saveCockpitConfig, CockpitStatus, DatabaseStatus } from "../api/client";
@@ -40,6 +41,7 @@ const Cockpit: React.FC = () => {
   // WorkspacePanel editing state
   const [editingDbId, setEditingDbId] = useState<string | null>(null);
   const [savingDbId, setSavingDbId] = useState<string | null>(null);
+  const [showRedeploy, setShowRedeploy] = useState(false);
 
   const loadStatus = useCallback(async (opts?: { initial?: boolean }) => {
     const isInitial = opts?.initial ?? false;
@@ -141,9 +143,26 @@ const Cockpit: React.FC = () => {
           onEditDb={handleEditDb}
           onSaveDb={handleSaveDb}
           onCancelEdit={handleCancelEdit}
+          onRedeploy={() => setShowRedeploy(true)}
         />
         <AutomationPanel />
       </div>
+
+      {showRedeploy && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1000, padding: "1rem",
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowRedeploy(false); }}
+        >
+          <SetupWizard
+            onComplete={() => { setShowRedeploy(false); void loadStatus(); }}
+            onSkip={() => setShowRedeploy(false)}
+          />
+        </div>
+      )}
     </>
   );
 };

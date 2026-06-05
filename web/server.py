@@ -500,6 +500,14 @@ def create_app(settings: Settings) -> FastAPI:
         save_cockpit_cfg(wid, cfg)
         return {"ok": True}
 
+    @app.delete("/api/workspace", response_model=None)
+    async def delete_workspace(request: Request) -> dict:
+        """Clear cockpit config (DB links + workspace_url) for this workspace."""
+        _require_token(request)
+        wid = _workspace_id(request)
+        save_cockpit_cfg(wid, {"databases": {}, "workspace_url": ""})
+        return {"ok": True}
+
     @app.get("/api/cockpit/scripts")
     async def cockpit_scripts(request: Request) -> dict:
         _require_token(request)

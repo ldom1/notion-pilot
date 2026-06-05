@@ -431,6 +431,11 @@ export async function saveCockpitConfig(
   await _json<{ ok: boolean }>("POST", "/api/cockpit/config", req);
 }
 
+/** DELETE /api/workspace — clear cockpit config (DB links) for this workspace */
+export async function deleteWorkspace(): Promise<void> {
+  await _json<{ ok: boolean }>("DELETE", "/api/workspace");
+}
+
 /** POST /api/setup/stream — SSE stream for workspace deployment */
 export interface SetupRequest {
   scope: "crm" | "inbox" | "both";
