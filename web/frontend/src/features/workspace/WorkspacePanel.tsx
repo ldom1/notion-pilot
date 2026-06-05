@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 export interface DatabaseEntry {
   count: number | null;
+  has_more?: boolean;
   label: string;
   icon: string;
   category: string;
@@ -24,6 +25,7 @@ interface TelegramStatus {
 interface WorkspacePanelProps {
   databases: Record<string, DatabaseEntry>;
   onRefresh: () => void;
+  isRefreshing?: boolean;
   editingDbId: string | null;
   savingDbId: string | null;
   onEditDb: (key: string) => void;
@@ -34,6 +36,7 @@ interface WorkspacePanelProps {
 export function WorkspacePanel({
   databases,
   onRefresh,
+  isRefreshing = false,
   editingDbId,
   savingDbId,
   onEditDb,
@@ -111,15 +114,24 @@ export function WorkspacePanel({
     <section className="panel">
       <div className="panel-header">
         <span className="panel-title">Workspace</span>
-        <button className="btn-ghost btn-sm" onClick={onRefresh}>↻ Refresh</button>
+        <button
+          className="btn-ghost btn-sm"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+        >
+          {isRefreshing ? "↻ …" : "↻ Refresh"}
+        </button>
       </div>
 
       <div className="db-grid">
         {Object.entries(databases).map(([key, db]) => {
           const isEditing = editingDbId === key;
-          const isSaving = savingDbId === key;
+          const isSaving = savingDbId === key || isRefreshing;
           const countIsNull = db.count === null;
           const catClass = (db.category ?? "").toLowerCase();
+          const countLabel = db.count !== null
+            ? `${db.count}${db.has_more ? "+" : ""}`
+            : null;
 
           return (
             <div className={`db-card${isSaving ? " db-card-saving" : ""}`} key={key}>
@@ -131,7 +143,7 @@ export function WorkspacePanel({
 
               <div className="db-name">{db.label}</div>
               <div className={`db-count${isSaving ? " na" : countIsNull ? " na" : db.error ? " error" : ""}`}>
-                {isSaving ? "…" : db.error ? "Error" : countIsNull ? "—" : db.count}
+                {isSaving ? "…" : db.error ? "Error" : countLabel ?? "—"}
               </div>
               <div className="db-count-label">
                 {isSaving ? "loading" : db.error ? db.error.slice(0, 40) : "records"}
