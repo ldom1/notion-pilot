@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { fetchStatus, runSetup } from "../api/client";
 import type { SSEEvent } from "../api/client";
 import { Spinner } from "../components/Spinner";
@@ -14,6 +14,12 @@ function SetupWizard(): React.ReactElement {
   const [deployState, setDeployState] = useState<DeployState>("idle");
   const [logs, setLogs] = useState<string[]>([]);
   const [notionUrl, setNotionUrl] = useState<string | null>(null);
+  const logRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll log box whenever logs update
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [logs]);
 
   async function handleDeploy(): Promise<void> {
     if (!workspaceName.trim() || deployState === "deploying") return;
@@ -44,7 +50,13 @@ function SetupWizard(): React.ReactElement {
       <div style={wizardStyles.card}>
         <div style={wizardStyles.successIcon}>✓</div>
         <h2 style={wizardStyles.title}>Workspace ready!</h2>
-        <p style={wizardStyles.sub}>Your Notion databases have been created.</p>
+        {logs.length > 0 && (
+          <div style={{ ...wizardStyles.logBox, maxHeight: "200px" }} ref={logRef}>
+            {logs.map((l, i) => (
+              <div key={i} style={wizardStyles.logLine}>{l}</div>
+            ))}
+          </div>
+        )}
         <div style={wizardStyles.actions}>
           {notionUrl && (
             <a
@@ -111,10 +123,13 @@ function SetupWizard(): React.ReactElement {
         </div>
       </div>
 
-      {(deployState === "deploying" || deployState === "error") && logs.length > 0 && (
-        <div style={wizardStyles.logBox}>
-          {logs.map((l, i) => <div key={i} style={wizardStyles.logLine}>{l}</div>)}
-          {deployState === "deploying" && <div style={wizardStyles.logLine}>…</div>}
+      {(deployState === "deploying" || deployState === "error") && (
+        <div style={wizardStyles.logBox} ref={logRef}>
+          {logs.length === 0
+            ? <div style={{ ...wizardStyles.logLine, color: "#999" }}>Connecting to Notion…</div>
+            : logs.map((l, i) => <div key={i} style={wizardStyles.logLine}>{l}</div>)
+          }
+          {deployState === "deploying" && <div style={{ ...wizardStyles.logLine, color: "#999" }}>▌</div>}
         </div>
       )}
 
