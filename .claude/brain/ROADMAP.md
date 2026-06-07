@@ -1,96 +1,85 @@
 # Roadmap
 
-## Phase 0 — Refactoring (current priority)
-
-Rename and reorganize before adding features. No new behavior, just structural clarity.
+## Phase 0 — Refactoring ✅
 
 - [x] Rename repo: `telegram-to-notion` → `notion-pilot`
 - [x] Rename Python package: `telegram_to_notion` → `notion_pilot`
-- [x] Reorganize into verticals: `crm/`, `inbox/` (from `pipelines/`), `shared/` (adapters, llm, utils, notion.py, config.py, models.py)
+- [x] Reorganize into verticals: `crm/`, `inbox/`, `shared/`
 - [x] Organize scripts: `scripts/crm/` + `scripts/inbox/`
-- [x] Unify People capture through `notion_people_data_source_id` and the central CRM syncer
-- [x] Update README, CHANGELOG, brain vault note path
+- [x] Unify People capture through `notion_people_data_source_id`
 
-## Phase 1 — Setup Wizard (CLI)
+## Phase 1 — Setup Wizard ✅
 
-One-command bootstrap on virgin Notion for both products.
+- [x] `scripts/inbox/setup_workspace.py` — create Knowledge DBs
+- [x] `scripts/crm/setup_workspace.py` — create CRM DBs
+- [x] `/setup` Telegram command — guided onboarding wizard
 
-- [x] `scripts/inbox/setup_workspace.py` — create Knowledge DBs (Notions, Ideas, Tools, Data & Technology)
-- [x] Extend `scripts/crm/setup_workspace.py` to optionally create all 4 DBs in one shot
-- [ ] `/setup` Telegram command — guided onboarding wizard that sets up the workspace and outputs `.env` values
+## Phase 2 — Email "à relire" ✅
 
-## Phase 2 — Email "à relire"
-
-- [x] Email pipeline: scan inbox → classify (newsletter / contact / transactional) via LLM
-- [x] Auto-tag newsletters and unread knowledge as `À relire` in Knowledge DB
+- [x] Email pipeline: classify (newsletter / contact / transactional) via LLM
+- [x] Auto-tag newsletters as `À relire` in Knowledge DB
 - [x] Skip already-processed messages (idempotent)
 
-## Phase 2b — Knowledge Triage (in progress)
+## Phase 2b — Knowledge Triage (partial)
 
-Batch enrichment script that replicates the Notion agent logic locally (no Notion AI credits needed).
-
-Source: Dom Telegram Bot DB (`NOTION_TELEGRAM_MSG_DATABASE_ID`) — pages with `Status = Not analysed`.
-Target: 4 custom knowledge DBs — Notions, Ideas, Tools, Data & Technology.
-
-**Flow:** read source page → LLM identifies subject entity + target DB → find or create meta-page → append dated note section → write summary back → mark `Analysed`.
-**Lifecycle:** `--purge` archives `Analysed` source pages older than 14 days.
-
-- [x] `scripts/inbox/enrich_knowledge.py` — batch triage script (dry-run, limit, dedup, purge, JSON output)
+- [x] `scripts/inbox/enrich_knowledge.py` — batch triage (dry-run, limit, dedup, purge, JSON output)
 - [x] Add to `config/scripts.yaml` for cockpit visibility
-- [x] Correct DB IDs in `.env` (page IDs → actual DB IDs for Notions, Tools, Data & Tech)
 - [ ] E2E test with `--limit=5` (no dry-run) to validate Notion writes
-- [ ] Tune LLM granularity: crypto roundup produces 7 entities — may need a `max_entities_per_page` guard
+- [ ] Tune LLM: `max_entities_per_page` guard (crypto roundups produce 7+ entities)
 
-## Phase 3 — Telegram Recap Commands
+## Phase 3 — Telegram Recap Commands ✅
 
-- [ ] `/recap` — daily/weekly summary: active deals, unread knowledge items, upcoming next actions
-- [ ] `/leads` — list open deals with stage
-- [ ] `/inbox` — list Knowledge items tagged `À relire`
-- [ ] Scheduled recap (cron or Telegram command)
+- [x] `/recap` — 7-day summary: active leads + stage, next actions, recent people, À relire
+- [x] `/leads` — open deals list (cap 10 + overflow)
+- [x] `/inbox` — knowledge items with status "Not analysed" (cap 10 + overflow)
+- [x] Smart routing: plain-text → LLM infer → confirm before write (infer_confirm flow)
+- [ ] Scheduled recap (deferred — manual `/recap` covers the use case for now)
 
-## Phase 4 — Website & Cockpit (current)
+## Phase 4 — Website & Cockpit ✅
 
-- [ ] Landing page (Astro or Next.js): pitch for notion-crm + notion-inbox, screenshots, CTAs
-- [x] "Deploy to Notion" wizard: Notion OAuth → auto-create DBs → display `.env` values
-- [x] Cockpit (`/cockpit`): workspace overview, script launcher, LLM chat against CRM data
-  - [x] DB cards with live record counts and inline pointer editing (cockpit_config.json)
-  - [x] Automation panel: scripts.yaml manifest → one-click run with SSE log output
-  - [x] "Ask your data" chat: query CRM → LLM leads → one-click "Add to Notion"
-- [ ] Chatbot endpoint (FastAPI): receive text → query Notion DBs → structured response
-- [ ] Chatbot UI: embeddable on landing page
+- [x] Landing page: hero, feature list, "Deploy to Notion" CTA
+- [x] "Deploy to Notion" wizard: Notion OAuth → auto-create DBs
+- [x] Cockpit (`/cockpit`): workspace overview, script launcher, LLM chat
+  - [x] DB cards with live record counts (single-page, `100+` for large DBs) and inline pointer editing
+  - [x] Automation panel: scripts.yaml → one-click run with SSE log output
+  - [x] "Ask your data" chat: query CRM → LLM → one-click "Add to Notion"
+  - [x] Telegram Bot status card: connection dot, last seen, ping button
+- [x] Deployed at `https://notion-pilot.dombot.tech` (Docker + nginx + Let's Encrypt)
+- [x] GitHub Actions CI + auto-deploy on push to main
+- [ ] Chatbot endpoint for embeddable landing page widget
+
+## Phase 4b — Cockpit UX / Performance (in progress, branch: fix/deployment)
+
+- [x] Remove BETA badge
+- [x] SVG favicon (compass icon, Notion Pilot purple)
+- [x] Centralized `<Spinner>` component — no more ad-hoc spinner definitions
+- [x] Refresh Workspace: per-card dim + spinner instead of full-page reload
+- [x] `_count_db` perf: single `page_size: 100` query, no pagination (5–10s → ~1–2s)
+- [x] `make deploy BRANCH=<name>` — SSH deploy to devbox from local
+- [ ] Server-side cache for `/api/cockpit/status` (TTL 60s) — avoid repeat Notion API calls on tab switch
 
 ## Phase 5 — Multi-customer deployment
 
-> **Decision (2026-06-03):** Hosted wizard + shared Telegram bot + file-upload cockpit. See DECISIONS.md for the full ADR.
+> **Decision (2026-06-03):** Hosted wizard + shared Telegram bot + file-upload cockpit. See DECISIONS.md.
 
-**How customers use Notion Pilot (target state):**
-1. Customer visits `notion-pilot.com` → OAuth with Notion → workspace created in their account
-2. Customer opens the cockpit → runs scripts, chats with data, uploads files
-3. Customer clicks "Connect Telegram" → deep link → links their Telegram user ID to their workspace
-4. One shared bot handles all customers, dispatches to the right workspace per user
-
-**What needs to be built:**
-
-- [ ] `data/` namespacing by Notion workspace_id — `data/{workspace_id}/crm/`, `data/{workspace_id}/conv_state.db`
-- [ ] `/api/cockpit/upload` — file upload for LinkedIn CSV (and future files); stores to `data/{workspace_id}/`
-- [ ] Encrypted Notion token storage per workspace (needed to run scripts on the customer's behalf)
+- [ ] `data/` namespacing by workspace_id — `data/{workspace_id}/crm/`, `data/{workspace_id}/conv_state.db`
+- [ ] `/api/cockpit/upload` — file upload for LinkedIn CSV
+- [ ] Encrypted Notion token storage per workspace
 - [ ] User registry: `{telegram_user_id → workspace_id}` SQLite table
-- [ ] "Connect Telegram" flow in cockpit: generate one-time deep link token → bot maps user on `/start <token>`
-- [ ] Bot dispatcher: look up workspace on each incoming message, route to correct Notion token + DB IDs
-- [ ] Docker Compose for self-hosted customers who want full control or their own private bot
+- [ ] "Connect Telegram" flow: one-time deep link token → bot maps user on `/start <token>`
+- [ ] Bot dispatcher: look up workspace on each message, route to correct token + DB IDs
 
 ## Phase 6 — Enrichment & Prospection Polish
 
-- [ ] Company enrichment: Apollo domain search + Brave fallback
-- [ ] People enrichment: Apollo person search by name + company
-- [ ] Prospection pipeline: batch enrich a list from CSV/LinkedIn export
+- [ ] Apollo domain search + Brave fallback for company enrichment
+- [ ] Apollo person search by name + company for people enrichment
 - [ ] Dedup: merge duplicate People/Companies via LLM similarity
-- [ ] Robustify enrichment for People and Companies: retry logic, partial-failure recovery, progress logging per record, idempotent runs (skip already-enriched records), dry-run mode that reports what would change
+- [ ] Batch enrich with retry logic, partial-failure recovery, idempotent runs
 
-## Later / Won't Do Now
+## Deferred / Won't Do Now
 
 - WhatsApp adapter
-- Web clipper (browser extension)
+- Browser extension / web clipper
 - RSS feeds
-- Multi-tenant SaaS billing (hard multi-tenancy, billing, subscription management)
+- Multi-tenant SaaS billing
 - Support for knowledge bases other than Notion

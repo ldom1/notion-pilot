@@ -1,6 +1,6 @@
 """Runtime configuration loaded from environment variables."""
 
-from pydantic import AliasChoices, Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -169,7 +169,7 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
     )
     notion_oauth_redirect_uri: str = Field(
         default="http://localhost:8080/auth/notion/callback",
-        description="OAuth redirect URI. Must match what is registered in the Notion integration.",
+        description="OAuth redirect URI. Must match what is registered in the Notion integration. Always set explicitly in production via NOTION_OAUTH_REDIRECT_URI.",
     )
     web_session_secret: SecretStr | None = Field(
         default=None,
@@ -189,6 +189,16 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
     discord_channel_id: str | None = Field(
         default=None, description="Discord channel ID to read from and write to"
     )
+
+    @model_validator(mode="after")
+    def _check_oauth_redirect_uri(self) -> "Settings":
+        if self.notion_oauth_client_id and "localhost" in self.notion_oauth_redirect_uri:
+            raise ValueError(
+                f"NOTION_OAUTH_REDIRECT_URI is set to '{self.notion_oauth_redirect_uri}' "
+                "which contains 'localhost' — this will break OAuth in production. "
+                "Set NOTION_OAUTH_REDIRECT_URI to your public callback URL."
+            )
+        return self
 
 
 def load_settings() -> Settings:

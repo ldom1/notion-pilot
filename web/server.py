@@ -66,6 +66,109 @@ from web.utils import (
 )
 
 
+def _oauth_error_page() -> str:
+    return """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Access denied — Notion Pilot</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f4ff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    nav {
+      display: flex;
+      align-items: center;
+      padding: 0 2rem;
+      height: 54px;
+      background: #fff;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .logo {
+      font-size: 1rem;
+      font-weight: 800;
+      color: #6e56cf;
+      letter-spacing: -0.3px;
+    }
+    main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 1.5rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid #e8e8e8;
+      padding: 3rem 2.5rem;
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.25rem;
+    }
+    .icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      background: #f5f4ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.75rem;
+    }
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #1a1a1a;
+    }
+    p {
+      font-size: 0.9rem;
+      color: #666;
+      line-height: 1.6;
+      max-width: 320px;
+    }
+    a.btn {
+      display: inline-block;
+      margin-top: 0.5rem;
+      padding: 0.65rem 1.5rem;
+      background: #6e56cf;
+      color: #fff;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    a.btn:hover { background: #5a45b0; }
+  </style>
+</head>
+<body>
+  <nav><span class="logo">Notion Pilot</span></nav>
+  <main>
+    <div class="card">
+      <div class="icon">🔒</div>
+      <h1>Access denied</h1>
+      <p>
+        The Notion authorisation was cancelled or the connection was rejected.
+        You can try again from the home page.
+      </p>
+      <a class="btn" href="/">Back to home</a>
+    </div>
+  </main>
+</body>
+</html>"""
+
+
 def create_app(settings: Settings) -> FastAPI:
     app = FastAPI(title="Notion Pilot", docs_url=None, redoc_url=None)
 
@@ -129,8 +232,17 @@ def create_app(settings: Settings) -> FastAPI:
         )
         return RedirectResponse(url)
 
-    @app.get("/auth/notion/callback")
-    async def auth_notion_callback(request: Request, code: str, state: str) -> RedirectResponse:
+    @app.get("/auth/notion/callback", response_model=None)
+    async def auth_notion_callback(
+        request: Request,
+        code: str | None = None,
+        state: str | None = None,
+        error: str | None = None,
+    ) -> RedirectResponse | HTMLResponse:
+        if error or not code or not state:
+            request.session.pop("oauth_state", None)
+            request.session.pop("oauth_next", None)
+            return HTMLResponse(_oauth_error_page(), status_code=200)
         if not settings.notion_oauth_client_id or not settings.notion_oauth_client_secret:
             raise HTTPException(status_code=500, detail="OAuth not configured")
         if request.session.get("oauth_state") != state:
@@ -193,6 +305,8 @@ def create_app(settings: Settings) -> FastAPI:
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Not connected to Notion"
             )
 
+        wid = _workspace_id(request)
+
         async def _generate() -> AsyncGenerator[str, None]:
             def sse(msg_type: str, **kwargs: object) -> str:
                 return f"data: {_json.dumps({'type': msg_type, **kwargs})}\n\n"
@@ -202,22 +316,37 @@ def create_app(settings: Settings) -> FastAPI:
                     yield sse("log", message="Creating root page…")
                     root_page_id = await create_workspace_root_page(client, req.workspace_name)
                     yield sse("log", message="✓ Root page created")
+
+                    db_ids: dict[str, str] = {}
+
                     if req.scope in ("crm", "both"):
                         yield sse("log", message="Creating CRM page…")
                         yield sse("log", message="  → Companies database")
                         yield sse("log", message="  → People database")
                         yield sse("log", message="  → Deals database")
-                        await create_crm_workspace(client, root_page_id)
+                        crm = await create_crm_workspace(client, root_page_id)
+                        db_ids["notion_companies_data_source_id"] = crm.companies_id
+                        db_ids["notion_people_data_source_id"] = crm.people_id
+                        db_ids["notion_deals_database_id"] = crm.deals_id
                         yield sse("log", message="✓ CRM ready (with demo data)")
+
                     if req.scope in ("inbox", "both"):
                         yield sse("log", message="Creating Knowledge page…")
                         yield sse("log", message="  → Notions database")
                         yield sse("log", message="  → Ideas database")
                         yield sse("log", message="  → Tools database")
                         yield sse("log", message="  → Data & Technology database")
-                        await create_inbox_workspace(client, root_page_id)
+                        inbox = await create_inbox_workspace(client, root_page_id)
+                        db_ids["notion_notions_database_id"] = inbox.notions_id
+                        db_ids["notion_ideas_database_id"] = inbox.ideas_id
+                        db_ids["notion_tools_database_id"] = inbox.tools_id
+                        db_ids["notion_data_tech_database_id"] = inbox.data_tech_id
                         yield sse("log", message="✓ Knowledge ready (with demo data)")
-                    yield sse("done", url=notion_page_url(root_page_id))
+
+                    root_url = notion_page_url(root_page_id)
+                    save_cockpit_cfg(wid, {"databases": db_ids, "workspace_url": root_url})
+                    yield sse("log", message="✓ Cockpit configured")
+                    yield sse("done", url=root_url)
             except httpx.HTTPStatusError as exc:
                 logger.error("setup failed: {} {}", exc.response.status_code, exc.response.text)
                 yield sse("error", message=f"Notion API error: {exc.response.text}")
@@ -369,6 +498,14 @@ def create_app(settings: Settings) -> FastAPI:
         if req.workspace_url:
             cfg["workspace_url"] = req.workspace_url
         save_cockpit_cfg(wid, cfg)
+        return {"ok": True}
+
+    @app.delete("/api/workspace", response_model=None)
+    async def delete_workspace(request: Request) -> dict:
+        """Clear cockpit config (DB links + workspace_url) for this workspace."""
+        _require_token(request)
+        wid = _workspace_id(request)
+        save_cockpit_cfg(wid, {"databases": {}, "workspace_url": ""})
         return {"ok": True}
 
     @app.get("/api/cockpit/scripts")
@@ -798,20 +935,68 @@ def create_app(settings: Settings) -> FastAPI:
     async def cockpit_create_lead(req: CreateLeadRequest, request: Request) -> dict:
         token = _require_token(request)
         wid = _workspace_id(request)
-        people_db_id = resolve_db_ids(settings, wid).get("notion_people_data_source_id")
+        db_ids = resolve_db_ids(settings, wid)
+        people_db_id = db_ids.get("notion_people_data_source_id")
+        deals_db_id = db_ids.get("notion_deals_database_id")
+        companies_db_id = db_ids.get("notion_companies_data_source_id")
         if not people_db_id:
             raise HTTPException(status_code=400, detail="People database not configured")
-        props: dict = {"Nom": {"title": [{"text": {"content": req.name}}]}}
+
+        person_props: dict = {"Nom": {"title": [{"text": {"content": req.name}}]}}
         if req.position:
-            props["Position"] = {"rich_text": [{"text": {"content": req.position}}]}
+            person_props["Position"] = {"rich_text": [{"text": {"content": req.position}}]}
         async with httpx.AsyncClient(headers=notion_headers(token), timeout=20) as client:
+            # 1. Create the People page
             r = await client.post(
                 f"{NOTION_API}/pages",
-                json={"parent": {"database_id": people_db_id}, "properties": props},
+                json={"parent": {"database_id": people_db_id}, "properties": person_props},
             )
             r.raise_for_status()
-            page_id = r.json()["id"]
-        return {"page_id": page_id, "url": notion_page_url(page_id)}
+            person_page_id = r.json()["id"]
+
+            if not deals_db_id:
+                return {"page_id": person_page_id, "url": notion_page_url(person_page_id)}
+
+            # 2. Optionally resolve company
+            company_id: str | None = None
+            company_prop_key: str | None = None
+            if req.company and companies_db_id:
+                cq = await client.post(
+                    f"{NOTION_API}/databases/{companies_db_id}/query",
+                    json={
+                        "filter": {"property": "title", "title": {"equals": req.company}},
+                        "page_size": 1,
+                    },
+                )
+                if cq.is_success and cq.json().get("results"):
+                    company_id = cq.json()["results"][0]["id"]
+                    db_schema = await client.get(f"{NOTION_API}/databases/{deals_db_id}")
+                    if db_schema.is_success:
+                        for prop_name, prop in db_schema.json().get("properties", {}).items():
+                            if prop.get("type") == "relation" and prop.get("relation", {}).get(
+                                "database_id", ""
+                            ).replace("-", "") == companies_db_id.replace("-", ""):
+                                company_prop_key = prop_name
+                                break
+
+            # 3. Create Deal linking the new person + company
+            deal_props: dict = {
+                "Name": {"title": [{"text": {"content": f"Lead: {req.name}"}}]},
+                "Stage": {"select": {"name": "Prospect"}},
+                "Contacts": {"relation": [{"id": person_page_id}]},
+            }
+            if company_id and company_prop_key:
+                deal_props[company_prop_key] = {"relation": [{"id": company_id}]}
+
+            d_r = await client.post(
+                f"{NOTION_API}/pages",
+                json={"parent": {"database_id": deals_db_id}, "properties": deal_props},
+            )
+            if d_r.is_success:
+                deal_page_id = d_r.json()["id"]
+                return {"page_id": deal_page_id, "url": notion_page_url(deal_page_id)}
+
+        return {"page_id": person_page_id, "url": notion_page_url(person_page_id)}
 
     # ── Workflows ─────────────────────────────────────────────────────────────
 
