@@ -79,7 +79,7 @@ async def test_get_inbox_items_filters_not_analysed():
 async def test_get_recent_people_returns_list():
     s = Settings(**_BASE, notion_people_data_source_id="ppl-db")
     mock_notion_client = AsyncMock()
-    mock_notion_client.data_sources.query = AsyncMock(
+    mock_notion_client.databases.query = AsyncMock(
         return_value={
             "results": [
                 {

@@ -115,7 +115,7 @@ async def get_recent_people(settings: Settings) -> list[dict[str, Any]]:
         return []
     token = _token(settings)
     client = AsyncClient(auth=token)
-    resp = await client.data_sources.query(
+    resp = await client.databases.query(
         settings.notion_people_data_source_id,
         filter={"timestamp": "created_time", "created_time": {"past_week": {}}},
         sorts=[{"timestamp": "created_time", "direction": "descending"}],
