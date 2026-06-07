@@ -945,10 +945,6 @@ def create_app(settings: Settings) -> FastAPI:
         person_props: dict = {"Nom": {"title": [{"text": {"content": req.name}}]}}
         if req.position:
             person_props["Position"] = {"rich_text": [{"text": {"content": req.position}}]}
-        if req.company and companies_db_id:
-            # Link company relation on the People page too
-            cq_people = None  # resolved below
-
         async with httpx.AsyncClient(headers=notion_headers(token), timeout=20) as client:
             # 1. Create the People page
             r = await client.post(
