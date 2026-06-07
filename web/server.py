@@ -963,7 +963,10 @@ def create_app(settings: Settings) -> FastAPI:
             if req.company and companies_db_id:
                 cq = await client.post(
                     f"{NOTION_API}/databases/{companies_db_id}/query",
-                    json={"filter": {"property": "title", "title": {"equals": req.company}}, "page_size": 1},
+                    json={
+                        "filter": {"property": "title", "title": {"equals": req.company}},
+                        "page_size": 1,
+                    },
                 )
                 if cq.is_success and cq.json().get("results"):
                     company_id = cq.json()["results"][0]["id"]

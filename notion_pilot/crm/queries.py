@@ -67,7 +67,9 @@ async def get_open_leads(settings: Settings) -> list[dict[str, Any]]:
             page_id = page.get("id", "").replace("-", "")
             url = f"https://notion.so/{page_id}" if page_id else None
             contact_ids = [r["id"] for r in props.get("Contacts", {}).get("relation", [])]
-            results.append({"title": _title(page), "stage": stage, "next_action": next_action, "url": url})
+            results.append(
+                {"title": _title(page), "stage": stage, "next_action": next_action, "url": url}
+            )
             contact_ids_per_result.append(contact_ids)
 
         # Resolve first contact name for each lead in parallel

@@ -190,7 +190,6 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         default=None, description="Discord channel ID to read from and write to"
     )
 
-
     @model_validator(mode="after")
     def _check_oauth_redirect_uri(self) -> "Settings":
         if self.notion_oauth_client_id and "localhost" in self.notion_oauth_redirect_uri:
