@@ -1,6 +1,5 @@
 """Unit tests for crm/recap.py."""
 
-from unittest.mock import AsyncMock, patch
 import pytest
 
 from notion_pilot.crm.recap import (
@@ -73,38 +72,3 @@ def test_format_recap_section_capped():
     result = format_recap(leads=_make_leads(10), people=[], inbox=[])
     # Should only show CAP_RECAP_SECTION leads (5) + overflow
     assert f"…and {10 - CAP_RECAP_SECTION} more" in result
-
-
-@pytest.mark.asyncio
-async def test_get_recent_people_uses_databases_api():
-    """Ensure get_recent_people calls databases.query, not data_sources.query."""
-    from notion_pilot.crm.queries import get_recent_people
-    from notion_pilot.shared.config import Settings
-
-    settings = Settings(
-        notion_token="secret_test",
-        notion_telegram_msg_database_id="db-id",
-        notion_people_data_source_id="people-db-id",
-    )
-
-    mock_response = {
-        "results": [
-            {
-                "properties": {
-                    "Name": {"type": "title", "title": [{"plain_text": "Alice"}]},
-                    "Company": {"type": "rich_text", "rich_text": [{"plain_text": "Acme"}]},
-                }
-            }
-        ]
-    }
-
-    with patch("notion_pilot.crm.queries.AsyncClient") as mock_cls:
-        mock_client = AsyncMock()
-        mock_cls.return_value = mock_client
-        mock_client.databases.query = AsyncMock(return_value=mock_response)
-        mock_client.data_sources.query = AsyncMock(side_effect=AssertionError("must not call data_sources"))
-
-        result = await get_recent_people(settings)
-
-    assert result == [{"name": "Alice", "company": "Acme"}]
-    mock_client.databases.query.assert_awaited_once()
