@@ -63,3 +63,51 @@ async def test_dispatch_read_recap():
     ):
         result = await dispatch_read("recap", s)
     assert "leads" in result.lower() or "Leads" in result
+
+
+def test_detect_read_intent_recap_french():
+    from notion_pilot.shared.adapters.telegram import _detect_read_intent
+
+    assert _detect_read_intent("Fais moi un recap des leads intéressants") == "recap"
+
+
+def test_detect_read_intent_recap_english():
+    from notion_pilot.shared.adapters.telegram import _detect_read_intent
+
+    assert _detect_read_intent("give me a recap") == "recap"
+
+
+def test_detect_read_intent_recap_standalone():
+    from notion_pilot.shared.adapters.telegram import _detect_read_intent
+
+    assert _detect_read_intent("recap") == "recap"
+
+
+def test_detect_read_intent_leads():
+    from notion_pilot.shared.adapters.telegram import _detect_read_intent
+
+    assert _detect_read_intent("montre moi les leads") == "leads"
+
+
+def test_detect_read_intent_inbox():
+    from notion_pilot.shared.adapters.telegram import _detect_read_intent
+
+    assert _detect_read_intent("à relire") == "inbox"
+
+
+def test_detect_read_intent_inbox_english():
+    from notion_pilot.shared.adapters.telegram import _detect_read_intent
+
+    assert _detect_read_intent("show inbox") == "inbox"
+
+
+def test_detect_read_intent_none_for_data_entry():
+    from notion_pilot.shared.adapters.telegram import _detect_read_intent
+
+    assert _detect_read_intent("J'ai rencontré Alice Martin chez Acme") is None
+
+
+def test_detect_read_intent_none_for_single_lead():
+    from notion_pilot.shared.adapters.telegram import _detect_read_intent
+
+    assert _detect_read_intent("j'ai un nouveau lead intéressant") is None

@@ -3,6 +3,7 @@
 import asyncio
 import datetime as _dt
 import json
+import re as _re
 import tempfile
 from datetime import timezone
 from pathlib import Path
@@ -42,6 +43,25 @@ def get_last_seen() -> _dt.datetime | None:
 
 
 READ_COMMANDS: frozenset[str] = frozenset({"recap", "leads", "inbox"})
+
+_READ_INTENT_PATTERNS: list[tuple[str, str]] = [
+    (r"\brecap\b", "recap"),
+    (r"\bleads\b", "leads"),
+    (r"inbox|relire", "inbox"),
+]
+
+
+def _detect_read_intent(text: str) -> str | None:
+    """Return a READ_COMMANDS name if text is a query intent, else None.
+
+    Matches whole-word keywords only to avoid false positives on data entries
+    like "j'ai un lead intéressant" (no trailing 's').
+    """
+    lowered = text.lower()
+    for pattern, cmd in _READ_INTENT_PATTERNS:
+        if _re.search(pattern, lowered):
+            return cmd
+    return None
 
 
 def _enrich_settings_from_cockpit(settings: Settings) -> Settings:
@@ -437,8 +457,13 @@ class TelegramAdapter:
                             await _dispatch_crm(msg, cmd_name, text)
                             return
 
-                # Priority 3: plain text → try LLM inference, else knowledge pipeline
+                # Priority 3: plain text / voice → check for read command intent first
                 incoming = await _to_incoming(settings, msg)
+                read_cmd = _detect_read_intent(incoming.text or "")
+                if read_cmd is not None:
+                    reply = await dispatch_read(read_cmd, settings)
+                    await _send_reply(msg, reply)
+                    return
                 infer_result = await infer_and_confirm(incoming.text or "", settings)
                 if infer_result is not None:
                     inferred_type, confirmation, extracted = infer_result
