@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Telegram CRM writes (`/people`, infer-confirm yes, multi-step commands): call `_enrich_settings_from_cockpit()` before handlers so People/Companies DB IDs from `cockpit_config.json` are used when env vars are unset (fixes `data_sources//query` 400 on save)
+- LinkedIn contact paste (`URL : Name, Company, Position`): deterministic parser in `contact_parse.py` bypasses LLM; rejects `[PERSON_NAME]` placeholders; fixes wrong name/company/position on infer-confirm save
+- CI: remove unused `pytest` import in `tests/unit/crm/test_recap.py`
 
 ### Added
 - `scripts/inbox/process_promotions.py` — batch Promotions folder → DomTelegramBot DB (dry-run, CSV review, dedup, `--from-csv`)

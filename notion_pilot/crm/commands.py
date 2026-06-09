@@ -9,6 +9,7 @@ from typing import Awaitable, Callable
 import httpx
 from loguru import logger
 
+from notion_pilot.crm.contact_parse import parse_linkedin_paste, sanitize_extracted
 from notion_pilot.crm.conv_state import ConvState
 from notion_pilot.shared.config import Settings
 
@@ -137,14 +138,19 @@ async def extract_fields_from_text(
     text: str, cmd: CommandDef, settings: Settings
 ) -> dict[str, str]:
     """Extract command fields from free-form text using OpenRouter LLM."""
+    field_names = [f.name for f in cmd.fields]
+    parsed = parse_linkedin_paste(text)
+    if parsed:
+        return {key: value for key, value in parsed.items() if key in field_names}
+
     if not settings.openrouter_api_key:
         return {}
-    field_names = [f.name for f in cmd.fields]
     prompt = (
         f"{cmd.llm_prompt}\n\n"
         f"Text: {text}\n\n"
         f"Return JSON with keys: {', '.join(field_names)}. "
-        "Use empty string for any field not found in the text."
+        "Use empty string for any field not found in the text. "
+        "NEVER use placeholder text like [PERSON_NAME], [COMPANY], <name>, etc."
     )
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
@@ -162,7 +168,8 @@ async def extract_fields_from_text(
             )
         resp.raise_for_status()
         data = json.loads(resp.json()["choices"][0]["message"]["content"])
-        return {k: str(v) for k, v in data.items() if v}
+        extracted = {k: str(v) for k, v in data.items() if v}
+        return sanitize_extracted(extracted, fallback=parse_linkedin_paste(text))
     except Exception:  # noqa: BLE001
         logger.warning("commands: LLM field extraction failed")
         return {}

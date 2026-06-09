@@ -23,6 +23,7 @@ from telegram.ext import (
 )
 
 from notion_pilot.crm.commands import COMMANDS, extract_fields_from_text, get_next_prompt
+from notion_pilot.crm.contact_parse import parse_linkedin_paste, sanitize_extracted
 from notion_pilot.crm.conv_state import ConvState, ConvStateStore
 from notion_pilot.crm.queries import get_inbox_items, get_open_leads, get_recent_people
 from notion_pilot.crm.recap import format_inbox, format_leads, format_recap
@@ -181,7 +182,13 @@ _INFER_PROMPT = (
     "- knowledge: everything else (notes, articles, ideas, reflections)\n\n"
     "Return JSON with keys: type (one of the 4 categories), "
     "name, company, position, email, linkedin_url, title, stage, notes. "
-    "Use empty string for fields that don't apply.\n\nMessage: "
+    "Use empty string for fields that don't apply.\n"
+    "NEVER use placeholder text like [PERSON_NAME], [COMPANY], <name>, etc. "
+    "Always use literal values from the message.\n"
+    "For 'URL : Name, Company, Position' format: company is the second comma-separated "
+    "value; everything after the second comma is the position.\n"
+    "Set linkedin_url from any linkedin.com/in/ URL in the message.\n\n"
+    "Message: "
 )
 
 _TYPE_LABEL: dict[str, str] = {
@@ -191,10 +198,30 @@ _TYPE_LABEL: dict[str, str] = {
 }
 
 
+def _build_infer_confirmation(inferred_type: str, extracted: dict[str, str]) -> str:
+    label = _TYPE_LABEL[inferred_type]
+    name = extracted.get("name") or extracted.get("title") or "this entry"
+    company = extracted.get("company", "")
+    position = extracted.get("position", "")
+    details = name
+    if company:
+        details += f" @ {company}"
+    if position:
+        details += f" ({position})"
+    return (
+        f"Looks like a {label} — {details}.\n"
+        f"Save to {label.capitalize()}s? Reply yes or /knowledge to file as a note."
+    )
+
+
 async def infer_and_confirm(
     text: str, settings: Settings
 ) -> tuple[str, str, dict[str, str]] | None:
     """Classify text via LLM. Returns (inferred_type, confirmation_text, extracted) or None for knowledge."""
+    parsed = parse_linkedin_paste(text)
+    if parsed:
+        return "people", _build_infer_confirmation("people", parsed), parsed
+
     if not settings.openrouter_api_key:
         return None
     try:
@@ -216,20 +243,13 @@ async def infer_and_confirm(
         inferred_type = str(data.get("type", "knowledge")).lower()
         if inferred_type not in ("people", "company", "deal"):
             return None
-        extracted = {k: str(v) for k, v in data.items() if v and k != "type"}
-        label = _TYPE_LABEL[inferred_type]
-        name = extracted.get("name") or extracted.get("title") or "this entry"
-        company = extracted.get("company", "")
-        position = extracted.get("position", "")
-        details = name
-        if company:
-            details += f" @ {company}"
-        if position:
-            details += f" ({position})"
-        confirmation = (
-            f"Looks like a {label} — {details}.\n"
-            f"Save to {label.capitalize()}s? Reply yes or /knowledge to file as a note."
+        extracted = sanitize_extracted(
+            {k: str(v) for k, v in data.items() if v and k != "type"},
+            fallback=parse_linkedin_paste(text),
         )
+        if inferred_type == "people" and not extracted.get("name"):
+            return None
+        confirmation = _build_infer_confirmation(inferred_type, extracted)
         return inferred_type, confirmation, extracted
     except Exception:  # noqa: BLE001
         logger.warning("telegram: LLM inference failed, falling back to knowledge pipeline")

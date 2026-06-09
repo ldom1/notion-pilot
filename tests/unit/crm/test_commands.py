@@ -35,6 +35,22 @@ def test_required_fields_have_prompts():
                 assert f.prompt, f"/{name}.{f.name} required field has no prompt"
 
 
+async def test_extract_fields_from_text_linkedin_paste_bypasses_llm():
+    s = Settings(**_SETTINGS)
+    cmd = COMMANDS["people"]
+    text = (
+        "https://www.linkedin.com/in/ocoussau/ : "
+        "Olivier Coussau, Veolia, Chapter Lead Appel d'Offres et Développement"
+    )
+    with patch("notion_pilot.crm.commands.httpx.AsyncClient") as mock_client_cls:
+        result = await extract_fields_from_text(text, cmd, s)
+
+    mock_client_cls.assert_not_called()
+    assert result["name"] == "Olivier Coussau"
+    assert result["company"] == "Veolia"
+    assert result["linkedin_url"] == "https://www.linkedin.com/in/ocoussau/"
+
+
 async def test_extract_fields_from_text_parses_llm_response():
     s = Settings(**_SETTINGS)
     cmd = COMMANDS["people"]
