@@ -4,6 +4,7 @@ import os
 from typing import Any
 
 from pydantic import AliasChoices, Field, SecretStr, model_validator
+from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 
@@ -16,10 +17,10 @@ class InfisicalSettingsSource(PydanticBaseSettingsSource):
 
     _PATHS = ["/global", "/notion-pilot"]
 
-    def get_field_value(self, field: Any, field_name: str) -> tuple[Any, str, bool]:  # type: ignore[override]
+    def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
         return None, field_name, False
 
-    def field_is_complex(self, field: Any) -> bool:  # type: ignore[override]
+    def field_is_complex(self, field: FieldInfo) -> bool:
         return False
 
     def __call__(self) -> dict[str, Any]:
@@ -60,9 +61,9 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
     )
 
     @classmethod
-    def settings_customise_sources(
+    def settings_customise_sources(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         cls,
-        settings_cls: type["Settings"],
+        settings_cls: type[BaseSettings],
         init_settings: PydanticBaseSettingsSource,
         env_settings: PydanticBaseSettingsSource,
         dotenv_settings: PydanticBaseSettingsSource,
