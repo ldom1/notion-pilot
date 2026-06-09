@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-
 from loguru import logger
 from telegram import Message, Update
 from telegram.ext import (
@@ -23,7 +22,7 @@ from telegram.ext import (
 )
 
 from notion_pilot.crm.commands import COMMANDS, extract_fields_from_text, get_next_prompt
-from notion_pilot.crm.contact_parse import parse_linkedin_paste, sanitize_extracted
+from notion_pilot.crm.contact_parse import parse_contact_message, sanitize_extracted
 from notion_pilot.crm.conv_state import ConvState, ConvStateStore
 from notion_pilot.crm.queries import get_inbox_items, get_open_leads, get_recent_people
 from notion_pilot.crm.recap import format_inbox, format_leads, format_recap
@@ -33,7 +32,6 @@ from notion_pilot.shared.config import Settings
 from notion_pilot.shared.media import extract_photo, extract_voice
 from notion_pilot.shared.media.transcribe_voice import transcribe_file
 from notion_pilot.shared.models import IncomingMessage, MediaType
-
 
 _last_seen: _dt.datetime | None = None
 
@@ -218,7 +216,7 @@ async def infer_and_confirm(
     text: str, settings: Settings
 ) -> tuple[str, str, dict[str, str]] | None:
     """Classify text via LLM. Returns (inferred_type, confirmation_text, extracted) or None for knowledge."""
-    parsed = parse_linkedin_paste(text)
+    parsed = parse_contact_message(text)
     if parsed:
         return "people", _build_infer_confirmation("people", parsed), parsed
 
@@ -245,7 +243,7 @@ async def infer_and_confirm(
             return None
         extracted = sanitize_extracted(
             {k: str(v) for k, v in data.items() if v and k != "type"},
-            fallback=parse_linkedin_paste(text),
+            fallback=parse_contact_message(text),
         )
         if inferred_type == "people" and not extracted.get("name"):
             return None

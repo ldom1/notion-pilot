@@ -9,7 +9,7 @@ from typing import Awaitable, Callable
 import httpx
 from loguru import logger
 
-from notion_pilot.crm.contact_parse import parse_linkedin_paste, sanitize_extracted
+from notion_pilot.crm.contact_parse import parse_contact_message, sanitize_extracted
 from notion_pilot.crm.conv_state import ConvState
 from notion_pilot.shared.config import Settings
 
@@ -139,7 +139,7 @@ async def extract_fields_from_text(
 ) -> dict[str, str]:
     """Extract command fields from free-form text using OpenRouter LLM."""
     field_names = [f.name for f in cmd.fields]
-    parsed = parse_linkedin_paste(text)
+    parsed = parse_contact_message(text)
     if parsed:
         return {key: value for key, value in parsed.items() if key in field_names}
 
@@ -169,7 +169,7 @@ async def extract_fields_from_text(
         resp.raise_for_status()
         data = json.loads(resp.json()["choices"][0]["message"]["content"])
         extracted = {k: str(v) for k, v in data.items() if v}
-        return sanitize_extracted(extracted, fallback=parse_linkedin_paste(text))
+        return sanitize_extracted(extracted, fallback=parse_contact_message(text))
     except Exception:  # noqa: BLE001
         logger.warning("commands: LLM field extraction failed")
         return {}

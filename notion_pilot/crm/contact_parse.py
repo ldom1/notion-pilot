@@ -12,6 +12,14 @@ _PLACEHOLDER_RE = re.compile(
     r"^\[(?:PERSON_NAME|COMPANY|NAME)\]$|^<[^>]+>$",
     re.IGNORECASE,
 )
+_POSITION_HINT = re.compile(
+    r"\b("
+    r"responsable|director|directeur|manager|lead|head|cto|ceo|vp|"
+    r"développement|developpement|affaires|consultant|chargé|chargee|engineer|"
+    r"founder|président|president|coordinator|analyst|architect|chapter"
+    r")\b",
+    re.IGNORECASE,
+)
 
 
 def is_placeholder(value: str) -> bool:
@@ -37,6 +45,33 @@ def parse_linkedin_paste(text: str) -> dict[str, str] | None:
     return {key: value for key, value in result.items() if value and not is_placeholder(value)}
 
 
+def parse_comma_contact(text: str) -> dict[str, str] | None:
+    """Parse ``Name, Company, Position`` or ``Name, Position, Company`` contact lines."""
+    stripped = text.strip()
+    if not stripped or stripped.lower().startswith("http") or "linkedin.com" in stripped.lower():
+        return None
+    if stripped.count(",") < 2:
+        return None
+    parts = [part.strip() for part in stripped.split(",", 2)]
+    if len(parts) != 3 or not parts[0] or is_placeholder(parts[0]):
+        return None
+    name, first, second = parts
+    first_pos = bool(_POSITION_HINT.search(first))
+    second_pos = bool(_POSITION_HINT.search(second))
+    if first_pos and not second_pos:
+        return {"name": name, "position": first, "company": second}
+    if second_pos and not first_pos:
+        return {"name": name, "company": first, "position": second}
+    if len(first.split()) <= 3 and len(second.split()) > len(first.split()):
+        return {"name": name, "company": first, "position": second}
+    return None
+
+
+def parse_contact_message(text: str) -> dict[str, str] | None:
+    """Try all deterministic contact paste formats."""
+    return parse_linkedin_paste(text) or parse_comma_contact(text)
+
+
 _CONTACT_FIELDS = frozenset({"name", "company", "position", "linkedin_url", "email"})
 
 
@@ -47,7 +82,7 @@ def sanitize_extracted(
     clean = {key: value for key, value in extracted.items() if value and not is_placeholder(value)}
     if not fallback:
         return clean
-    if fallback.get("linkedin_url"):
+    if fallback.get("linkedin_url") or (fallback.get("name") and fallback.get("company")):
         for key in _CONTACT_FIELDS:
             if fallback.get(key):
                 clean[key] = fallback[key]

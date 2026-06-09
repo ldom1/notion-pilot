@@ -1,9 +1,10 @@
 """Unit tests for crm/queries.py."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from notion_pilot.crm.queries import get_open_leads, get_inbox_items, get_recent_people
+import pytest
+
+from notion_pilot.crm.queries import get_inbox_items, get_open_leads, get_recent_people
 from notion_pilot.shared.config import Settings
 
 _BASE = dict(notion_telegram_msg_database_id="kb-db", notion_token="tok")

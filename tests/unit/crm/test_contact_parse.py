@@ -1,6 +1,12 @@
 """Unit tests for crm/contact_parse.py."""
 
-from notion_pilot.crm.contact_parse import is_placeholder, parse_linkedin_paste, sanitize_extracted
+from notion_pilot.crm.contact_parse import (
+    is_placeholder,
+    parse_comma_contact,
+    parse_contact_message,
+    parse_linkedin_paste,
+    sanitize_extracted,
+)
 
 _OLIVIER_MSG = (
     "https://www.linkedin.com/in/ocoussau/ : "
@@ -19,6 +25,33 @@ def test_parse_linkedin_paste_olivier_coussau():
 
 def test_parse_linkedin_paste_no_match():
     assert parse_linkedin_paste("Met Jean Dupont from Artelys, CTO") is None
+
+
+def test_parse_comma_contact_name_position_company():
+    result = parse_comma_contact(
+        "Lisa Schwob, Responsable d'affaires Digital pour Veolia Eau France, Veolia"
+    )
+    assert result is not None
+    assert result["name"] == "Lisa Schwob"
+    assert result["company"] == "Veolia"
+    assert "Responsable d'affaires" in result["position"]
+
+
+def test_parse_comma_contact_name_company_position():
+    result = parse_comma_contact(
+        "Olivier Coussau, Veolia, Chapter Lead Appel d'Offres et Développement"
+    )
+    assert result is not None
+    assert result["name"] == "Olivier Coussau"
+    assert result["company"] == "Veolia"
+    assert "Chapter Lead" in result["position"]
+
+
+def test_parse_contact_message_prefers_linkedin():
+    assert parse_contact_message(_OLIVIER_MSG) is not None
+    assert parse_contact_message(
+        "Lisa Schwob, Responsable d'affaires Digital pour Veolia Eau France, Veolia"
+    )["company"] == "Veolia"
 
 
 def test_is_placeholder():

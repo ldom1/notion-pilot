@@ -1,8 +1,9 @@
 # tests/unit/test_telegram_read_commands.py
 """Unit tests for Telegram read command dispatch."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from notion_pilot.shared.config import Settings
 

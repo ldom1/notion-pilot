@@ -2,8 +2,9 @@
 """Unit tests for smart routing inference in TelegramAdapter."""
 
 import json
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from notion_pilot.shared.config import Settings
 
@@ -19,6 +20,28 @@ _OLIVIER_MSG = (
     "https://www.linkedin.com/in/ocoussau/ : "
     "Olivier Coussau, Veolia, Chapter Lead Appel d'Offres et Développement"
 )
+
+
+_LISA_MSG = (
+    "Lisa Schwob, Responsable d'affaires Digital pour Veolia Eau France, Veolia"
+)
+
+
+@pytest.mark.asyncio
+async def test_infer_comma_contact_bypasses_llm():
+    from notion_pilot.shared.adapters.telegram import infer_and_confirm
+
+    s = Settings(**_BASE)
+    with patch("notion_pilot.shared.adapters.telegram.httpx.AsyncClient") as mock_client_cls:
+        result = await infer_and_confirm(_LISA_MSG, s)
+
+    mock_client_cls.assert_not_called()
+    assert result is not None
+    inferred_type, confirmation_text, extracted = result
+    assert inferred_type == "people"
+    assert "Lisa Schwob" in confirmation_text
+    assert "Veolia" in confirmation_text
+    assert extracted["name"] == "Lisa Schwob"
 
 
 @pytest.mark.asyncio
