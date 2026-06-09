@@ -13,6 +13,7 @@ dependencies = [
     "httpx>=0.27.0",
     "loguru>=0.7.3",
     "python-dotenv>=1.2.2",
+    "infisicalsdk>=1.0.3",
     "faster-whisper>=1.2.1",
     "rapidfuzz>=3.14.5",
     "uvicorn>=0.48.0",
