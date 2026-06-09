@@ -26,6 +26,7 @@ class InfisicalSettingsSource(PydanticBaseSettingsSource):
         client_id = os.environ.get("INFISICAL_CLIENT_ID")
         if not client_id:
             return {}
+
         from infisical_sdk import InfisicalSDKClient  # noqa: PLC0415
 
         client = InfisicalSDKClient(host="https://app.infisical.com")

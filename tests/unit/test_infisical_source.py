@@ -21,9 +21,10 @@ class TestInfisicalSettingsSourceNoOp:
 
     def test_does_not_import_sdk_when_client_id_absent(self, monkeypatch):
         monkeypatch.delenv("INFISICAL_CLIENT_ID", raising=False)
-        with patch.dict("sys.modules", {"infisical_sdk": None}):
+        with patch("infisical_sdk.InfisicalSDKClient") as mock_cls:
             source = InfisicalSettingsSource(Settings)
             result = source()
+        mock_cls.assert_not_called()
         assert result == {}
 
 
