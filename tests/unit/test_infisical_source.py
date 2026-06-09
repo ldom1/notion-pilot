@@ -1,4 +1,5 @@
 """Unit tests for InfisicalSettingsSource."""
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -67,7 +68,7 @@ class TestInfisicalSettingsSourceFetch:
 
     def test_returns_secrets_as_lowercase_dict(self, mock_client):
         mock_client.secrets.list_secrets.side_effect = [
-            [_make_secret("OPENROUTER_API_KEY", "or-key")],   # /global
+            [_make_secret("OPENROUTER_API_KEY", "or-key")],  # /global
             [_make_secret("TELEGRAM_BOT_TOKEN", "bot-tok")],  # /notion-pilot
         ]
         with patch("infisical_sdk.InfisicalSDKClient", return_value=mock_client):
@@ -77,8 +78,8 @@ class TestInfisicalSettingsSourceFetch:
 
     def test_app_path_overrides_global_on_key_conflict(self, mock_client):
         mock_client.secrets.list_secrets.side_effect = [
-            [_make_secret("SHARED_KEY", "from-global")],    # /global fetched first
-            [_make_secret("SHARED_KEY", "from-app")],       # /notion-pilot fetched second
+            [_make_secret("SHARED_KEY", "from-global")],  # /global fetched first
+            [_make_secret("SHARED_KEY", "from-app")],  # /notion-pilot fetched second
         ]
         with patch("infisical_sdk.InfisicalSDKClient", return_value=mock_client):
             result = InfisicalSettingsSource(Settings)()
