@@ -49,9 +49,12 @@ def test_parse_comma_contact_name_company_position():
 
 def test_parse_contact_message_prefers_linkedin():
     assert parse_contact_message(_OLIVIER_MSG) is not None
-    assert parse_contact_message(
-        "Lisa Schwob, Responsable d'affaires Digital pour Veolia Eau France, Veolia"
-    )["company"] == "Veolia"
+    assert (
+        parse_contact_message(
+            "Lisa Schwob, Responsable d'affaires Digital pour Veolia Eau France, Veolia"
+        )["company"]
+        == "Veolia"
+    )
 
 
 def test_is_placeholder():

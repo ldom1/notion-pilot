@@ -22,9 +22,7 @@ _OLIVIER_MSG = (
 )
 
 
-_LISA_MSG = (
-    "Lisa Schwob, Responsable d'affaires Digital pour Veolia Eau France, Veolia"
-)
+_LISA_MSG = "Lisa Schwob, Responsable d'affaires Digital pour Veolia Eau France, Veolia"
 
 
 @pytest.mark.asyncio
