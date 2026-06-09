@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: remove unused `pytest` import in `tests/unit/crm/test_recap.py`
 
 ### Added
+- Deploy workflow: `workflow_dispatch` trigger for manual re-deploys
 - `scripts/inbox/process_promotions.py` — batch Promotions folder → DomTelegramBot DB (dry-run, CSV review, dedup, `--from-csv`)
 - Config: `IMAP_PROMOTIONS_FOLDER`, `IMAP_SINCE_DAYS`; email bodies fall back to stripped HTML
 - Promotions review CSV: one-line summaries; `decision` = `Untouched` | `Treated and archived` | `Auto archived`

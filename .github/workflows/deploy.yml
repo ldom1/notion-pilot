@@ -3,6 +3,7 @@ name: Deploy
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -23,6 +24,9 @@ jobs:
           username: lgiron
           key: ${{ secrets.DEVBOX_SSH_KEY }}
           script: |
-            cd /home/lgiron/Lab/notion-pilot
-            GIT_SSH_COMMAND="ssh -i /home/lgiron/.ssh/notion-pilot-deploy -o StrictHostKeyChecking=no" git pull
+            set -euo pipefail
+            DEPLOY_DIR=/home/lgiron/Lab/notion-pilot
+            git config --global --add safe.directory "$DEPLOY_DIR"
+            cd "$DEPLOY_DIR"
+            GIT_SSH_COMMAND="ssh -i /home/lgiron/.ssh/notion-pilot-deploy -o StrictHostKeyChecking=no" git pull origin main
             docker compose up --build -d

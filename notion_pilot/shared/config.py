@@ -1,7 +1,73 @@
 """Runtime configuration loaded from environment variables."""
 
+import os
+from typing import Any
+
 from pydantic import AliasChoices, Field, SecretStr, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic.fields import FieldInfo
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+
+try:
+    from infisical_sdk import InfisicalSDKClient
+except ImportError:  # pragma: no cover — optional dependency
+    InfisicalSDKClient = None  # noqa: F841
+
+
+class InfisicalSettingsSource(PydanticBaseSettingsSource):
+    """Fetches secrets from Infisical via Universal Auth (SDK path).
+
+    No-op when INFISICAL_CLIENT_ID is absent — CLI-injected env vars take over.
+    Secrets from /notion-pilot override /global on key conflict (later path wins).
+    """
+
+    _PATHS: tuple[str, ...] = ("/global", "/notion-pilot")
+
+    def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
+        # Required by ABC; not called because __call__ is fully overridden.
+        return None, field_name, False
+
+    def field_is_complex(self, field: FieldInfo) -> bool:
+        # Required by ABC; not called because __call__ is fully overridden.
+        return False
+
+    def __call__(self) -> dict[str, Any]:
+        client_id = os.environ.get("INFISICAL_CLIENT_ID")
+        if not client_id:
+            return {}
+
+        client_secret = os.environ.get("INFISICAL_CLIENT_SECRET")
+        project_id = os.environ.get("INFISICAL_PROJECT_ID")
+        if not client_secret or not project_id:
+            missing = [
+                k
+                for k, v in {
+                    "INFISICAL_CLIENT_SECRET": client_secret,
+                    "INFISICAL_PROJECT_ID": project_id,
+                }.items()
+                if not v
+            ]
+            raise ValueError(
+                f"INFISICAL_CLIENT_ID is set but {', '.join(missing)} "
+                "are missing. Set all three or none."
+            )
+
+        host = os.environ.get("INFISICAL_HOST", "https://app.infisical.com")
+        client = InfisicalSDKClient(host=host)
+        client.auth.universal_auth.login(
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+        env_slug = os.environ.get("INFISICAL_ENV", "prod")
+        secrets: dict[str, Any] = {}
+        for path in self._PATHS:
+            for s in client.secrets.list_secrets(
+                project_id=project_id,
+                environment_slug=env_slug,
+                secret_path=path,
+                view_secret_value=True,
+            ):
+                secrets[s.secretKey.lower()] = s.secretValue
+        return secrets
 
 
 class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
@@ -14,6 +80,22 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         extra="ignore",
         populate_by_name=True,
     )
+
+    @classmethod
+    def settings_customise_sources(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            InfisicalSettingsSource(settings_cls),
+            env_settings,
+            dotenv_settings,
+            init_settings,
+        )
 
     # ── Notion (optional when using OAuth) ──────────────────────────────────
     notion_token: SecretStr | None = Field(
