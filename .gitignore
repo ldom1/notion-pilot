@@ -1,8 +1,10 @@
 # --- Secrets & local-only ---
 # Never commit credentials or machine-specific deploy scripts.
 .env
+.env.bootstrap
 .env.*
 !.env.example
+!.env.bootstrap.example
 deploy.sh
 PLAN.md
 
