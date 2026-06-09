@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Infisical secret manager** — all app secrets now live in Infisical (`Dom Universe` project, `prod` env, `/global` + `/notion-pilot` folders); `.env` replaced by `.env.bootstrap` (4 vars: client_id, client_secret, project_id, env)
+- `infisical.json` — project config for the Infisical CLI (`infisical run --` local dev workflow)
+- `.env.bootstrap.example` — template for bootstrapping Docker/devbox deploys
+- `InfisicalSettingsSource` (`notion_pilot/shared/config.py`) — pydantic-settings v2 custom source; SDK (Universal Auth) path for Docker, CLI-injected env vars for local dev; per-path errors are non-fatal (warns + continues)
+- `deploy.sh` — rewritten for Docker Compose (`git fetch → reset --hard → docker compose up --build -d`); replaces the old tag-based systemd script
+
+### Changed
+- `Makefile`: `dev` and `dev-backend` targets now wrap `launch_webserver.sh` with `infisical run --`; `deploy` delegates to `./deploy.sh`
+- `launch_webserver.sh`: removed `.env` file reading; secrets come from Infisical CLI injection (`infisical run -- ./launch_webserver.sh`)
+- Docker Compose: `env_file` changed from `.env` to `.env.bootstrap` (4 Infisical bootstrap vars only)
+
 ### Fixed
 - Telegram CRM writes (`/people`, infer-confirm yes, multi-step commands): call `_enrich_settings_from_cockpit()` before handlers so People/Companies DB IDs from `cockpit_config.json` are used when env vars are unset (fixes `data_sources//query` 400 on save)
 - LinkedIn contact paste (`URL : Name, Company, Position`): deterministic parser in `contact_parse.py` bypasses LLM; rejects `[PERSON_NAME]` placeholders; fixes wrong name/company/position on infer-confirm save

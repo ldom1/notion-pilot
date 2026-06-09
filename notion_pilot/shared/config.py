@@ -1,11 +1,14 @@
 """Runtime configuration loaded from environment variables."""
 
+import logging
 import os
 from typing import Any
 
 from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+
+_log = logging.getLogger(__name__)
 
 try:
     from infisical_sdk import InfisicalSDKClient
@@ -60,13 +63,22 @@ class InfisicalSettingsSource(PydanticBaseSettingsSource):
         env_slug = os.environ.get("INFISICAL_ENV", "prod")
         secrets: dict[str, Any] = {}
         for path in self._PATHS:
-            for s in client.secrets.list_secrets(
-                project_id=project_id,
-                environment_slug=env_slug,
-                secret_path=path,
-                view_secret_value=True,
-            ):
-                secrets[s.secretKey.lower()] = s.secretValue
+            try:
+                for s in client.secrets.list_secrets(
+                    project_id=project_id,
+                    environment_slug=env_slug,
+                    secret_path=path,
+                    view_secret_value=True,
+                ):
+                    secrets[s.secretKey.lower()] = s.secretValue
+            except Exception as exc:  # noqa: BLE001
+                _log.warning("Infisical: could not read path %s — %s", path, exc)
+        if not secrets:
+            _log.warning(
+                "Infisical: authenticated but no secrets loaded from any path. "
+                "Check that the machine identity has 'Read' + 'List' permission on the configured paths. "
+                "Falling back to environment variables."
+            )
         return secrets
 
 

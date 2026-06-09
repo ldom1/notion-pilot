@@ -73,6 +73,7 @@ logs/
 data/
 
 # --- Claude ---
+.claude/worktrees/
 .superpowers
 # Per-workspace data (DB pointers, workflows — not committed)
 web/workspaces/
