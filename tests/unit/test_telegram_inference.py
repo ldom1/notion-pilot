@@ -26,20 +26,51 @@ _LISA_MSG = "Lisa Schwob, Responsable d'affaires Digital pour Veolia Eau France,
 
 
 @pytest.mark.asyncio
-async def test_infer_comma_contact_bypasses_llm():
+async def test_infer_comma_contact_uses_llm():
     from notion_pilot.shared.adapters.telegram import infer_and_confirm
 
     s = Settings(**_BASE)
-    with patch("notion_pilot.shared.adapters.telegram.httpx.AsyncClient") as mock_client_cls:
+    llm_payload = json.dumps(
+        {
+            "type": "people",
+            "name": "Lisa Schwob",
+            "company": "Veolia",
+            "position": "Responsable d'affaires Digital pour Veolia Eau France",
+        }
+    )
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json.return_value = {"choices": [{"message": {"content": llm_payload}}]}
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    mock_client.post = AsyncMock(return_value=mock_resp)
+
+    with patch("notion_pilot.shared.adapters.telegram.httpx.AsyncClient", return_value=mock_client):
         result = await infer_and_confirm(_LISA_MSG, s)
 
-    mock_client_cls.assert_not_called()
+    mock_client.post.assert_called_once()
     assert result is not None
     inferred_type, confirmation_text, extracted = result
     assert inferred_type == "people"
     assert "Lisa Schwob" in confirmation_text
-    assert "Veolia" in confirmation_text
     assert extracted["name"] == "Lisa Schwob"
+
+
+@pytest.mark.asyncio
+async def test_infer_linkedin_company_url_bypasses_llm():
+    from notion_pilot.shared.adapters.telegram import infer_and_confirm
+
+    s = Settings(**_BASE)
+    with patch("notion_pilot.shared.adapters.telegram.httpx.AsyncClient") as mock_client_cls:
+        result = await infer_and_confirm("https://www.linkedin.com/company/altotrain/", s)
+
+    mock_client_cls.assert_not_called()
+    assert result is not None
+    inferred_type, confirmation_text, extracted = result
+    assert inferred_type == "company"
+    assert "Altotrain" in confirmation_text
+    assert extracted["name"] == "Altotrain"
 
 
 @pytest.mark.asyncio
@@ -152,6 +183,15 @@ def test_handle_confirm_no():
     assert _resolve_confirmation("no") == "no"
     assert _resolve_confirmation("non") == "no"
     assert _resolve_confirmation("/knowledge") == "no"
+
+
+def test_handle_confirm_cancel():
+    from notion_pilot.shared.adapters.telegram import _resolve_confirmation
+
+    assert _resolve_confirmation("cancel") == "cancel"
+    assert _resolve_confirmation("skip") == "cancel"
+    assert _resolve_confirmation("rien") == "cancel"
+    assert _resolve_confirmation("/cancel") == "cancel"
 
 
 def test_handle_confirm_unknown():

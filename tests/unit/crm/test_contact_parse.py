@@ -4,6 +4,8 @@ from notion_pilot.crm.contact_parse import (
     is_placeholder,
     parse_comma_contact,
     parse_contact_message,
+    parse_linkedin_company_paste,
+    parse_linkedin_deterministic,
     parse_linkedin_paste,
     sanitize_extracted,
 )
@@ -45,6 +47,31 @@ def test_parse_comma_contact_name_company_position():
     assert result["name"] == "Olivier Coussau"
     assert result["company"] == "Veolia"
     assert "Chapter Lead" in result["position"]
+
+
+def test_parse_linkedin_company_url_only():
+    result = parse_linkedin_company_paste("https://www.linkedin.com/company/altotrain/")
+    assert result is not None
+    assert result["name"] == "Altotrain"
+    assert result["linkedin_url"] == "https://www.linkedin.com/company/altotrain"
+
+
+def test_parse_linkedin_company_with_name():
+    result = parse_linkedin_company_paste(
+        "https://www.linkedin.com/company/altotrain/ : Alto, Rail Transportation"
+    )
+    assert result is not None
+    assert result["name"] == "Alto"
+    assert "altotrain" in result["linkedin_url"]
+
+
+def test_parse_linkedin_deterministic_routes_by_path():
+    person = parse_linkedin_deterministic(_OLIVIER_MSG)
+    assert person is not None
+    assert person[0] == "people"
+    company = parse_linkedin_deterministic("https://www.linkedin.com/company/altotrain/")
+    assert company is not None
+    assert company[0] == "company"
 
 
 def test_parse_contact_message_prefers_linkedin():

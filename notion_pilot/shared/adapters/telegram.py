@@ -22,7 +22,7 @@ from telegram.ext import (
 )
 
 from notion_pilot.crm.commands import COMMANDS, extract_fields_from_text, get_next_prompt
-from notion_pilot.crm.contact_parse import parse_contact_message, sanitize_extracted
+from notion_pilot.crm.contact_parse import parse_linkedin_deterministic, sanitize_extracted
 from notion_pilot.crm.conv_state import ConvState, ConvStateStore
 from notion_pilot.crm.queries import get_inbox_items, get_open_leads, get_recent_people
 from notion_pilot.crm.recap import format_inbox, format_leads, format_recap
@@ -208,7 +208,7 @@ def _build_infer_confirmation(inferred_type: str, extracted: dict[str, str]) -> 
         details += f" ({position})"
     return (
         f"Looks like a {label} — {details}.\n"
-        f"Save to {label.capitalize()}s? Reply yes or /knowledge to file as a note."
+        f"Save to {label.capitalize()}s? Reply yes, /knowledge to file as a note, or cancel to discard."
     )
 
 
@@ -216,9 +216,10 @@ async def infer_and_confirm(
     text: str, settings: Settings
 ) -> tuple[str, str, dict[str, str]] | None:
     """Classify text via LLM. Returns (inferred_type, confirmation_text, extracted) or None for knowledge."""
-    parsed = parse_contact_message(text)
-    if parsed:
-        return "people", _build_infer_confirmation("people", parsed), parsed
+    linkedin = parse_linkedin_deterministic(text)
+    if linkedin:
+        inferred_type, parsed = linkedin
+        return inferred_type, _build_infer_confirmation(inferred_type, parsed), parsed
 
     if not settings.openrouter_api_key:
         return None
@@ -241,11 +242,13 @@ async def infer_and_confirm(
         inferred_type = str(data.get("type", "knowledge")).lower()
         if inferred_type not in ("people", "company", "deal"):
             return None
-        extracted = sanitize_extracted(
-            {k: str(v) for k, v in data.items() if v and k != "type"},
-            fallback=parse_contact_message(text),
-        )
-        if inferred_type == "people" and not extracted.get("name"):
+        llm_fields = {k: str(v) for k, v in data.items() if v and k != "type"}
+        fallback = None
+        linkedin_fb = parse_linkedin_deterministic(text)
+        if linkedin_fb and linkedin_fb[0] == inferred_type:
+            fallback = linkedin_fb[1]
+        extracted = sanitize_extracted(llm_fields, fallback=fallback)
+        if inferred_type in ("people", "company") and not extracted.get("name"):
             return None
         confirmation = _build_infer_confirmation(inferred_type, extracted)
         return inferred_type, confirmation, extracted
@@ -255,12 +258,16 @@ async def infer_and_confirm(
 
 
 def _resolve_confirmation(text: str) -> str:
-    """Return 'yes', 'no', or 'unknown' based on user reply."""
+    """Return 'yes', 'no', 'cancel', or 'unknown' based on user reply."""
     t = text.strip().lower()
     if t in ("yes", "oui", "y", "o"):
         return "yes"
     if t in ("no", "non", "n") or t.startswith("/knowledge"):
         return "no"
+    if t in ("cancel", "skip", "abort", "rien", "nothing", "discard") or t.startswith(
+        ("/cancel", "/skip")
+    ):
+        return "cancel"
     return "unknown"
 
 
@@ -387,6 +394,9 @@ class TelegramAdapter:
                                 await _send_reply(msg, "Failed to save. See server logs.")
                         else:
                             await _send_reply(msg, "Unknown type — saved nothing.")
+                    elif resolution == "cancel":
+                        state_store.clear(chat_id)
+                        await _send_reply(msg, "Discarded — nothing saved to Notion.")
                     elif resolution == "no":
                         state_store.clear(chat_id)
                         original_text = state.collected.get("original_text", text)
@@ -418,7 +428,10 @@ class TelegramAdapter:
                             state.collected["retry"] = str(retry + 1)
                             state_store.set(state)
                             await _send_reply(
-                                msg, state.collected.get("confirmation", "Reply yes or /knowledge.")
+                                msg,
+                                state.collected.get(
+                                    "confirmation", "Reply yes, /knowledge, or cancel."
+                                ),
                             )
                         else:
                             state_store.clear(chat_id)

@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import re
 
-_LINKEDIN_PASTE_RE = re.compile(
+_LINKEDIN_PERSON_PASTE_RE = re.compile(
     r"(https?://(?:www\.)?linkedin\.com/in/\S+)\s*:\s*(.+)",
+    re.IGNORECASE,
+)
+_LINKEDIN_COMPANY_URL_RE = re.compile(
+    r"(https?://(?:www\.)?linkedin\.com/company/[^/\s]+/?)(?:\s*:\s*(.+))?",
     re.IGNORECASE,
 )
 _PLACEHOLDER_RE = re.compile(
@@ -27,9 +31,13 @@ def is_placeholder(value: str) -> bool:
     return bool(_PLACEHOLDER_RE.match(value.strip()))
 
 
-def parse_linkedin_paste(text: str) -> dict[str, str] | None:
-    """Parse ``URL : Name, Company, Position`` LinkedIn contact pastes."""
-    match = _LINKEDIN_PASTE_RE.search(text.strip())
+def _slug_to_label(slug: str) -> str:
+    return slug.replace("-", " ").replace("_", " ").strip().title()
+
+
+def parse_linkedin_person_paste(text: str) -> dict[str, str] | None:
+    """Parse ``linkedin.com/in/… : Name, Company, Position`` person pastes."""
+    match = _LINKEDIN_PERSON_PASTE_RE.search(text.strip())
     if not match:
         return None
     linkedin_url, rest = match.group(1), match.group(2).strip()
@@ -43,6 +51,42 @@ def parse_linkedin_paste(text: str) -> dict[str, str] | None:
         "linkedin_url": linkedin_url,
     }
     return {key: value for key, value in result.items() if value and not is_placeholder(value)}
+
+
+def parse_linkedin_company_paste(text: str) -> dict[str, str] | None:
+    """Parse ``linkedin.com/company/…`` with optional ``: Name, sector, …`` tail."""
+    match = _LINKEDIN_COMPANY_URL_RE.search(text.strip())
+    if not match:
+        return None
+    linkedin_url = match.group(1).rstrip("/")
+    rest = (match.group(2) or "").strip()
+    slug_match = re.search(r"/company/([^/?#]+)", linkedin_url, re.IGNORECASE)
+    slug_name = _slug_to_label(slug_match.group(1)) if slug_match else ""
+    if rest:
+        name = rest.split(",", 1)[0].strip()
+        if is_placeholder(name):
+            name = slug_name
+    else:
+        name = slug_name
+    if not name:
+        return None
+    return {"name": name, "linkedin_url": linkedin_url}
+
+
+def parse_linkedin_paste(text: str) -> dict[str, str] | None:
+    """Alias for person paste (backward compatible)."""
+    return parse_linkedin_person_paste(text)
+
+
+def parse_linkedin_deterministic(text: str) -> tuple[str, dict[str, str]] | None:
+    """Return (inferred_type, fields) for LinkedIn /in/ or /company/ URLs."""
+    person = parse_linkedin_person_paste(text)
+    if person:
+        return "people", person
+    company = parse_linkedin_company_paste(text)
+    if company:
+        return "company", company
+    return None
 
 
 def parse_comma_contact(text: str) -> dict[str, str] | None:
@@ -68,8 +112,13 @@ def parse_comma_contact(text: str) -> dict[str, str] | None:
 
 
 def parse_contact_message(text: str) -> dict[str, str] | None:
-    """Try all deterministic contact paste formats."""
-    return parse_linkedin_paste(text) or parse_comma_contact(text)
+    """Try deterministic person paste formats (/people command)."""
+    return parse_linkedin_person_paste(text) or parse_comma_contact(text)
+
+
+def parse_company_message(text: str) -> dict[str, str] | None:
+    """Try deterministic company paste formats (/company command)."""
+    return parse_linkedin_company_paste(text)
 
 
 _CONTACT_FIELDS = frozenset({"name", "company", "position", "linkedin_url", "email"})
