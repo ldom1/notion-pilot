@@ -20,9 +20,9 @@ class TestInfisicalSettingsSourceNoOp:
         source = InfisicalSettingsSource(Settings)
         assert source() == {}
 
-    def test_does_not_import_sdk_when_client_id_absent(self, monkeypatch):
+    def test_does_not_instantiate_sdk_when_client_id_absent(self, monkeypatch):
         monkeypatch.delenv("INFISICAL_CLIENT_ID", raising=False)
-        with patch("infisical_sdk.InfisicalSDKClient") as mock_cls:
+        with patch("notion_pilot.shared.config.InfisicalSDKClient") as mock_cls:
             source = InfisicalSettingsSource(Settings)
             result = source()
         mock_cls.assert_not_called()
@@ -42,7 +42,7 @@ class TestInfisicalSettingsSourceFetch:
 
     def test_authenticates_with_universal_auth(self, mock_client):
         mock_client.secrets.list_secrets.return_value = []
-        with patch("infisical_sdk.InfisicalSDKClient", return_value=mock_client):
+        with patch("notion_pilot.shared.config.InfisicalSDKClient", return_value=mock_client):
             InfisicalSettingsSource(Settings)()
         mock_client.auth.universal_auth.login.assert_called_once_with(
             client_id="test-client-id",
@@ -51,7 +51,7 @@ class TestInfisicalSettingsSourceFetch:
 
     def test_fetches_from_global_and_app_paths(self, mock_client):
         mock_client.secrets.list_secrets.return_value = []
-        with patch("infisical_sdk.InfisicalSDKClient", return_value=mock_client):
+        with patch("notion_pilot.shared.config.InfisicalSDKClient", return_value=mock_client):
             InfisicalSettingsSource(Settings)()
         assert mock_client.secrets.list_secrets.call_count == 2
         calls = mock_client.secrets.list_secrets.call_args_list
@@ -61,7 +61,7 @@ class TestInfisicalSettingsSourceFetch:
 
     def test_uses_prod_env_by_default(self, mock_client):
         mock_client.secrets.list_secrets.return_value = []
-        with patch("infisical_sdk.InfisicalSDKClient", return_value=mock_client):
+        with patch("notion_pilot.shared.config.InfisicalSDKClient", return_value=mock_client):
             InfisicalSettingsSource(Settings)()
         for c in mock_client.secrets.list_secrets.call_args_list:
             assert c.kwargs["environment_slug"] == "prod"
@@ -71,7 +71,7 @@ class TestInfisicalSettingsSourceFetch:
             [_make_secret("OPENROUTER_API_KEY", "or-key")],  # /global
             [_make_secret("TELEGRAM_BOT_TOKEN", "bot-tok")],  # /notion-pilot
         ]
-        with patch("infisical_sdk.InfisicalSDKClient", return_value=mock_client):
+        with patch("notion_pilot.shared.config.InfisicalSDKClient", return_value=mock_client):
             result = InfisicalSettingsSource(Settings)()
         assert result["openrouter_api_key"] == "or-key"
         assert result["telegram_bot_token"] == "bot-tok"
@@ -81,14 +81,19 @@ class TestInfisicalSettingsSourceFetch:
             [_make_secret("SHARED_KEY", "from-global")],  # /global fetched first
             [_make_secret("SHARED_KEY", "from-app")],  # /notion-pilot fetched second
         ]
-        with patch("infisical_sdk.InfisicalSDKClient", return_value=mock_client):
+        with patch("notion_pilot.shared.config.InfisicalSDKClient", return_value=mock_client):
             result = InfisicalSettingsSource(Settings)()
         assert result["shared_key"] == "from-app"
+
+    def test_raises_on_partial_credentials(self, monkeypatch):
+        monkeypatch.delenv("INFISICAL_CLIENT_SECRET", raising=False)
+        with pytest.raises(ValueError, match="INFISICAL_CLIENT_SECRET"):
+            InfisicalSettingsSource(Settings)()
 
     def test_custom_env_slug_from_env_var(self, mock_client, monkeypatch):
         monkeypatch.setenv("INFISICAL_ENV", "dev")
         mock_client.secrets.list_secrets.return_value = []
-        with patch("infisical_sdk.InfisicalSDKClient", return_value=mock_client):
+        with patch("notion_pilot.shared.config.InfisicalSDKClient", return_value=mock_client):
             InfisicalSettingsSource(Settings)()
         for c in mock_client.secrets.list_secrets.call_args_list:
             assert c.kwargs["environment_slug"] == "dev"

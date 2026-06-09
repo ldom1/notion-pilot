@@ -7,6 +7,11 @@ from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
+try:
+    from infisical_sdk import InfisicalSDKClient
+except ImportError:  # pragma: no cover — optional dependency
+    InfisicalSDKClient = None  # noqa: F841
+
 
 class InfisicalSettingsSource(PydanticBaseSettingsSource):
     """Fetches secrets from Infisical via Universal Auth (SDK path).
@@ -15,12 +20,14 @@ class InfisicalSettingsSource(PydanticBaseSettingsSource):
     Secrets from /notion-pilot override /global on key conflict (later path wins).
     """
 
-    _PATHS = ["/global", "/notion-pilot"]
+    _PATHS: tuple[str, ...] = ("/global", "/notion-pilot")
 
     def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
+        # Required by ABC; not called because __call__ is fully overridden.
         return None, field_name, False
 
     def field_is_complex(self, field: FieldInfo) -> bool:
+        # Required by ABC; not called because __call__ is fully overridden.
         return False
 
     def __call__(self) -> dict[str, Any]:
@@ -28,14 +35,28 @@ class InfisicalSettingsSource(PydanticBaseSettingsSource):
         if not client_id:
             return {}
 
-        from infisical_sdk import InfisicalSDKClient  # noqa: PLC0415
+        client_secret = os.environ.get("INFISICAL_CLIENT_SECRET")
+        project_id = os.environ.get("INFISICAL_PROJECT_ID")
+        if not client_secret or not project_id:
+            missing = [
+                k
+                for k, v in {
+                    "INFISICAL_CLIENT_SECRET": client_secret,
+                    "INFISICAL_PROJECT_ID": project_id,
+                }.items()
+                if not v
+            ]
+            raise ValueError(
+                f"INFISICAL_CLIENT_ID is set but {', '.join(missing)} "
+                "are missing. Set all three or none."
+            )
 
-        client = InfisicalSDKClient(host="https://app.infisical.com")
+        host = os.environ.get("INFISICAL_HOST", "https://app.infisical.com")
+        client = InfisicalSDKClient(host=host)
         client.auth.universal_auth.login(
             client_id=client_id,
-            client_secret=os.environ["INFISICAL_CLIENT_SECRET"],
+            client_secret=client_secret,
         )
-        project_id = os.environ["INFISICAL_PROJECT_ID"]
         env_slug = os.environ.get("INFISICAL_ENV", "prod")
         secrets: dict[str, Any] = {}
         for path in self._PATHS:
