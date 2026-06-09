@@ -6,7 +6,6 @@ import asyncio
 from typing import Any
 
 import httpx
-from notion_client import AsyncClient
 
 from notion_pilot.shared.config import Settings
 
@@ -114,15 +113,18 @@ async def get_recent_people(settings: Settings) -> list[dict[str, Any]]:
     if not settings.notion_people_data_source_id:
         return []
     token = _token(settings)
-    client = AsyncClient(auth=token)
-    resp = await client.data_sources.query(
-        settings.notion_people_data_source_id,
-        filter={"timestamp": "created_time", "created_time": {"past_week": {}}},
-        sorts=[{"timestamp": "created_time", "direction": "descending"}],
-        page_size=20,
-    )
+    async with httpx.AsyncClient(headers=_headers(token), timeout=30) as client:
+        resp = await client.post(
+            f"{_NOTION_BASE}/databases/{settings.notion_people_data_source_id}/query",
+            json={
+                "filter": {"timestamp": "created_time", "created_time": {"past_week": {}}},
+                "sorts": [{"timestamp": "created_time", "direction": "descending"}],
+                "page_size": 20,
+            },
+        )
+    resp.raise_for_status()
     results = []
-    for page in resp.get("results", []):
+    for page in resp.json().get("results", []):
         props = page.get("properties", {})
         company = _rich_text(props.get("Company", {}))
         results.append({"name": _title(page), "company": company})
