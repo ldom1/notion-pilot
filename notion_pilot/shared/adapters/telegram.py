@@ -290,7 +290,7 @@ class TelegramAdapter:
             prompt = get_next_prompt(cmd, state)
             if prompt is None:
                 # All required fields extracted — run handler immediately
-                result = await cmd.handler(collected, settings)
+                result = await cmd.handler(collected, _enrich_settings_from_cockpit(settings))
                 await _send_reply(msg, result)
                 return
 
@@ -321,7 +321,9 @@ class TelegramAdapter:
                 # All required fields filled — run handler
                 state_store.clear(msg.chat_id)
                 try:
-                    result = await cmd.handler(state.collected, settings)
+                    result = await cmd.handler(
+                        state.collected, _enrich_settings_from_cockpit(settings)
+                    )
                     await _send_reply(msg, result)
                 except Exception:  # noqa: BLE001
                     logger.exception("telegram: CRM handler failed for /{}", state.command)
@@ -358,7 +360,9 @@ class TelegramAdapter:
                         cmd = COMMANDS.get(inferred_type)
                         if cmd:
                             try:
-                                result = await cmd.handler(extracted, settings)
+                                result = await cmd.handler(
+                                    extracted, _enrich_settings_from_cockpit(settings)
+                                )
                                 await _send_reply(msg, result)
                             except Exception:  # noqa: BLE001
                                 logger.exception("telegram: inferred handler failed")
