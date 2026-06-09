@@ -1,7 +1,50 @@
 """Runtime configuration loaded from environment variables."""
 
+import os
+from typing import Any
+
 from pydantic import AliasChoices, Field, SecretStr, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+
+
+class InfisicalSettingsSource(PydanticBaseSettingsSource):
+    """Fetches secrets from Infisical via Universal Auth (SDK path).
+
+    No-op when INFISICAL_CLIENT_ID is absent — CLI-injected env vars take over.
+    Secrets from /notion-pilot override /global on key conflict (later path wins).
+    """
+
+    _PATHS = ["/global", "/notion-pilot"]
+
+    def get_field_value(self, field: Any, field_name: str) -> tuple[Any, str, bool]:  # type: ignore[override]
+        return None, field_name, False
+
+    def field_is_complex(self, field: Any) -> bool:  # type: ignore[override]
+        return False
+
+    def __call__(self) -> dict[str, Any]:
+        client_id = os.environ.get("INFISICAL_CLIENT_ID")
+        if not client_id:
+            return {}
+        from infisical_sdk import InfisicalSDKClient  # noqa: PLC0415
+
+        client = InfisicalSDKClient(host="https://app.infisical.com")
+        client.auth.universal_auth.login(
+            client_id=client_id,
+            client_secret=os.environ["INFISICAL_CLIENT_SECRET"],
+        )
+        project_id = os.environ["INFISICAL_PROJECT_ID"]
+        env_slug = os.environ.get("INFISICAL_ENV", "prod")
+        secrets: dict[str, Any] = {}
+        for path in self._PATHS:
+            for s in client.secrets.list_secrets(
+                project_id=project_id,
+                environment_slug=env_slug,
+                secret_path=path,
+                view_secret_value=True,
+            ):
+                secrets[s.secretKey.lower()] = s.secretValue
+        return secrets
 
 
 class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
@@ -14,6 +57,22 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         extra="ignore",
         populate_by_name=True,
     )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type["Settings"],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            InfisicalSettingsSource(settings_cls),
+            env_settings,
+            dotenv_settings,
+            init_settings,
+        )
 
     # ── Notion (optional when using OAuth) ──────────────────────────────────
     notion_token: SecretStr | None = Field(

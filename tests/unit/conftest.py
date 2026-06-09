@@ -6,6 +6,8 @@ from pydantic_settings import SettingsConfigDict
 # Keys that must NOT bleed from the developer's .env into unit tests that
 # construct Settings with no explicit values for these fields.
 _ENV_KEYS_TO_CLEAR = [
+    "INFISICAL_CLIENT_ID",
+    "INFISICAL_CLIENT_SECRET",
     "OPENROUTER_API_KEY",
     "BRAVE_API_KEY",
     "APOLLO_API_KEY",
