@@ -48,6 +48,19 @@
 - [x] GitHub Actions CI + auto-deploy on push to main
 - [ ] Chatbot endpoint for embeddable landing page widget
 
+## Infisical Secret Manager ✅ (partial — permissions pending)
+
+- [x] `InfisicalSettingsSource` in `notion_pilot/shared/config.py` — pydantic-settings v2 custom source; SDK Universal Auth for Docker, CLI env injection for local dev
+- [x] `infisical.json` + `.env.bootstrap` / `.env.bootstrap.example` — project config and bootstrap template
+- [x] `docker-compose.yml`: `env_file: .env.bootstrap` (required) + `env_file: .env` (optional fallback)
+- [x] `deploy.sh` rewritten for Docker Compose (branch-based, not tag-based)
+- [x] `Makefile` `dev`/`dev-backend` wrap `launch_webserver.sh` with `infisical run --`
+- [x] `launch_webserver.sh` drops `.env` reading; expects Infisical CLI injection
+- [x] Per-path 403 errors are non-fatal (warn + continue, fall back to env vars)
+- [ ] **Infisical machine identity permissions** — add **Read on Secrets** (not just Secret Values) to both `read-global` and `read-notion-pilot` policies so `list_secrets` (`describeSecret`) works
+- [ ] After permissions fixed: delete `.env` from devbox, verify Infisical is sole source, remove optional `.env` fallback from `docker-compose.yml`
+- [ ] Ansible role: write `.env.bootstrap` from vault (template `env_bootstrap.j2` ready)
+
 ## Phase 4b — Cockpit UX / Performance (in progress, branch: fix/deployment)
 
 - [x] Remove BETA badge

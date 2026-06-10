@@ -7,11 +7,12 @@
 - LLM enrichment via OpenRouter (heuristics fallback if no key)
 - Multi-adapter architecture: Telegram, Email (IMAP), Discord
 - CRM module fully functional: `/lead`, `/people`, `/company`, `/deal`, `/enrich`, `/knowledge`
-- Deployed on devbox as systemd user service
+- **Deployed on devbox as Docker Compose** (web + bot containers, nginx reverse proxy, Let's Encrypt)
+- **Infisical secret manager integrated** (PR #14 merged): `InfisicalSettingsSource`, `infisical.json`, `.env.bootstrap`; local dev via `infisical run --`; deploy via `./deploy.sh --branch <name>`
 
 ## Current Branch
 
-`feat/notion-pilot-cockpit` — Phase 4 + UX polish complete.
+`develop` — Infisical integration complete, deploy workflow modernized.
 
 ## What's New (2026-06-04, UX polish)
 
@@ -47,13 +48,19 @@
 
 ## Next Steps
 
-1. Fix Telegram conflict error (two getUpdates pollers running simultaneously)
-2. Improve LLM prompt to prevent fictional/unknown contacts in lead suggestions
-3. End-to-end test: sign-out → OAuth → cockpit → run script → compose workflow → save → run from list
-4. Add `crm_prospect.py` to `config/scripts.yaml` once CLI args confirmed
-5. Phase 5: `data/{workspace_id}/` namespacing, LinkedIn upload endpoint, shared bot dispatcher
-6. Notion conversation history (log chat sessions to Notion — roadmap item)
-7. Phase 2: email "à relire" pipeline
+### Infisical (immediate — requires Infisical UI action)
+1. **Fix machine identity permissions**: edit `read-global` and `read-notion-pilot` policies → add **Read on Secrets** resource (currently only Secret Values; `list_secrets` needs `describeSecret`)
+2. After permissions fixed: verify `notion_token: SET` via `docker exec notion-pilot-web-1 uv run python -c "from notion_pilot.shared.config import load_settings; s = load_settings(); print('notion_token:', 'SET' if s.notion_token else 'MISSING')"`
+3. Delete `.env` from devbox (`rm /home/lgiron/Lab/notion-pilot/.env`) — Infisical becomes sole source
+4. Remove optional `.env` fallback from `docker-compose.yml` (the `required: false` entry)
+5. Re-deploy and confirm clean (no warnings, no `.env` needed)
+
+### Backlog
+6. Fix Telegram conflict error (two getUpdates pollers running simultaneously)
+7. Improve LLM prompt to prevent fictional/unknown contacts in lead suggestions
+8. Add `crm_prospect.py` to `config/scripts.yaml` once CLI args confirmed
+9. Phase 5: `data/{workspace_id}/` namespacing, LinkedIn upload endpoint, shared bot dispatcher
+10. Server-side cache for `/api/cockpit/status` (TTL 60s)
 
 ## Web module layout
 
