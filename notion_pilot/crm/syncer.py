@@ -274,7 +274,7 @@ class NotionPeopleSyncer:
 
         properties: dict[str, object] = {
             "Nom": {"title": [{"text": {"content": person.name}}]},
-            "In my network": {"select": {"name": "Yes"}},
+            "Relationship": {"select": {"name": "Yes"}},
         }
         if person.position:
             properties["Position"] = {"rich_text": [{"text": {"content": person.position}}]}

@@ -57,9 +57,9 @@ class NotionDealsSyncer:
         if deal.probability_pct is not None:
             props["Probability (%)"] = {"number": deal.probability_pct}
         if deal.next_action:
-            props["Next Action"] = {"rich_text": [{"text": {"content": deal.next_action}}]}
+            props["Next Step"] = {"rich_text": [{"text": {"content": deal.next_action}}]}
         if deal.next_action_date:
-            props["Next Action Date"] = {"date": {"start": deal.next_action_date}}
+            props["Next Step Date"] = {"date": {"start": deal.next_action_date}}
         if deal.notes:
             props["Notes"] = {"rich_text": [{"text": {"content": deal.notes}}]}
         if deal.people_ids:

@@ -59,8 +59,8 @@ async def main() -> None:
                 "expression": 'formatNumber(round((prop("Value (euros)") * prop("Probability (%)"))), "eur")'
             }
         },
-        "Next Action": {"rich_text": {}},
-        "Next Action Date": {"date": {}},
+        "Next Step": {"rich_text": {}},
+        "Next Step Date": {"date": {}},
         "Notes": {"rich_text": {}},
     }
 

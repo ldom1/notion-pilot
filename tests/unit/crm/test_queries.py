@@ -32,7 +32,7 @@ async def test_get_open_leads_returns_list():
                     "properties": {
                         "Name": {"type": "title", "title": [{"plain_text": "Artelys HPC"}]},
                         "Stage": {"select": {"name": "Prospect"}},
-                        "Next action": {"rich_text": [{"plain_text": "Call CEO"}]},
+                        "Next Step": {"rich_text": [{"plain_text": "Call CEO"}]},
                     },
                 }
             ]

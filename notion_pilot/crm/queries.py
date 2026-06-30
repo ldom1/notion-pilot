@@ -49,8 +49,8 @@ async def get_open_leads(settings: Settings) -> list[dict[str, Any]]:
             json={
                 "filter": {
                     "and": [
-                        {"property": "Stage", "select": {"does_not_equal": "Closed - Won"}},
-                        {"property": "Stage", "select": {"does_not_equal": "Closed - Lost"}},
+                        {"property": "Stage", "select": {"does_not_equal": "Closed Won"}},
+                        {"property": "Stage", "select": {"does_not_equal": "Closed Lost"}},
                     ]
                 },
                 "sorts": [{"timestamp": "last_edited_time", "direction": "descending"}],
@@ -63,7 +63,7 @@ async def get_open_leads(settings: Settings) -> list[dict[str, Any]]:
         props = page.get("properties", {})
         stage_prop = props.get("Stage", {})
         stage = (stage_prop.get("select") or {}).get("name", "")
-        next_action = _rich_text(props.get("Next action", {}))
+        next_action = _rich_text(props.get("Next Step", {}))
         results.append(
             {
                 "title": _title(page),

@@ -176,7 +176,7 @@ class TestNotionPeopleSyncer:
         syncer, client = await self._make_syncer([], [])
         await syncer.upsert(PersonRecord(name="X", company="Y"))
         props = client.pages.create.call_args.kwargs["properties"]
-        assert props["In my network"]["select"]["name"] == "Yes"
+        assert props["Relationship"]["select"]["name"] == "Yes"
 
     async def test_upsert_sets_phone_seniority_role_type(self):
         syncer, client = await TestNotionPeopleSyncer._make_syncer(TestNotionPeopleSyncer, [], [])

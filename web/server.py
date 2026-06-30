@@ -768,7 +768,7 @@ def create_app(settings: Settings) -> FastAPI:
                     deal_props[key] = {"number": val}
                 elif val:
                     # select or text
-                    if key in {"Stage", "Type"}:
+                    if key in {"Stage", "Lead Source"}:
                         deal_props[key] = {"select": {"name": val}}
                     else:
                         deal_props[key] = {"rich_text": [{"text": {"content": str(val)}}]}

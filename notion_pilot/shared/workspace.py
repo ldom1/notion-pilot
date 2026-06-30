@@ -663,10 +663,10 @@ async def _seed_people(
             "Linkedin": {"url": p["linkedin"]},
             "Email - pro": {"email": p["email_pro"]},
             "Phone": {"phone_number": p["phone"]},
-            "In my network": {"select": {"name": p["in_network"]}},
+            "Relationship": {"select": {"name": p["in_network"]}},
             "Seniority": {"select": {"name": p["seniority"]}},
             "Role Type": {"multi_select": [{"name": r} for r in p["role_type"]]},
-            "Profile": {"select": {"name": p["profile"]}},
+            "Priority": {"select": {"name": p["profile"]}},
             "Tags": {"multi_select": [{"name": t} for t in p["tags"]]},
             "Notes": {"rich_text": _rt(p["notes"])},
         }
@@ -692,10 +692,9 @@ async def _seed_deals(
             "Value (euros)": {"number": d["value"]},
             "Probability (%)": {"number": d["probability"]},
             "Product": {"multi_select": [{"name": p} for p in d["product"]]},
-            "Type": {"select": {"name": d["type"]}},
-            "Next Action": {"rich_text": _rt(d["next_action"])},
-            "Next Action Date": {"date": {"start": d["next_action_date"]}},
-            "Contacted": {"checkbox": d["contacted"]},
+            "Lead Source": {"select": {"name": d["type"]}},
+            "Next Step": {"rich_text": _rt(d["next_action"])},
+            "Next Step Date": {"date": {"start": d["next_action_date"]}},
             "Notes": {"rich_text": _rt(d["notes"])},
         }
         if contacts:
@@ -857,7 +856,7 @@ async def create_crm_workspace(
             "Email - pro": {"email": {}},
             "Email - private": {"email": {}},
             "Phone": {"phone_number": {}},
-            "In my network": {
+            "Relationship": {
                 "select": {
                     "options": [
                         {"name": "Yes", "color": "green"},
@@ -884,7 +883,7 @@ async def create_crm_workspace(
                 }
             },
             "Role Type": {"multi_select": {"options": []}},
-            "Profile": {
+            "Priority": {
                 "select": {
                     "options": [
                         {"name": "Normal", "color": "default"},
@@ -921,8 +920,8 @@ async def create_crm_workspace(
             },
             "Value (euros)": {"number": {"format": "euro"}},
             "Probability (%)": {"number": {"format": "percent"}},
-            "Next Action": {"rich_text": {}},
-            "Next Action Date": {"date": {}},
+            "Next Step": {"rich_text": {}},
+            "Next Step Date": {"date": {}},
             "Product": {
                 "multi_select": {
                     "options": [
@@ -933,7 +932,7 @@ async def create_crm_workspace(
                     ]
                 }
             },
-            "Type": {
+            "Lead Source": {
                 "select": {
                     "options": [
                         {"name": "Prospection froide", "color": "gray"},
@@ -943,7 +942,6 @@ async def create_crm_workspace(
                     ]
                 }
             },
-            "Contacted": {"checkbox": {}},
             "Notes": {"rich_text": {}},
         },
         "💼",
