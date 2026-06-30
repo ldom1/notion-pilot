@@ -12,7 +12,7 @@ Complete them after all migration scripts have run successfully.
 | Companies | `https://www.notion.so/cfc2119896844ef798aefc5657511998` |
 | Meetings | `https://www.notion.so/e94cc98f2f664c53acd662b9d8f7d5aa` |
 | Activities | `https://www.notion.so/38f6c45194658166a862e531d15f467f` |
-| CRM parent page | `https://www.notion.so/36d6c45194658 0b7af00d80250f0974c` |
+| CRM parent page | `https://www.notion.so/36d6c451946580b7af00d80250f0974c` |
 
 ---
 
