@@ -657,7 +657,7 @@ async def _seed_people(
     ids: dict[str, str] = {}
     for p in _DEMO_PEOPLE:
         props: dict[str, Any] = {
-            "Nom": {"title": _rt(p["name"])},
+            "Name": {"title": _rt(p["name"])},
             "Company": {"relation": [{"id": company_ids[p["company"]]}]},
             "Position": {"rich_text": _rt(p["position"])},
             "Linkedin": {"url": p["linkedin"]},
@@ -849,7 +849,7 @@ async def create_crm_workspace(
         crm_page_id,
         "People",
         {
-            "Nom": {"title": {}},
+            "Name": {"title": {}},
             "Company": {"relation": {"database_id": companies_id, "single_property": {}}},
             "Position": {"rich_text": {}},
             "Linkedin": {"url": {}},
@@ -914,7 +914,7 @@ async def create_crm_workspace(
                         {"name": "Negotiation", "color": "orange"},
                         {"name": "Closed Won", "color": "green"},
                         {"name": "Closed Lost", "color": "red"},
-                        {"name": "No answer", "color": "default"},
+                        {"name": "No Answer", "color": "default"},
                     ]
                 }
             },

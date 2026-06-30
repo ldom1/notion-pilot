@@ -85,7 +85,7 @@ def _make_people_page(page_id: str, name: str, company_page_ids: list[str] | Non
     return {
         "id": page_id,
         "properties": {
-            "Nom": {"type": "title", "title": [{"plain_text": name}]},
+            "Name": {"type": "title", "title": [{"plain_text": name}]},
             "Company": {
                 "type": "relation",
                 "relation": [{"id": cid} for cid in (company_page_ids or [])],
@@ -198,7 +198,7 @@ class TestNotionPeopleSyncer:
 
 def _make_people_page_no_company(page_id: str, name: str, email: str = "") -> dict:
     props: dict = {
-        "Nom": {"title": [{"plain_text": name}]},
+        "Name": {"title": [{"plain_text": name}]},
         "Company": {"relation": []},
     }
     if email:
@@ -240,7 +240,7 @@ async def test_load_snapshot_reads_optional_fields():
             {
                 "id": "p1",
                 "properties": {
-                    "Nom": {"title": [{"plain_text": "Alice Martin"}]},
+                    "Name": {"title": [{"plain_text": "Alice Martin"}]},
                     "Company": {"relation": []},
                     "Position": {"rich_text": [{"plain_text": "VP Engineering"}]},
                     "Seniority": {"select": {"name": "vp"}},

@@ -51,6 +51,7 @@ async def get_open_leads(settings: Settings) -> list[dict[str, Any]]:
                     "and": [
                         {"property": "Stage", "select": {"does_not_equal": "Closed Won"}},
                         {"property": "Stage", "select": {"does_not_equal": "Closed Lost"}},
+                        {"property": "Stage", "select": {"does_not_equal": "No Answer"}},
                     ]
                 },
                 "sorts": [{"timestamp": "last_edited_time", "direction": "descending"}],
