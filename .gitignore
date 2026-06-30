@@ -77,4 +77,4 @@ web/workspaces/
 
 # Frontend build
 web/dist/
-web/frontend/node_modules/
+web/frontend/node_modules/data/crm_meetings_synced.json
