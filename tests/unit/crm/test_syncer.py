@@ -80,6 +80,49 @@ class TestNotionCompanySyncer:
 
         assert client.pages.create.call_count == 1
 
+    async def test_ensure_siren_property_creates_when_missing(self):
+        client = AsyncMock()
+        client.databases.retrieve.return_value = {"properties": {"Name": {}}}
+        syncer = NotionCompanySyncer(client, "fake-ds-id", standard_api=True)
+
+        await syncer.ensure_siren_property()
+
+        client.databases.update.assert_awaited_once_with(
+            "fake-ds-id", properties={"SIREN": {"rich_text": {}}}
+        )
+
+    async def test_ensure_siren_property_skips_when_present(self):
+        client = AsyncMock()
+        client.databases.retrieve.return_value = {"properties": {"Name": {}, "SIREN": {}}}
+        syncer = NotionCompanySyncer(client, "fake-ds-id", standard_api=True)
+
+        await syncer.ensure_siren_property()
+
+        client.databases.update.assert_not_awaited()
+
+    async def test_load_snapshot_captures_siren_into_details(self):
+        # Reuses this file's existing `_mock_ds_query` helper (data_sources API path,
+        # same convention as `test_load_snapshot_populates_cache` above) rather than
+        # mocking `databases.retrieve` directly — `_query_page` under standard_api=True
+        # makes a raw httpx call outside the AsyncMock client, so the data_sources
+        # path is what's actually mockable here.
+        client = _mock_ds_query(
+            [
+                {
+                    "id": "pid1",
+                    "properties": {
+                        "Name": {"title": [{"plain_text": "Artelys"}]},
+                        "SIREN": {"rich_text": [{"plain_text": "428895676"}]},
+                    },
+                }
+            ]
+        )
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+
+        await syncer.load_snapshot()
+
+        assert syncer.details["pid1"]["siren"] == "428895676"
+
 
 def _make_people_page(page_id: str, name: str, company_page_ids: list[str] | None = None) -> dict:
     return {

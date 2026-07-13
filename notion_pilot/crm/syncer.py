@@ -72,6 +72,19 @@ class NotionCompanySyncer:
             "Content-Type": "application/json",
         }
 
+    async def ensure_siren_property(self) -> None:
+        """Idempotent: adds a SIREN rich_text property to the Companies DB
+        if it doesn't already have one. Only supports the standard databases
+        API path for now — data_sources schema updates go through a
+        different endpoint and aren't needed by any current workspace."""
+        if not self._standard_api:
+            return
+        db = await self._client.databases.retrieve(self._ds_id)
+        if "SIREN" in db.get("properties", {}):
+            return
+        await self._client.databases.update(self._ds_id, properties={"SIREN": {"rich_text": {}}})
+        logger.info("Added SIREN property to Companies DB {}", self._ds_id[:8])
+
     async def _query_page(self, cursor: str | None) -> dict[str, Any]:
         if self._standard_api:
             body: dict[str, object] = {"page_size": 100}
@@ -113,6 +126,10 @@ class NotionCompanySyncer:
                         detail["country"] = props["Country"]["select"]["name"]
                     if props.get("Sector", {}).get("select"):
                         detail["sector"] = props["Sector"]["select"]["name"]
+                    if props.get("SIREN", {}).get("rich_text"):
+                        detail["siren"] = "".join(
+                            t.get("plain_text", "") for t in props["SIREN"]["rich_text"]
+                        )
                     icon = page.get("icon") or {}
                     if icon.get("type") == "external":
                         detail["icon_url"] = (icon.get("external") or {}).get("url", "")
