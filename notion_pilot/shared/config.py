@@ -221,6 +221,10 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         default=None,
         description="Notion database ID for the Deals database (standard databases API, not data_sources).",
     )
+    prosper_mcp_url: str = Field(
+        default="http://localhost:8090/sse",
+        description="SSE endpoint for prosper's MCP server (company resolution + enrichment).",
+    )
 
     # ── Knowledge Inbox DBs (optional) ──────────────────────────────────────
     notion_notions_database_id: str | None = Field(
