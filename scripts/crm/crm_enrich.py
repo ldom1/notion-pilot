@@ -18,7 +18,7 @@ from notion_client import AsyncClient
 
 from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer
 from notion_pilot.shared.config import load_settings
-from notion_pilot.shared.utils.enrichment import enrich_company, enrich_person
+from notion_pilot.shared.prosper_client import enrich_company, enrich_person
 
 _RATE_LIMIT_S = 0.4  # seconds between Notion writes to stay under rate limit
 _NOTION_BASE = "https://www.notion.so"

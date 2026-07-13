@@ -24,7 +24,7 @@ from notion_pilot.inbox import build_knowledge_pipeline
 from notion_pilot.shared.adapters.email import EmailAdapter, _sender_allowed
 from notion_pilot.shared.config import Settings, load_settings
 from notion_pilot.shared.models import _first_url
-from notion_pilot.shared.utils.enrichment import enrich_person
+from notion_pilot.shared.prosper_client import enrich_person
 
 _SENDER_CONFIG = Path("config/email-senders.yaml")
 _REVIEW_CSV = Path("data/inbox/email-import-review.csv")
