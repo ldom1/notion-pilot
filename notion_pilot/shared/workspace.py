@@ -67,7 +67,6 @@ _ROOT_CHILDREN: list[JsonDict] = [
     _h2("Telegram quick reference"),
     _bullet("/lead — Create or update a company"),
     _bullet("/deal — Log a deal"),
-    _bullet("/enrich — Enrich a contact or company with Apollo / Brave Search"),
     _bullet("/people — Add a contact"),
     _bullet("/notion — Save a thought, article, or link to Knowledge"),
     _bullet("/idea — Capture an idea"),
@@ -76,14 +75,13 @@ _ROOT_CHILDREN: list[JsonDict] = [
 
 _CRM_CHILDREN: list[JsonDict] = [
     _callout(
-        "Start with a Company → add People → track Deals → /enrich to auto-fill details.",
+        "Start with a Company → add People → track Deals.",
         "🏢",
     ),
     _h2("Getting started"),
     _numbered("Add a company: /lead TechCorp"),
     _numbered("Add contacts: /people Alice Martin, CTO @ TechCorp"),
     _numbered("Track a deal: /deal ERP Integration — TechCorp, €45k"),
-    _numbered("Enrich a contact: /enrich Alice Martin"),
     _paragraph(
         "💡 Tip: switch the Deals view to Board (group by Stage) for a Kanban pipeline."
         " In Notion: ··· → Add a view → Board."

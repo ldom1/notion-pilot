@@ -113,24 +113,6 @@ async def _handle_lead(collected: dict[str, str], settings: Settings) -> str:
     return person_msg
 
 
-async def _handle_enrich(collected: dict[str, str], settings: Settings) -> str:
-    from notion_pilot.shared.utils.enrichment import enrich_person
-
-    enrichment = await enrich_person(collected["name"], collected.get("company", ""), settings)
-    parts = []
-    if enrichment.email:
-        parts.append(f"email: {enrichment.email}")
-    if enrichment.phone:
-        parts.append(f"phone: {enrichment.phone}")
-    if enrichment.linkedin_url:
-        parts.append(f"linkedin: {enrichment.linkedin_url}")
-    if enrichment.seniority:
-        parts.append(f"seniority: {enrichment.seniority}")
-    if not parts:
-        return f"No enrichment data found for {collected['name']}."
-    return f"✓ Enriched {collected['name']}:\n" + "\n".join(f"  • {p}" for p in parts)
-
-
 async def _handle_knowledge(_collected: dict[str, str], _settings: Settings) -> str:
     return "__KNOWLEDGE__"  # sentinel: caller routes to knowledge pipeline
 
@@ -253,16 +235,6 @@ COMMANDS: dict[str, CommandDef] = {
         ],
         llm_prompt="Extract the deal title, stage, and notes from this message.",
         handler=_handle_deal,
-    ),
-    "enrich": CommandDef(
-        name="enrich",
-        description="Look up enrichment data for a person",
-        fields=[
-            FieldDef("name", "Person's full name?"),
-            FieldDef("company", "Which company?"),
-        ],
-        llm_prompt="Extract the person's name and company from this message.",
-        handler=_handle_enrich,
     ),
     "knowledge": CommandDef(
         name="knowledge",
