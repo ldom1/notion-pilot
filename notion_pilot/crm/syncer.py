@@ -171,17 +171,20 @@ class NotionCompanySyncer:
         logger.info("Created company: {} ({})", name, page_id)
 
         if settings is not None:
-            resolution = await resolve_company(name, settings)
-            best_match = resolution.get("best_match")
-            if resolution.get("confidence_level") == "high" and best_match:
-                await self.ensure_siren_property()
-                await self._client.pages.update(
-                    page_id,
-                    properties={
-                        "SIREN": {"rich_text": [{"text": {"content": best_match["siren"]}}]}
-                    },
-                )
-                logger.info("Auto-populated SIREN {} for {}", best_match["siren"], name)
+            try:
+                resolution = await resolve_company(name, settings)
+                best_match = resolution.get("best_match")
+                if resolution.get("confidence_level") == "high" and best_match:
+                    await self.ensure_siren_property()
+                    await self._client.pages.update(
+                        page_id,
+                        properties={
+                            "SIREN": {"rich_text": [{"text": {"content": best_match["siren"]}}]}
+                        },
+                    )
+                    logger.info("Auto-populated SIREN {} for {}", best_match["siren"], name)
+            except Exception:  # noqa: BLE001
+                logger.warning("SIREN resolution failed for {}; continuing without it", name)
 
         return page_id
 

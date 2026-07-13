@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
 
 from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
@@ -438,3 +439,56 @@ async def test_lead_path_populates_siren_via_people_upsert(monkeypatch):
     )
 
     assert resolved_with_settings == [settings]
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_survives_resolve_company_connection_failure(monkeypatch):
+    """Regression test for the Critical finding: if prosper's MCP server is
+    unreachable, resolve_company can raise a raw connection exception (not
+    just return a structured error dict). get_or_create must still return the
+    already-created page_id instead of propagating the exception — the
+    company page creation must not depend on prosper's availability."""
+    from notion_pilot.shared.config import Settings
+
+    client = AsyncMock()
+    client.pages.create.return_value = {"id": "new-page-id"}
+    syncer = NotionCompanySyncer(client, "fake-ds-id", standard_api=True)
+    settings = Settings(notion_telegram_msg_database_id="d")
+
+    async def fake_resolve(name, settings):
+        raise httpx.ConnectError("connection refused")
+
+    monkeypatch.setattr("notion_pilot.crm.syncer.resolve_company", fake_resolve)
+
+    page_id = await syncer.get_or_create("Artelys", settings=settings)
+
+    assert page_id == "new-page-id"
+    client.pages.update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_lead_path_survives_resolve_company_connection_failure(monkeypatch):
+    """Regression test for the /lead blast radius: if resolve_company raises
+    while creating the company (inside get_or_create), the person page must
+    still get created afterwards — no orphaned company page with a silently
+    dropped person/deal."""
+    from notion_pilot.crm.syncer import NotionPeopleSyncer, PersonRecord
+    from notion_pilot.shared.config import Settings
+
+    client = AsyncMock()
+    client.pages.create.side_effect = [{"id": "new-company-id"}, {"id": "person-page-id"}]
+    company_syncer = NotionCompanySyncer(client, "fake-companies-ds", standard_api=True)
+    people_syncer = NotionPeopleSyncer(client, "fake-people-ds", company_syncer)
+    settings = Settings(notion_telegram_msg_database_id="d")
+
+    async def fake_resolve(name, settings):
+        raise Exception("boom")  # noqa: TRY002
+
+    monkeypatch.setattr("notion_pilot.crm.syncer.resolve_company", fake_resolve)
+
+    result = await people_syncer.upsert(
+        PersonRecord(name="Jean Dupont", company="NewCo"), settings=settings
+    )
+
+    assert result.status == "created"
+    assert result.page_id == "person-page-id"
