@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `InfisicalSettingsSource` (`notion_pilot/shared/config.py`) — pydantic-settings v2 custom source; SDK (Universal Auth) path for Docker, CLI-injected env vars for local dev; per-path errors are non-fatal (warns + continues)
 - `deploy.sh` — rewritten for Docker Compose (`git fetch → reset --hard → docker compose up --build -d`); replaces the old tag-based systemd script
 - MCP server (`notion_pilot/mcp/`) exposing the CRM vertical as tools: `upsert_people`, `upsert_companies`, `find_duplicates`, `enrich_people`, `enrich_companies`, `rank_contacts_for_pitch`, `search_people`, `search_companies`, `get_recent_people`, `get_open_leads`, `refresh_notion_snapshot`. Stdio transport, dry-run-by-default on all write tools.
+- `notion_pilot/shared/siren_lookup.py` — SIREN-by-name lookup via the French government's free company registry API (no key required); wired into `upsert_companies`, which surfaces the candidate SIREN in the `confirm=false` preview and only writes it once the caller repeats the call with `confirm=true`.
 
 ### Changed
 - `Makefile`: `dev` and `dev-backend` targets now wrap `launch_webserver.sh` with `infisical run --`; `deploy` delegates to `./deploy.sh`

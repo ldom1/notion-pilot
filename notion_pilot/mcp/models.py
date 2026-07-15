@@ -37,6 +37,7 @@ class RecordResult(BaseModel):
     matched_company: str = ""
     page_id: str = ""
     error_message: str = ""
+    siren: str = ""
 
 
 class BatchResult(BaseModel):

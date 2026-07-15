@@ -197,7 +197,7 @@ Tools:
 | Tool | Description |
 |---|---|
 | `upsert_people` | Upsert people into the Notion People database, dedup-checked. Defaults to a dry-run preview (`confirm=false`) — pass `confirm=true` to actually write. |
-| `upsert_companies` | Upsert companies into the Notion Companies database, dedup-checked. Defaults to a dry-run preview — pass `confirm=true` to write. |
+| `upsert_companies` | Upsert companies into the Notion Companies database, dedup-checked. New companies get a SIREN candidate looked up by name via the French government's company registry, shown in the preview for approval and written on `confirm=true`. Defaults to a dry-run preview. |
 | `find_duplicates` | Find likely-duplicate People/Companies pairs already in Notion via fuzzy name matching. `target`: `people`, `companies`, or `both`. |
 | `enrich_people` | Enrich People records missing seniority/role/email via prosper's `enrich_person` MCP tool. Defaults to a dry-run preview. |
 | `enrich_companies` | Enrich Company records missing sector/size/country/LinkedIn via prosper's `enrich_company` MCP tool. Defaults to a dry-run preview. |

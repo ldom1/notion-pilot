@@ -35,8 +35,10 @@ async def upsert_people(records: list[PersonRecord], confirm: bool = False) -> B
 
 @mcp.tool()
 async def upsert_companies(records: list[CompanyRecord], confirm: bool = False) -> BatchResult:
-    """Upsert companies into the Notion Companies database, dedup-checked.
-    Defaults to a dry-run preview (confirm=False) — pass confirm=True to write."""
+    """Upsert companies into the Notion Companies database, dedup-checked. New
+    companies get a SIREN candidate looked up by name (French government
+    company registry) — shown in the confirm=False preview for the caller to
+    approve, and written only once the same call is repeated with confirm=True."""
     return await t.upsert_companies(_session, records, confirm)
 
 
@@ -53,8 +55,8 @@ async def find_duplicates(
 async def enrich_people(
     page_ids: list[str] | None = None, limit: int = 9999, confirm: bool = False
 ) -> BatchResult:
-    """Enrich People records missing seniority/role/email via the Apollo →
-    Brave → Perplexity → LLM waterfall. Defaults to a dry-run preview."""
+    """Enrich People records missing seniority/role/email via prosper's
+    enrich_person MCP tool. Defaults to a dry-run preview."""
     return await t.enrich_people(_session, _settings, page_ids, limit, confirm)
 
 
@@ -62,8 +64,8 @@ async def enrich_people(
 async def enrich_companies(
     page_ids: list[str] | None = None, limit: int = 9999, confirm: bool = False
 ) -> BatchResult:
-    """Enrich Company records missing sector/size/country/LinkedIn via the same
-    waterfall as enrich_people. Defaults to a dry-run preview."""
+    """Enrich Company records missing sector/size/country/LinkedIn via prosper's
+    enrich_company MCP tool. Defaults to a dry-run preview."""
     return await t.enrich_companies(_session, _settings, page_ids, limit, confirm)
 
 
