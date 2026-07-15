@@ -14,6 +14,10 @@ class PersonRecord(BaseModel):
     phone: str | None = None
     seniority: str | None = None
     role_type: list[str] | None = None
+    force: bool = Field(
+        default=False,
+        description="Bypass a needs_review dedup block on confirm=true (never bypasses other gates)",
+    )
 
 
 class CompanyRecord(BaseModel):
@@ -25,6 +29,16 @@ class CompanyRecord(BaseModel):
     size: str | None = None
     country: str | None = None
     sector: str | None = None
+    contact_email: str | None = Field(
+        default=None,
+        description="Email of a known contact at this company — used as a dedup domain signal and, "
+        "if no other source provides one, to derive a website guess",
+    )
+    force: bool = Field(
+        default=False,
+        description="Bypass a needs_review dedup block on confirm=true (never bypasses the SIREN "
+        "confidence gate)",
+    )
 
 
 class RecordResult(BaseModel):
@@ -38,6 +52,19 @@ class RecordResult(BaseModel):
     page_id: str = ""
     error_message: str = ""
     siren: str = ""
+    siren_candidate_name: str = Field(
+        default="", description="Registry match name, kept separate from matched_name (Notion dedup)"
+    )
+    reason: str = Field(default="", description="Explanation for needs_review or a force override")
+    candidates: list[dict[str, str | float]] = Field(
+        default_factory=list,
+        description='Actionable near-matches: {"type": "notion", page_id, name, score} or '
+        '{"type": "siren", siren, matched_name, score}',
+    )
+    enrichment_preview: dict[str, str] = Field(
+        default_factory=dict,
+        description="Fields that would be written on confirm=true (siren, sector, size, country, website)",
+    )
 
 
 class BatchResult(BaseModel):
