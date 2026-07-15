@@ -205,6 +205,54 @@ async def test_upsert_companies_confirm_true_skips_siren_for_matched_company(mon
     assert result.results[0].siren == ""
 
 
+async def test_upsert_companies_dry_run_flags_acronym_as_needs_review():
+    # No lookup_siren mock needed — needs_review short-circuits _company_dedup_signal
+    # before the SIREN block is ever reached.
+    session = await _loaded_session(existing_companies={"id-rte": "RTE"})
+
+    result = await upsert_companies(session, [CompanyRecord(name="Rte France")], confirm=False)
+
+    assert result.results[0].status == "needs_review"
+    assert result.results[0].candidates == [
+        {"type": "notion", "page_id": "id-rte", "name": "RTE", "score": 100.0}
+    ]
+
+
+async def test_upsert_companies_dry_run_domain_match_wins_over_needs_review():
+    # No lookup_siren mock needed — a domain match returns "matched" before the
+    # SIREN block is ever reached.
+    session = await _loaded_session(existing_companies={"id-rte": "RTE"})
+    session.company_syncer.details["id-rte"] = {"website": "https://www.rte-france.com"}
+
+    result = await upsert_companies(
+        session,
+        [CompanyRecord(name="Rte France", contact_email="alice.martin@rte-france.com")],
+        confirm=False,
+    )
+
+    assert result.results[0].status == "matched"
+    assert result.results[0].matched_name == "RTE"
+
+
+async def test_upsert_companies_dry_run_partial_word_overlap_is_not_flagged(monkeypatch):
+    # "EDF Renouvelables" vs "EDF Trading" share the word "EDF" but neither name's
+    # full token set is contained in the other's (unlike "RTE" vs "Rte France", where
+    # "RTE" alone is 100% of a token in "Rte France"). Verified: token_set_ratio == 42.9,
+    # well below the 90 needs_review floor. IMPORTANT: any single-token name that is a
+    # complete subset of a longer name's tokens ALWAYS scores 100 on token_set_ratio,
+    # no matter how many extra distinguishing words the longer name has — e.g. "EDF" vs
+    # "EDF Trading" also scores 100, and DOES get flagged needs_review by this chain.
+    # That's an accepted, deliberate trade-off: favor an extra human review over silently
+    # creating a duplicate. Don't pick a single-token vs. multi-word-containing-that-token
+    # pair for this "not flagged" test — it will score 100 and contradict the acronym test.
+    session = await _loaded_session(existing_companies={"id-edf-r": "EDF Renouvelables"})
+    monkeypatch.setattr("notion_pilot.mcp.tools.lookup_siren", AsyncMock(return_value=None))
+
+    result = await upsert_companies(session, [CompanyRecord(name="EDF Trading")], confirm=False)
+
+    assert result.results[0].status == "would_create"
+
+
 async def test_upsert_people_dry_run_matches_by_email_despite_name_mismatch():
     session = await _loaded_session(
         existing_people=[

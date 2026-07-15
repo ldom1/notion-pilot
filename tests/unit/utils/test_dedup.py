@@ -6,6 +6,7 @@ from notion_pilot.shared.utils.dedup import (
     find_match,
     find_people_duplicates,
     normalize,
+    normalize_domain,
     notion_page_url,
 )
 
@@ -125,3 +126,9 @@ def test_find_match_email_signal_ignored_when_no_candidate_has_it():
     candidates = [{"name": "Alice Martin", "company": "Engie", "page_id": "xyz"}]
     result = find_match("Bob Bernard", "OVHcloud", candidates, email="bob@ovhcloud.com")
     assert result.status == DedupStatus.NEW
+
+
+def test_normalize_domain_strips_www_and_scheme():
+    assert normalize_domain("https://www.rte-france.com/") == "rte-france.com"
+    assert normalize_domain("rte-france.com") == "rte-france.com"
+    assert normalize_domain("WWW.Enedis.fr") == "enedis.fr"

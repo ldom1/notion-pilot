@@ -2,7 +2,7 @@
 
 import asyncio
 
-from rapidfuzz.fuzz import token_sort_ratio
+from rapidfuzz.fuzz import token_set_ratio, token_sort_ratio
 
 from notion_pilot.crm.prospection import rank_contacts
 from notion_pilot.crm.queries import get_open_leads, get_recent_people
@@ -25,10 +25,56 @@ from notion_pilot.shared.utils.dedup import (
     find_match,
     find_people_duplicates,
     normalize,
+    normalize_domain,
     notion_page_url,
 )
 
 _RATE_LIMIT_S = 0.4  # stay under Notion's write rate limit
+
+_DEDUP_MATCH_THRESHOLD = 85.0
+_DEDUP_REVIEW_THRESHOLD = 90.0  # token_set_ratio, catches acronym/subset containment
+
+
+def _company_dedup_signal(
+    record: CompanyRecord,
+    id_to_name: dict[str, str],
+    details: dict[str, dict[str, str]],
+) -> tuple[str, float, str, list[dict[str, object]]]:
+    """4-signal decision chain, in strict precedence order — exactly one
+    status comes out, never a mix: domain_match > confident name match
+    (token_sort_ratio) > acronym/subset name match (token_set_ratio) >
+    would_create."""
+    norm = normalize(record.name)
+
+    if record.contact_email and "@" in record.contact_email:
+        email_domain = normalize_domain(record.contact_email.split("@")[-1])
+        for page_id, name in id_to_name.items():
+            website = details.get(page_id, {}).get("website", "")
+            if website and normalize_domain(website) == email_domain:
+                return "matched", 100.0, name, []
+
+    best_sort = (0.0, "", "")  # score, name, page_id
+    best_set = (0.0, "", "")
+    for page_id, name in id_to_name.items():
+        cached_norm = normalize(name)
+        sort_score = float(token_sort_ratio(norm, cached_norm))
+        if sort_score > best_sort[0]:
+            best_sort = (sort_score, name, page_id)
+        set_score = float(token_set_ratio(norm, cached_norm))
+        if set_score > best_set[0]:
+            best_set = (set_score, name, page_id)
+
+    if best_sort[0] >= _DEDUP_MATCH_THRESHOLD:
+        return "matched", best_sort[0], best_sort[1], []
+    if best_set[0] >= _DEDUP_REVIEW_THRESHOLD:
+        score, name, page_id = best_set
+        return (
+            "needs_review",
+            score,
+            name,
+            [{"type": "notion", "page_id": page_id, "name": name, "score": score}],
+        )
+    return "would_create", best_sort[0], best_sort[1], []
 
 
 async def upsert_people(
@@ -98,15 +144,14 @@ async def upsert_companies(
 
     for i, record in enumerate(records):
         if not confirm:
-            norm = normalize(record.name)
-            best_score = 0.0
-            best_name = ""
-            for cached_norm, page_id in session.company_syncer._name_to_id.items():
-                score = float(token_sort_ratio(norm, cached_norm))
-                if score > best_score:
-                    best_score = score
-                    best_name = session.company_syncer.id_to_name(page_id)
-            status = "matched" if best_score >= 85 else "would_create"
+            status, score, best_name, candidates = _company_dedup_signal(
+                record, session.company_syncer._id_to_name, session.company_syncer.details
+            )
+            reason = (
+                f"name similarity to existing company {best_name!r} (score {score:.0f})"
+                if status == "needs_review"
+                else ""
+            )
 
             siren = ""
             if status == "would_create":
@@ -122,9 +167,11 @@ async def upsert_companies(
                 RecordResult(
                     name=record.name,
                     status=status,
-                    score=best_score,
+                    score=score,
                     matched_name=best_name,
                     siren=siren,
+                    reason=reason,
+                    candidates=candidates,
                 )
             )
             continue

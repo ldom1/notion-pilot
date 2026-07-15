@@ -45,6 +45,16 @@ def normalize(text: str) -> str:
     return "".join(c for c in nfkd if not unicodedata.combining(c))
 
 
+def normalize_domain(value: str) -> str:
+    """Lowercase a domain or URL and strip scheme/path/leading www — for
+    equality checks only (e.g. "https://www.rte-france.com/" ==
+    "rte-france.com")."""
+    domain = value.lower().strip().split("://")[-1].split("/")[0]
+    if domain.startswith("www."):
+        domain = domain[len("www."):]
+    return domain
+
+
 def _key(name: str, company: str) -> str:
     return normalize(f"{name} {company}")
 
