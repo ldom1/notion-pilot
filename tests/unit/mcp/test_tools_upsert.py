@@ -337,6 +337,44 @@ async def test_upsert_companies_confirm_true_force_does_not_bypass_siren_confide
     assert result.results[0].siren == ""
 
 
+async def test_upsert_companies_confirm_true_force_bypasses_dedup_but_not_siren_gate(monkeypatch):
+    # Combined scenario: force=True lets a needs_review dedup block through (status
+    # becomes created_with_override), but a diverging SIREN candidate present at the
+    # same time is still independently rejected by the SIREN confidence gate — force
+    # must not bleed into that separate check.
+    session = await _loaded_session(existing_companies={"id-rte": "RTE"})
+    monkeypatch.setattr(
+        session.company_syncer, "get_or_create", AsyncMock(return_value="new-company-id")
+    )
+    monkeypatch.setattr(
+        "notion_pilot.mcp.tools.lookup_siren_candidates",
+        AsyncMock(
+            return_value=[
+                {
+                    "siren": "409526167",
+                    "matched_name": "VCSP ROUTE FRANCE",
+                    "section_activite_principale": "F",
+                    "activite_principale": "42.11Z",
+                    "tranche_effectif_salarie": "01",
+                }
+            ]
+        ),
+    )
+    monkeypatch.setattr(
+        "notion_pilot.mcp.tools.enrich_company", AsyncMock(return_value=CompanyEnrichment())
+    )
+    ensure_siren_mock = AsyncMock()
+    monkeypatch.setattr(session.company_syncer, "ensure_siren_property", ensure_siren_mock)
+
+    result = await upsert_companies(
+        session, _settings(), [CompanyRecord(name="Rte France", force=True)], confirm=True
+    )
+
+    ensure_siren_mock.assert_not_called()
+    assert result.results[0].status == "created_with_override"  # force bypassed the dedup block
+    assert result.results[0].siren == ""  # SIREN gate still rejected the diverging candidate
+
+
 async def test_upsert_companies_dry_run_flags_acronym_as_needs_review():
     # No lookup_siren mock needed — needs_review short-circuits _company_dedup_signal
     # before the SIREN block is ever reached.
