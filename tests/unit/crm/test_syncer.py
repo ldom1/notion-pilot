@@ -408,7 +408,9 @@ async def test_get_or_create_ensures_siren_property_before_writing(monkeypatch):
     client.databases.update.assert_awaited_once_with(
         "fake-ds-id", properties={"SIREN": {"rich_text": {}}}
     )
-    relevant_calls = [c[0] for c in client.mock_calls if c[0] in ("databases.update", "pages.update")]
+    relevant_calls = [
+        c[0] for c in client.mock_calls if c[0] in ("databases.update", "pages.update")
+    ]
     assert relevant_calls == ["databases.update", "pages.update"]
 
 
@@ -434,9 +436,7 @@ async def test_lead_path_populates_siren_via_people_upsert(monkeypatch):
 
     monkeypatch.setattr("notion_pilot.crm.syncer.resolve_company", fake_resolve)
 
-    await people_syncer.upsert(
-        PersonRecord(name="Jean Dupont", company="NewCo"), settings=settings
-    )
+    await people_syncer.upsert(PersonRecord(name="Jean Dupont", company="NewCo"), settings=settings)
 
     assert resolved_with_settings == [settings]
 

@@ -19,8 +19,15 @@ async def test_enrich_person_calls_prosper_tool_and_returns_dataclass():
     settings = Settings(
         notion_telegram_msg_database_id="db", prosper_mcp_url="http://fake:8090/sse"
     )
-    fake_result = {"email": "jean@artelys.com", "phone": "", "linkedin_url": "",
-                   "seniority": "", "role_type": [], "country": "", "source": "apollo"}
+    fake_result = {
+        "email": "jean@artelys.com",
+        "phone": "",
+        "linkedin_url": "",
+        "seniority": "",
+        "role_type": [],
+        "country": "",
+        "source": "apollo",
+    }
 
     with patch(
         "notion_pilot.shared.prosper_client._call_prosper_tool",
@@ -41,9 +48,17 @@ async def test_enrich_company_calls_prosper_tool_and_returns_dataclass():
     settings = Settings(
         notion_telegram_msg_database_id="db", prosper_mcp_url="http://fake:8090/sse"
     )
-    fake_result = {"website": "https://artelys.com", "linkedin_url": "", "size": "",
-                   "country": "", "sector": "", "tech_stack": [], "crm_status": "",
-                   "logo_url": "", "source": "apollo"}
+    fake_result = {
+        "website": "https://artelys.com",
+        "linkedin_url": "",
+        "size": "",
+        "country": "",
+        "sector": "",
+        "tech_stack": [],
+        "crm_status": "",
+        "logo_url": "",
+        "source": "apollo",
+    }
 
     with patch(
         "notion_pilot.shared.prosper_client._call_prosper_tool",
