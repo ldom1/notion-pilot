@@ -25,11 +25,12 @@ class PersonRecord:
     phone: str = field(default="")
     seniority: str = field(default="")
     role_type: list[str] = field(default_factory=list)
+    force: bool = field(default=False)
 
 
 @dataclass
 class UpsertResult:
-    status: Literal["created", "skipped", "review"]
+    status: Literal["created", "created_with_override", "skipped", "review"]
     page_id: str = field(default="")
     score: float = field(default=0.0)
     matched_name: str = field(default="")
@@ -303,7 +304,7 @@ class NotionPeopleSyncer:
                 matched_name=match.matched_name,
                 matched_company=match.matched_company,
             )
-        if match.status == DedupStatus.REVIEW:
+        if match.status == DedupStatus.REVIEW and not person.force:
             return UpsertResult(
                 "review",
                 score=match.score,
@@ -344,4 +345,7 @@ class NotionPeopleSyncer:
         page_id: str = page["id"]
         self._existing.append({"name": person.name, "company": person.company, "page_id": page_id})
         logger.info("Created person: {} @ {} ({})", person.name, person.company, page_id)
-        return UpsertResult("created", page_id=page_id)
+        return UpsertResult(
+            "created_with_override" if match.status == DedupStatus.REVIEW else "created",
+            page_id=page_id,
+        )

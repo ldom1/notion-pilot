@@ -203,6 +203,22 @@ class TestNotionPeopleSyncer:
         assert result.status in ("skipped", "review")
         client.pages.create.assert_not_called()
 
+    async def test_upsert_review_range_with_force_creates_with_override(self):
+        # Same company (exact match, reused — no extra company-create call) but a
+        # different first name than the existing person: "Pierre Dupont" vs
+        # "Jean Dupont" @ "Acme Corp" scores 81.8 via token_sort_ratio, landing
+        # squarely in the REVIEW band (75-85), verified independently — not SKIP.
+        people = [_make_people_page("p1", "Jean Dupont", ["c1"])]
+        companies = [_make_company_page("c1", "Acme Corp")]
+        syncer, client = await self._make_syncer(people, companies)
+
+        result = await syncer.upsert(
+            PersonRecord(name="Pierre Dupont", company="Acme Corp", force=True)
+        )
+
+        assert result.status == "created_with_override"
+        client.pages.create.assert_called_once()
+
     async def test_upsert_sets_linkedin_and_email(self):
         syncer, client = await self._make_syncer([], [])
 

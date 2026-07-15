@@ -79,6 +79,25 @@ async def test_upsert_people_confirm_true_writes(monkeypatch):
     assert result.fail_count == 0
 
 
+async def test_upsert_people_confirm_true_force_creates_with_override(monkeypatch):
+    session = await _loaded_session()
+    from notion_pilot.crm.syncer import UpsertResult
+
+    upsert_mock = AsyncMock(
+        return_value=UpsertResult(status="created_with_override", page_id="new-id")
+    )
+    monkeypatch.setattr(session.people_syncer, "upsert", upsert_mock)
+
+    result = await upsert_people(
+        session,
+        [PersonRecord(name="Jean Dupont", company="EDF", force=True)],
+        confirm=True,
+    )
+
+    upsert_mock.assert_awaited_once()
+    assert result.results[0].status == "created_with_override"
+
+
 async def test_upsert_people_batch_continues_after_one_error(monkeypatch):
     session = await _loaded_session()
     from notion_pilot.crm.syncer import UpsertResult

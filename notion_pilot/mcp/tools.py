@@ -136,6 +136,7 @@ async def upsert_people(
                 phone=record.phone or "",
                 seniority=record.seniority or "",
                 role_type=record.role_type or [],
+                force=record.force,
             )
             outcome = await session.people_syncer.upsert(syncer_record)
             results.append(
