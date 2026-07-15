@@ -655,13 +655,12 @@ async def _seed_people(
     ids: dict[str, str] = {}
     for p in _DEMO_PEOPLE:
         props: dict[str, Any] = {
-            "Nom": {"title": _rt(p["name"])},
+            "Name": {"title": _rt(p["name"])},
             "Company": {"relation": [{"id": company_ids[p["company"]]}]},
             "Position": {"rich_text": _rt(p["position"])},
             "Linkedin": {"url": p["linkedin"]},
             "Email - pro": {"email": p["email_pro"]},
             "Phone": {"phone_number": p["phone"]},
-            "In my network": {"select": {"name": p["in_network"]}},
             "Seniority": {"select": {"name": p["seniority"]}},
             "Role Type": {"multi_select": [{"name": r} for r in p["role_type"]]},
             "Profile": {"select": {"name": p["profile"]}},
@@ -848,21 +847,13 @@ async def create_crm_workspace(
         crm_page_id,
         "People",
         {
-            "Nom": {"title": {}},
+            "Name": {"title": {}},
             "Company": {"relation": {"database_id": companies_id, "single_property": {}}},
             "Position": {"rich_text": {}},
             "Linkedin": {"url": {}},
             "Email - pro": {"email": {}},
             "Email - private": {"email": {}},
             "Phone": {"phone_number": {}},
-            "In my network": {
-                "select": {
-                    "options": [
-                        {"name": "Yes", "color": "green"},
-                        {"name": "Non", "color": "gray"},
-                    ]
-                }
-            },
             "Seniority": {
                 "select": {
                     "options": [

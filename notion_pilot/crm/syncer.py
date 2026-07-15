@@ -249,7 +249,7 @@ class NotionPeopleSyncer:
             result = await self._query_page(cursor)
             for page in result["results"]:
                 props = page["properties"]
-                name_prop = props.get("Nom", {})
+                name_prop = props.get("Name", {})
                 name = name_prop["title"][0]["plain_text"] if name_prop.get("title") else ""
                 if not name:
                     continue
@@ -313,8 +313,7 @@ class NotionPeopleSyncer:
             company_id = await self._company_syncer.get_or_create(person.company, settings=settings)
 
         properties: dict[str, object] = {
-            "Nom": {"title": [{"text": {"content": person.name}}]},
-            "In my network": {"select": {"name": "Yes"}},
+            "Name": {"title": [{"text": {"content": person.name}}]},
         }
         if person.position:
             properties["Position"] = {"rich_text": [{"text": {"content": person.position}}]}
