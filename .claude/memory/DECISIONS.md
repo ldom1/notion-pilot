@@ -140,5 +140,11 @@ updated:
 **Rejected:** Keeping enrichment logic in notion-pilot; rewiring `/enrich` to call prosper's MCP server directly from the bot (would introduce a live network dependency into the Telegram interaction path with no fallback story)
 **Rationale:** Prosper is becoming the company-intelligence/lead-gen platform; centralizing all external enrichment-provider calls there avoids duplicating Apollo/Brave integration across two repos. Removing `/enrich` rather than rewiring it sidesteps a reliability question entirely — enrichment is now invoked by calling prosper's MCP tools directly (from a Claude session or a script), not through the bot. See [[prosper]] and the CRM responsibility rationalization spec for the full design.
 
+### 2026-07-14 — Rebase feat/mcp-crm-server onto feat/crm-rationalization-notion-pilot rather than defer
+**Decision:** As soon as the enrichment.py→prosper_client migration (2026-07-09 entry above) was confirmed to break the uncommitted `feat/mcp-crm-server` branch, rebase it immediately (stash uncommitted work → move branch pointer to the new tip, since it had zero commits → pop stash → fix the one mechanical import) rather than leave the branches to diverge further.
+**Rejected:** Leaving `feat/mcp-crm-server` on its stale base and deferring reconciliation to whenever it's actually merged.
+**Rationale:** The two branches touch overlapping code (`shared/utils/dedup.py`, the enrichment call path) and were going to need reconciliation eventually regardless; doing it immediately, while both sets of changes were still fresh in context, was cheaper and lower-risk than an open-ended deferral where the branches could drift further apart.
+**Affects:** [Non-Obvious Decisions](ARCHITECTURE.md#non-obvious-decisions)
+
 ## Template
 <!-- added by ai-dotfiles upgrade -->

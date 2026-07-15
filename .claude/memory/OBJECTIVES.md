@@ -1,3 +1,8 @@
+---
+type: objectives
+updated:
+---
+
 # Objectives
 
 ## Goal

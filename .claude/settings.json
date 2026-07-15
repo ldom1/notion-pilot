@@ -17,5 +17,8 @@
         "INDEX_PATH": "/home/lgiron/vault-qmd/brain.db"
       }
     }
+  },
+  "worktree": {
+    "baseRef": "head"
   }
 }
