@@ -99,7 +99,7 @@ class NotionDealsSyncer:
         page_id = await self.create(deal)
         return page_id, True
 
-    async def load_snapshot(self) -> None:
+    async def load_notion_snapshot(self) -> None:
         """Load existing deals into memory. Call once at startup."""
         cursor: str | None = None
         while True:

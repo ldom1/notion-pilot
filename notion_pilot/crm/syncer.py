@@ -105,7 +105,7 @@ class NotionCompanySyncer:
             kw["start_cursor"] = cursor
         return cast(dict[str, Any], await self._client.data_sources.query(self._ds_id, **kw))
 
-    async def load_snapshot(self) -> None:
+    async def load_notion_snapshot(self) -> None:
         if self._standard_api is None:
             await self._detect_api()
         cursor: str | None = None
@@ -240,8 +240,8 @@ class NotionPeopleSyncer:
             kw["start_cursor"] = cursor
         return cast(dict[str, Any], await self._client.data_sources.query(self._ds_id, **kw))
 
-    async def load_snapshot(self) -> None:
-        """Load all existing people into memory. Call company_syncer.load_snapshot() first if using one."""
+    async def load_notion_snapshot(self) -> None:
+        """Load all existing people into memory. Call company_syncer.load_notion_snapshot() first if using one."""
         if self._company_syncer is not None and self._company_syncer._standard_api is not None:
             self._standard_api = self._company_syncer._standard_api
         cursor: str | None = None

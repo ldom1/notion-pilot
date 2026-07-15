@@ -85,8 +85,8 @@ async def run(dry_run: bool, enrich: bool, csv_path: Path) -> None:
     )
 
     logger.info("Loading Notion snapshots...")
-    await company_syncer.load_snapshot()
-    await people_syncer.load_snapshot()
+    await company_syncer.load_notion_snapshot()
+    await people_syncer.load_notion_snapshot()
 
     records = _parse_connections(csv_path)
     logger.info("Parsed {} connections from {}", len(records), csv_path)

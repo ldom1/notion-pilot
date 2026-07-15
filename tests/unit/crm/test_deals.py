@@ -71,7 +71,7 @@ async def test_create_sets_stage():
 async def test_upsert_creates_new_when_not_in_snapshot():
     client = _mock_client(snapshot_results=[])
     syncer = NotionDealsSyncer(client, "token", "db-id")
-    await syncer.load_snapshot()
+    await syncer.load_notion_snapshot()
     page_id, created = await syncer.upsert(DealRecord(title="New Deal"))
     assert created is True
     assert page_id == "new-deal-id"
@@ -86,7 +86,7 @@ async def test_upsert_updates_existing():
     }
     client = _mock_client(snapshot_results=[existing_page])
     syncer = NotionDealsSyncer(client, "token", "db-id")
-    await syncer.load_snapshot()
+    await syncer.load_notion_snapshot()
     page_id, created = await syncer.upsert(DealRecord(title="Existing Deal", stage="Proposal"))
     assert created is False
     assert page_id == "existing-id"
@@ -102,5 +102,5 @@ async def test_load_snapshot_populates_title_map():
     }
     client = _mock_client(snapshot_results=[existing_page])
     syncer = NotionDealsSyncer(client, "token", "db-id")
-    await syncer.load_snapshot()
+    await syncer.load_notion_snapshot()
     assert syncer._snapshot["My Deal"] == "deal-abc"

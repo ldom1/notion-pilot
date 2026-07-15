@@ -22,8 +22,8 @@ def _settings() -> Settings:
 async def _loaded_session(existing_people=None, existing_companies=None) -> SyncerSession:
     session = SyncerSession(_settings())
     monkeypatch_load = AsyncMock()
-    session.company_syncer.load_snapshot = monkeypatch_load
-    session.people_syncer.load_snapshot = monkeypatch_load
+    session.company_syncer.load_notion_snapshot = monkeypatch_load
+    session.people_syncer.load_notion_snapshot = monkeypatch_load
     session.company_syncer._id_to_name = dict(existing_companies or {})
     session.company_syncer._name_to_id = {
         v.lower(): k for k, v in (existing_companies or {}).items()

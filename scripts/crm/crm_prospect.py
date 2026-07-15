@@ -33,8 +33,8 @@ async def run(pitch: str, top_k: int) -> None:
     people_syncer = NotionPeopleSyncer(
         client, settings.notion_people_data_source_id, company_syncer
     )
-    await company_syncer.load_snapshot()
-    await people_syncer.load_snapshot()
+    await company_syncer.load_notion_snapshot()
+    await people_syncer.load_notion_snapshot()
 
     candidates = people_syncer._existing
     logger.info("Ranking {} contacts for pitch: {}", len(candidates), pitch)

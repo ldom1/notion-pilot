@@ -51,7 +51,7 @@ async def dedup_companies(threshold: float) -> None:
         return
     client = AsyncClient(auth=settings.notion_token.get_secret_value())
     syncer = NotionCompanySyncer(client, settings.notion_companies_data_source_id)
-    await syncer.load_snapshot()
+    await syncer.load_notion_snapshot()
     logger.info(
         "Scanning {} companies for duplicates (threshold={})...", len(syncer._id_to_name), threshold
     )
@@ -69,8 +69,8 @@ async def dedup_people(threshold: float) -> None:
     people_syncer = NotionPeopleSyncer(
         client, settings.notion_people_data_source_id, company_syncer
     )
-    await company_syncer.load_snapshot()
-    await people_syncer.load_snapshot()
+    await company_syncer.load_notion_snapshot()
+    await people_syncer.load_notion_snapshot()
     existing = [dict(r) for r in people_syncer._existing]
     logger.info("Scanning {} people for duplicates (threshold={})...", len(existing), threshold)
     pairs = find_people_duplicates(existing, threshold)

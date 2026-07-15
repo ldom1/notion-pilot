@@ -53,8 +53,8 @@ class SyncerSession:
             logger.warning("Background Notion snapshot pre-warm failed: {}", exc)
 
     async def _load(self) -> None:
-        await self.company_syncer.load_snapshot()
-        await self.people_syncer.load_snapshot()
+        await self.company_syncer.load_notion_snapshot()
+        await self.people_syncer.load_notion_snapshot()
 
     async def ensure_loaded(self) -> None:
         """Await the in-flight/prior load, starting one first if necessary."""

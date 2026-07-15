@@ -20,8 +20,8 @@ def _settings() -> Settings:
 
 async def _loaded_session() -> SyncerSession:
     session = SyncerSession(_settings())
-    session.company_syncer.load_snapshot = AsyncMock()
-    session.people_syncer.load_snapshot = AsyncMock()
+    session.company_syncer.load_notion_snapshot = AsyncMock()
+    session.people_syncer.load_notion_snapshot = AsyncMock()
     # "Acme Corp." (trailing period only) reliably scores >=85 against "Acme Corp"
     # under the existing plain token_sort_ratio matcher; "EDF"/"EDF S.A." does not (~55).
     session.company_syncer._id_to_name = {

@@ -54,7 +54,7 @@ async def main(out_dir: Path = _DEFAULT_OUT_DIR) -> Path:
     settings = load_settings()
     client = AsyncClient(auth=settings.notion_token.get_secret_value())
     company_syncer = NotionCompanySyncer(client, settings.notion_companies_data_source_id or "")
-    await company_syncer.load_snapshot()
+    await company_syncer.load_notion_snapshot()
 
     deals_syncer = None
     if settings.notion_deals_database_id:
@@ -62,7 +62,7 @@ async def main(out_dir: Path = _DEFAULT_OUT_DIR) -> Path:
             deals_syncer = NotionDealsSyncer(
                 http, settings.notion_token.get_secret_value(), settings.notion_deals_database_id
             )
-            await deals_syncer.load_snapshot()
+            await deals_syncer.load_notion_snapshot()
 
     # Calls build_export_rows directly rather than duplicating its SIREN-lookup
     # logic inline — the first version of this task hardcoded "siren": "" in

@@ -21,8 +21,8 @@ def _settings() -> Settings:
 
 async def _loaded_session() -> SyncerSession:
     session = SyncerSession(_settings())
-    session.company_syncer.load_snapshot = AsyncMock()
-    session.people_syncer.load_snapshot = AsyncMock()
+    session.company_syncer.load_notion_snapshot = AsyncMock()
+    session.people_syncer.load_notion_snapshot = AsyncMock()
     session.people_syncer._existing = [
         {"page_id": "p1", "name": "Jean Dupont", "company": "EDF"},
     ]

@@ -53,8 +53,8 @@ async def _handle_people(collected: dict[str, str], settings: Settings) -> str:
     people_syncer = NotionPeopleSyncer(
         client, settings.notion_people_data_source_id or "", company_syncer
     )
-    await company_syncer.load_snapshot()
-    await people_syncer.load_snapshot()
+    await company_syncer.load_notion_snapshot()
+    await people_syncer.load_notion_snapshot()
 
     record = PersonRecord(
         name=collected["name"],
@@ -75,7 +75,7 @@ async def _handle_company(collected: dict[str, str], settings: Settings) -> str:
 
     client = AsyncClient(auth=_notion_token(settings))
     syncer = NotionCompanySyncer(client, settings.notion_companies_data_source_id or "")
-    await syncer.load_snapshot()
+    await syncer.load_notion_snapshot()
     page_id = await syncer.get_or_create(collected["name"], settings=settings)
     return f"✓ Company in Notion: {collected['name']} (id: {page_id[:8]}…)"
 

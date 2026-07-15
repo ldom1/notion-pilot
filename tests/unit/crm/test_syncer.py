@@ -37,7 +37,7 @@ class TestNotionCompanySyncer:
             ]
         )
         syncer = NotionCompanySyncer(client, "fake-ds-id")
-        await syncer.load_snapshot()
+        await syncer.load_notion_snapshot()
 
         assert syncer.id_to_name("id-edf") == "EDF"
         assert syncer.id_to_name("id-rte") == "RTE"
@@ -46,7 +46,7 @@ class TestNotionCompanySyncer:
     async def test_get_or_create_returns_existing_on_exact_match(self):
         client = _mock_ds_query([_make_company_page("id-edf", "EDF")])
         syncer = NotionCompanySyncer(client, "fake-ds-id")
-        await syncer.load_snapshot()
+        await syncer.load_notion_snapshot()
 
         page_id = await syncer.get_or_create("EDF")
         assert page_id == "id-edf"
@@ -55,7 +55,7 @@ class TestNotionCompanySyncer:
     async def test_get_or_create_returns_existing_on_fuzzy_match(self):
         client = _mock_ds_query([_make_company_page("id-edf", "EDF S.A.")])
         syncer = NotionCompanySyncer(client, "fake-ds-id")
-        await syncer.load_snapshot()
+        await syncer.load_notion_snapshot()
 
         page_id = await syncer.get_or_create("EDF SA")
         assert page_id == "id-edf"
@@ -64,7 +64,7 @@ class TestNotionCompanySyncer:
     async def test_get_or_create_creates_new_company(self):
         client = _mock_ds_query([_make_company_page("id-edf", "EDF")])
         syncer = NotionCompanySyncer(client, "fake-ds-id")
-        await syncer.load_snapshot()
+        await syncer.load_notion_snapshot()
 
         page_id = await syncer.get_or_create("OVHcloud")
         assert page_id == "new-company-id"
@@ -76,7 +76,7 @@ class TestNotionCompanySyncer:
     async def test_get_or_create_caches_new_company(self):
         client = _mock_ds_query([])
         syncer = NotionCompanySyncer(client, "fake-ds-id")
-        await syncer.load_snapshot()
+        await syncer.load_notion_snapshot()
 
         await syncer.get_or_create("NewCorp")
         await syncer.get_or_create("NewCorp")  # second call — should not create again
@@ -122,7 +122,7 @@ class TestNotionCompanySyncer:
         )
         syncer = NotionCompanySyncer(client, "fake-ds-id")
 
-        await syncer.load_snapshot()
+        await syncer.load_notion_snapshot()
 
         assert syncer.details["pid1"]["siren"] == "428895676"
 
@@ -164,9 +164,9 @@ class TestNotionPeopleSyncer:
     async def _make_syncer(self, people_pages, company_pages):
         client = _mock_people_client(people_pages, company_pages)
         company_syncer = NotionCompanySyncer(client, "fake-companies-ds")
-        await company_syncer.load_snapshot()
+        await company_syncer.load_notion_snapshot()
         people_syncer = NotionPeopleSyncer(client, "fake-people-ds", company_syncer)
-        await people_syncer.load_snapshot()
+        await people_syncer.load_notion_snapshot()
         return people_syncer, client
 
     async def test_upsert_skips_exact_duplicate(self):
@@ -257,7 +257,7 @@ class TestNotionPeopleSyncerNoCompany:
         client = _mock_ds_query([])  # empty snapshot
         client.pages.create = AsyncMock(return_value={"id": "new-person-id"})
         syncer = NotionPeopleSyncer(client, "fake-ds-id", company_syncer=None)
-        await syncer.load_snapshot()
+        await syncer.load_notion_snapshot()
 
         result = await syncer.upsert(
             PersonRecord(name="Alice Smith", company="", email="alice@acme.com")
@@ -271,7 +271,7 @@ class TestNotionPeopleSyncerNoCompany:
     async def test_upsert_without_company_syncer_deduplicates_by_name(self):
         client = _mock_ds_query([_make_people_page_no_company("existing-id", "Alice Smith")])
         syncer = NotionPeopleSyncer(client, "fake-ds-id", company_syncer=None)
-        await syncer.load_snapshot()
+        await syncer.load_notion_snapshot()
 
         result = await syncer.upsert(
             PersonRecord(name="Alice Smith", company="", email="alice@acme.com")
@@ -298,9 +298,9 @@ async def test_load_snapshot_reads_optional_fields():
         company_pages=[],
     )
     company_syncer = NotionCompanySyncer(client, "fake-companies-ds")
-    await company_syncer.load_snapshot()
+    await company_syncer.load_notion_snapshot()
     people_syncer = NotionPeopleSyncer(client, "fake-people-ds", company_syncer)
-    await people_syncer.load_snapshot()
+    await people_syncer.load_notion_snapshot()
 
     assert len(people_syncer._existing) == 1
     candidate = people_syncer._existing[0]

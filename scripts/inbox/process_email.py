@@ -327,7 +327,7 @@ async def _build_people_syncer(settings: Settings, token: str) -> NotionPeopleSy
         return None
     client = AsyncClient(auth=token)
     syncer = NotionPeopleSyncer(client, ds_id, company_syncer=None)
-    await syncer.load_snapshot()
+    await syncer.load_notion_snapshot()
     return syncer
 
 

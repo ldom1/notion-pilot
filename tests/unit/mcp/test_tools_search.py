@@ -20,8 +20,8 @@ def _settings() -> Settings:
 
 async def _loaded_session() -> SyncerSession:
     session = SyncerSession(_settings())
-    session.company_syncer.load_snapshot = AsyncMock()
-    session.people_syncer.load_snapshot = AsyncMock()
+    session.company_syncer.load_notion_snapshot = AsyncMock()
+    session.people_syncer.load_notion_snapshot = AsyncMock()
     # "Acme" and "Acme Corp" both score >=60 (the search min-score) against the
     # query "acme" under plain token_sort_ratio, so both appear in an unlimited
     # search — needed to meaningfully exercise the `limit` truncation below.

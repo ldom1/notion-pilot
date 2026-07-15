@@ -30,8 +30,8 @@ async def test_ensure_loaded_populates_syncers(monkeypatch):
 
     company_load = AsyncMock()
     people_load = AsyncMock()
-    monkeypatch.setattr(session.company_syncer, "load_snapshot", company_load)
-    monkeypatch.setattr(session.people_syncer, "load_snapshot", people_load)
+    monkeypatch.setattr(session.company_syncer, "load_notion_snapshot", company_load)
+    monkeypatch.setattr(session.people_syncer, "load_notion_snapshot", people_load)
 
     await session.ensure_loaded()
 
@@ -43,8 +43,8 @@ async def test_ensure_loaded_only_loads_once(monkeypatch):
     session = SyncerSession(_settings())
     company_load = AsyncMock()
     people_load = AsyncMock()
-    monkeypatch.setattr(session.company_syncer, "load_snapshot", company_load)
-    monkeypatch.setattr(session.people_syncer, "load_snapshot", people_load)
+    monkeypatch.setattr(session.company_syncer, "load_notion_snapshot", company_load)
+    monkeypatch.setattr(session.people_syncer, "load_notion_snapshot", people_load)
 
     await session.ensure_loaded()
     await session.ensure_loaded()  # second call should not reload
@@ -59,8 +59,8 @@ async def test_start_prewarm_is_non_blocking(monkeypatch):
     async def slow_load():
         await asyncio.sleep(0.05)
 
-    monkeypatch.setattr(session.company_syncer, "load_snapshot", slow_load)
-    monkeypatch.setattr(session.people_syncer, "load_snapshot", AsyncMock())
+    monkeypatch.setattr(session.company_syncer, "load_notion_snapshot", slow_load)
+    monkeypatch.setattr(session.people_syncer, "load_notion_snapshot", AsyncMock())
 
     session.start_prewarm()  # must return immediately, not block for 0.05s
     assert session._load_task is not None
@@ -73,8 +73,8 @@ async def test_refresh_forces_a_new_load(monkeypatch):
     session = SyncerSession(_settings())
     company_load = AsyncMock()
     people_load = AsyncMock()
-    monkeypatch.setattr(session.company_syncer, "load_snapshot", company_load)
-    monkeypatch.setattr(session.people_syncer, "load_snapshot", people_load)
+    monkeypatch.setattr(session.company_syncer, "load_notion_snapshot", company_load)
+    monkeypatch.setattr(session.people_syncer, "load_notion_snapshot", people_load)
     session.company_syncer._id_to_name = {"a": "A", "b": "B"}
     session.people_syncer._existing = [{"name": "X", "company": "A", "page_id": "p1"}]
 
@@ -93,8 +93,8 @@ async def test_start_prewarm_failure_does_not_crash_or_raise(monkeypatch):
     async def failing_load():
         raise RuntimeError("bad credentials")
 
-    monkeypatch.setattr(session.company_syncer, "load_snapshot", failing_load)
-    monkeypatch.setattr(session.people_syncer, "load_snapshot", AsyncMock())
+    monkeypatch.setattr(session.company_syncer, "load_notion_snapshot", failing_load)
+    monkeypatch.setattr(session.people_syncer, "load_notion_snapshot", AsyncMock())
 
     session.start_prewarm()
     await asyncio.sleep(0)  # let the task run and the done_callback fire
