@@ -16,7 +16,7 @@ from notion_pilot.mcp.models import (
 )
 from notion_pilot.mcp.session import SyncerSession
 from notion_pilot.shared.config import Settings
-from notion_pilot.shared.prosper_client import enrich_company, enrich_person
+from notion_pilot.shared.prosper_client import CompanyEnrichment, enrich_company, enrich_person
 from notion_pilot.shared.siren_lookup import (
     lookup_siren_candidates,
     naf_section_to_sector,
@@ -157,7 +157,7 @@ async def upsert_people(
 
 
 async def upsert_companies(
-    session: SyncerSession, records: list[CompanyRecord], confirm: bool = False
+    session: SyncerSession, settings: Settings, records: list[CompanyRecord], confirm: bool = False
 ) -> BatchResult:
     await session.ensure_loaded()
     results: list[RecordResult] = []
@@ -228,31 +228,94 @@ async def upsert_companies(
             continue
 
         try:
-            # get_or_create (existing code, unchanged) returns an existing page_id on a
-            # fuzzy match >= 85 or creates a new one, but doesn't tell the caller which
-            # happened. Snapshot the known page_ids first so we can tell the two apart
-            # afterwards without touching get_or_create itself.
+            dedup_status, dedup_score, dedup_best_name, dedup_candidates = _company_dedup_signal(
+                record, session.company_syncer._id_to_name, session.company_syncer.details
+            )
+            if dedup_status == "needs_review" and not record.force:
+                results.append(
+                    RecordResult(
+                        name=record.name,
+                        status="needs_review",
+                        score=dedup_score,
+                        matched_name=dedup_best_name,
+                        candidates=dedup_candidates,
+                        reason=f"name similarity to existing company {dedup_best_name!r} "
+                        f"(score {dedup_score:.0f})",
+                    )
+                )
+                continue
+
             known_before = set(session.company_syncer._id_to_name.keys())
             page_id = await session.company_syncer.get_or_create(record.name)
-            status = "matched" if page_id in known_before else "created"
+            created_new = page_id not in known_before
+
+            if not created_new:
+                status = "matched"
+            elif dedup_status == "needs_review":  # only reachable here when record.force is True
+                status = "created_with_override"
+            else:
+                status = "created"
 
             siren = ""
-            if status == "created":
-                # The caller already confirmed this creation (and, per the preview
-                # step above, saw the SIREN candidate) — safe to write it now.
+            siren_candidate_name = ""
+            reason = (
+                f"created despite name similarity to {dedup_best_name!r} (score {dedup_score:.0f})"
+                if status == "created_with_override"
+                else ""
+            )
+
+            if created_new:
+                props: dict[str, object] = {}
+                try:
+                    enrichment = await enrich_company(record.name, settings)
+                except Exception:  # noqa: BLE001
+                    enrichment = CompanyEnrichment()
+                if enrichment.sector:
+                    props["Sector"] = {"select": {"name": enrichment.sector}}
+                if enrichment.size:
+                    props["Size"] = {"select": {"name": enrichment.size}}
+                if enrichment.country:
+                    props["Country"] = {"select": {"name": enrichment.country}}
+                if enrichment.linkedin_url:
+                    props["Linkedin"] = {"url": enrichment.linkedin_url}
+
                 try:
                     siren_candidates = await lookup_siren_candidates(record.name)
                 except Exception:  # noqa: BLE001
                     siren_candidates = []
                 if siren_candidates:
-                    siren = siren_candidates[0]["siren"]
-                    await session.company_syncer.ensure_siren_property()
-                    await session.company_syncer._client.pages.update(
-                        page_id, properties={"SIREN": {"rich_text": [{"text": {"content": siren}}]}}
+                    top = siren_candidates[0]
+                    divergence = float(
+                        token_sort_ratio(normalize(record.name), normalize(top["matched_name"]))
                     )
+                    if divergence >= _DEDUP_MATCH_THRESHOLD:
+                        siren = top["siren"]
+                        siren_candidate_name = top["matched_name"]
+                        await session.company_syncer.ensure_siren_property()
+                        props["SIREN"] = {"rich_text": [{"text": {"content": siren}}]}
+                        for field, value in _registry_fields(top).items():
+                            key = {"sector": "Sector", "size": "Size", "country": "Country"}[field]
+                            if key not in props:
+                                props[key] = {"select": {"name": value}}
+
+                website = record.website or enrichment.website or ""
+                if not website and record.contact_email:
+                    website = f"https://{record.contact_email.split('@')[-1]}"
+                if website:
+                    props["Website"] = {"url": website}
+
+                if props:
+                    await session.company_syncer._client.pages.update(page_id, properties=props)
 
             results.append(
-                RecordResult(name=record.name, status=status, page_id=page_id, siren=siren)
+                RecordResult(
+                    name=record.name,
+                    status=status,
+                    page_id=page_id,
+                    siren=siren,
+                    siren_candidate_name=siren_candidate_name,
+                    reason=reason,
+                )
             )
             if i < len(records) - 1:
                 await asyncio.sleep(_RATE_LIMIT_S)

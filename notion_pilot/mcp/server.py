@@ -35,11 +35,15 @@ async def upsert_people(records: list[PersonRecord], confirm: bool = False) -> B
 
 @mcp.tool()
 async def upsert_companies(records: list[CompanyRecord], confirm: bool = False) -> BatchResult:
-    """Upsert companies into the Notion Companies database, dedup-checked. New
-    companies get a SIREN candidate looked up by name (French government
-    company registry) — shown in the confirm=False preview for the caller to
-    approve, and written only once the same call is repeated with confirm=True."""
-    return await t.upsert_companies(_session, records, confirm)
+    """Upsert companies into the Notion Companies database, dedup-checked
+    (name/domain/acronym signals). New companies get SIREN + sector/size/
+    country enriched — prosper first, falling back to the French government
+    company registry if prosper is unreachable — shown in the confirm=False
+    preview for the caller to approve, and written only once the same call is
+    repeated with confirm=True. A needs_review result means a likely
+    duplicate or a low-confidence SIREN match was found; pass force=True on
+    that record to create anyway."""
+    return await t.upsert_companies(_session, _settings, records, confirm)
 
 
 @mcp.tool()
