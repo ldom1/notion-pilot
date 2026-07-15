@@ -126,12 +126,15 @@ Target: 4 custom knowledge DBs — Notions, Ideas, Tools, Data & Technology.
 ## Now
 <!-- added by ai-dotfiles upgrade -->
 
-- MCP server (`notion_pilot/mcp/`) implemented on branch `feat/mcp-crm-server` (2026-07-13, uncommitted in worktree `.claude/worktrees/feat-mcp-crm-server`) — exposes CRM upsert/dedup/enrich/rank/read as 11 MCP tools. Needs: user review of the uncommitted diff, commit, merge. See [DECISIONS.md](DECISIONS.md) 2026-07-13 entries.
+- **Blocking bug (2026-07-15, live-test discovered):** `NotionPeopleSyncer.upsert()` (`notion_pilot/crm/syncer.py:316-317`) hardcodes Notion properties `"Nom"`/`"In my network"` that don't exist on the live People data source (it actually has `"Name"` as the title property, and no `"In my network"` at all). Blocks person creation on **every** path — MCP, `/people`, `/lead`, email import, LinkedIn import — not just MCP. Needs a user decision: patch the live DB schema to match the code (rename `Name`→`Nom`, add `In my network`), or change the code to match this DB and update `shared/workspace.py`'s `create_crm_workspace()` too for consistency. See [DECISIONS.md](DECISIONS.md) 2026-07-15 entry and `[[2026-07-15-mcp-server-test]]`.
+- SIREN auto-lookup in `upsert_companies` (merged 2026-07-15) has a real accuracy gap on short/generic/domain-derived company names — verified a false-positive top-1 match in live testing. Consider: surface top-3 gov-API candidates instead of top-1, or require a minimum name-similarity floor before treating a match as confident.
+- `RecordResult.matched_name` gets silently overwritten by the SIREN registry's name when a company is `would_create`, discarding the original fuzzy-dedup near-match name — should be a separate field.
 
 ## Next
 <!-- added by ai-dotfiles upgrade -->
 
-- Once merged: verify the `notion-crm` MCP server registration already added in the sibling `artelys-crystal-hpc-lead-generation` project's `.claude/settings.json` actually resolves (it points at this repo's main checkout, not the worktree).
+- MCP server (`notion_pilot/mcp/`) merged to `develop` 2026-07-15 (PR #18, squash commit `8e705b7`) — exposes CRM upsert/dedup/enrich/rank/read as 11 MCP tools. Registered in this repo's own `.claude/settings.json` as `notion-crm` (needs a Claude Code restart to connect). Still needs: verify the *sibling* `artelys-crystal-hpc-lead-generation` project's `.claude/settings.json` registration (added earlier, points at this repo's main checkout — the worktree it may have referenced is gone now that the branch merged) actually resolves.
+- No MCP tool creates a Lead/Deal yet — only `upsert_people`/`upsert_companies` write, `get_open_leads` is read-only. Add if Deal creation via MCP is wanted.
 
 ## Later
 <!-- added by ai-dotfiles upgrade -->

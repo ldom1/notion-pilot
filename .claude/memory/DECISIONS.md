@@ -146,5 +146,11 @@ updated:
 **Rationale:** The two branches touch overlapping code (`shared/utils/dedup.py`, the enrichment call path) and were going to need reconciliation eventually regardless; doing it immediately, while both sets of changes were still fresh in context, was cheaper and lower-risk than an open-ended deferral where the branches could drift further apart.
 **Affects:** [Non-Obvious Decisions](ARCHITECTURE.md#non-obvious-decisions)
 
+### 2026-07-15 — Do not auto-patch the live People DB schema on discovering the Nom/Name mismatch
+**Decision:** When live-testing the newly merged MCP server found that `NotionPeopleSyncer.upsert()` writes to `"Nom"`/`"In my network"` properties that don't exist on the real People data source (which has `"Name"` as its title property and no `"In my network"` at all — blocking person creation on every code path), leave the live schema untouched and surface the finding + two remediation options to the user rather than picking one and patching production data.
+**Rejected:** Silently patching the live Notion database schema (rename title property, add missing select) to unblock the test; silently changing the code to match this DB's schema instead.
+**Rationale:** A title-property rename or schema change on a live, in-use Notion database is a real structural change with consequences the agent can't fully see (existing views/filters/formulas referencing `"Name"`), and picking "fix the code" vs. "fix the DB" has architecture-wide consequences (`shared/workspace.py` creates new workspaces with `Nom`/`In my network`, so fixing only the code would diverge new-workspace behavior from this DB). See `[[2026-07-15-mcp-server-test]]` for the full investigation.
+**Affects:** [Non-Obvious Decisions](ARCHITECTURE.md#non-obvious-decisions)
+
 ## Template
 <!-- added by ai-dotfiles upgrade -->

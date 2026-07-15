@@ -16,7 +16,7 @@ updated:
 
 ## Current Branch
 
-`feat/crm-rationalization-notion-pilot` (2026-07-14) — thin CRM sync layer migration, PR [#16](https://github.com/ldom1/notion-pilot/pull/16) open against `develop`, not merged. See [[2026-07-14-crm-rationalization-execution]] for details. (This line was stale — previously pointed at `feat/notion-pilot-cockpit`, several branches/sessions behind.)
+`develop` (2026-07-15) — PR #16 (thin CRM sync layer: SIREN auto-population + enrichment migration to prosper, squash `0d22d45`) and PR #18 (MCP server, squash `8e705b7`) both merged. See [[2026-07-14-crm-rationalization-execution]] and `[[2026-07-15-mcp-server-test]]` for details.
 
 ## What's New (2026-06-04, UX polish)
 
@@ -86,10 +86,11 @@ web/
 ## In Progress
 <!-- added by ai-dotfiles upgrade -->
 
-- MCP server (`notion_pilot/mcp/`) fully implemented (2026-07-13) on branch `feat/mcp-crm-server`, in an isolated worktree at `.claude/worktrees/feat-mcp-crm-server` — **uncommitted**, per explicit no-commit instruction for that session. Needs: review diff → commit → merge.
-- **Merge hazard resolved (2026-07-14):** `feat/mcp-crm-server` has been rebased onto the current tip of `feat/crm-rationalization-notion-pilot` (`1befdb4`) and its `tools.py`/`test_tools_enrich.py` import updated from the deleted `shared.utils.enrichment` to `shared.prosper_client` (mechanical fix — identical signatures/dataclass shapes). 293/293 unit tests pass, ruff + mypy strict clean, stdio smoke check clean, both before and after. The branch is now current and mergeable; see [[2026-07-14-crm-rationalization-execution]] for the rebase log.
+- MCP server (`notion_pilot/mcp/`) merged to `develop` 2026-07-15 (PR #18, squash `8e705b7`) — 11 tools (upsert/dedup/enrich/rank/search/read), registered in this repo's `.claude/settings.json` as `notion-crm` (needs a Claude Code restart to connect for real via stdio).
+- **Blocked:** live-tested the MCP server against real Notion data (first contact from Artelys Crystal HPC lead-gen CSVs). Companies create fine (including a new SIREN auto-lookup, 1/2 correct in the test — see `[[2026-07-15-mcp-server-test]]`). **People creation is broken on every path** (MCP, `/people`, `/lead`, email/LinkedIn import) — `syncer.py` writes to `"Nom"`/`"In my network"` properties that don't exist on the live People DB (it has `"Name"` as title, no `"In my network"`). Needs a user decision on which side to fix — see DECISIONS.md 2026-07-15 entry.
 
 ## Open Questions
 <!-- added by ai-dotfiles upgrade -->
 
-- Should the `feat/mcp-crm-server` branch merge into `feat/crm-rationalization-notion-pilot`/PR #16 before that PR merges to `develop`, or wait until after? (No longer a hazard either way — the import fix is already applied — this is now purely a merge-ordering/PR-hygiene question.)
+- People DB schema fix: patch the live Notion database (rename `Name`→`Nom`, add `In my network`) or change the code (and `shared/workspace.py`'s new-workspace schema) to use `Name` instead? Blocking further CRM writes until decided.
+- Should `upsert_companies`' SIREN lookup show multiple candidates (not just top-1) given the demonstrated false-positive on a short/generic company name?

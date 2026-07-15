@@ -16,6 +16,17 @@
       "env": {
         "INDEX_PATH": "/home/lgiron/vault-qmd/brain.db"
       }
+    },
+    "notion-crm": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/home/lgiron/lab_perso/notion-pilot",
+        "run",
+        "python",
+        "-m",
+        "notion_pilot.mcp.server"
+      ]
     }
   },
   "worktree": {
