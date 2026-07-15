@@ -203,6 +203,23 @@ class TestNotionPeopleSyncer:
         assert result.status in ("skipped", "review")
         client.pages.create.assert_not_called()
 
+    async def test_upsert_review_range_without_force_returns_review(self):
+        # Same fixture as the force=True test below, minus force: "Pierre Dupont" vs
+        # existing "Jean Dupont" @ "Acme Corp" scores 81.8 via token_sort_ratio — a
+        # genuine REVIEW-band match (75-85), verified independently — not SKIP, unlike
+        # the older test_upsert_review_range_does_not_create fixture above (which
+        # actually resolves to SKIP at score 100.0 and therefore never exercises this
+        # branch). This proves the early-return still holds without force: no page
+        # gets created.
+        people = [_make_people_page("p1", "Jean Dupont", ["c1"])]
+        companies = [_make_company_page("c1", "Acme Corp")]
+        syncer, client = await self._make_syncer(people, companies)
+
+        result = await syncer.upsert(PersonRecord(name="Pierre Dupont", company="Acme Corp"))
+
+        assert result.status == "review"
+        client.pages.create.assert_not_called()
+
     async def test_upsert_review_range_with_force_creates_with_override(self):
         # Same company (exact match, reused — no extra company-create call) but a
         # different first name than the existing person: "Pierre Dupont" vs
