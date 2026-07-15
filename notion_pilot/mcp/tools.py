@@ -43,11 +43,11 @@ def _company_dedup_signal(
     record: CompanyRecord,
     id_to_name: dict[str, str],
     details: dict[str, dict[str, str]],
-) -> tuple[str, float, str, list[dict[str, object]]]:
+) -> tuple[str, float, str, str, list[dict[str, object]]]:
     """4-signal decision chain, in strict precedence order — exactly one
     status comes out, never a mix: domain_match > confident name match
     (token_sort_ratio) > acronym/subset name match (token_set_ratio) >
-    would_create."""
+    would_create. Returns (status, score, best_name, best_page_id, candidates)."""
     norm = normalize(record.name)
 
     if record.contact_email and "@" in record.contact_email:
@@ -55,7 +55,7 @@ def _company_dedup_signal(
         for page_id, name in id_to_name.items():
             website = details.get(page_id, {}).get("website", "")
             if website and normalize_domain(website) == email_domain:
-                return "matched", 100.0, name, []
+                return "matched", 100.0, name, page_id, []
 
     best_sort = (0.0, "", "")  # score, name, page_id
     best_set = (0.0, "", "")
@@ -69,16 +69,17 @@ def _company_dedup_signal(
             best_set = (set_score, name, page_id)
 
     if best_sort[0] >= _DEDUP_MATCH_THRESHOLD:
-        return "matched", best_sort[0], best_sort[1], []
+        return "matched", best_sort[0], best_sort[1], best_sort[2], []
     if best_set[0] >= _DEDUP_REVIEW_THRESHOLD:
         score, name, page_id = best_set
         return (
             "needs_review",
             score,
             name,
+            page_id,
             [{"type": "notion", "page_id": page_id, "name": name, "score": score}],
         )
-    return "would_create", best_sort[0], best_sort[1], []
+    return "would_create", best_sort[0], best_sort[1], best_sort[2], []
 
 
 def _registry_fields(candidate: dict[str, str]) -> dict[str, str]:
@@ -165,7 +166,7 @@ async def upsert_companies(
 
     for i, record in enumerate(records):
         if not confirm:
-            status, score, best_name, candidates = _company_dedup_signal(
+            status, score, best_name, best_page_id, candidates = _company_dedup_signal(
                 record, session.company_syncer._id_to_name, session.company_syncer.details
             )
             reason = (
@@ -229,8 +230,10 @@ async def upsert_companies(
             continue
 
         try:
-            dedup_status, dedup_score, dedup_best_name, dedup_candidates = _company_dedup_signal(
-                record, session.company_syncer._id_to_name, session.company_syncer.details
+            dedup_status, dedup_score, dedup_best_name, dedup_page_id, dedup_candidates = (
+                _company_dedup_signal(
+                    record, session.company_syncer._id_to_name, session.company_syncer.details
+                )
             )
             if dedup_status == "needs_review" and not record.force:
                 results.append(
@@ -246,9 +249,17 @@ async def upsert_companies(
                 )
                 continue
 
-            known_before = set(session.company_syncer._id_to_name.keys())
-            page_id = await session.company_syncer.get_or_create(record.name)
-            created_new = page_id not in known_before
+            if dedup_status == "matched":
+                # Our own dedup signal (domain match or confident name match) is
+                # authoritative — it always wins over get_or_create's separate,
+                # weaker name-only check, so a domain match with a low name-similarity
+                # score (e.g. "RTE" vs "Rte France") can't slip past it into a duplicate.
+                page_id = dedup_page_id
+                created_new = False
+            else:
+                known_before = set(session.company_syncer._id_to_name.keys())
+                page_id = await session.company_syncer.get_or_create(record.name)
+                created_new = page_id not in known_before
 
             if not created_new:
                 status = "matched"

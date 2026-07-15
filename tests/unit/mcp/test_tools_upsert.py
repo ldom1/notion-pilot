@@ -282,6 +282,29 @@ async def test_upsert_companies_confirm_true_prosper_enrichment_takes_priority_o
     assert props["Size"]["select"]["name"] == "1-10"
 
 
+async def test_upsert_companies_confirm_true_domain_match_wins_without_calling_get_or_create(monkeypatch):
+    # Regression test for the live-incident duplicate: a domain match (highest-precedence
+    # dedup signal) must be authoritative on confirm=True, never falling through to
+    # get_or_create's own separate, weaker name-only check. "Rte France" vs "RTE" scores
+    # well below get_or_create's internal 85 threshold on name alone — if the dedup
+    # signal's "matched" result were ignored, get_or_create would create a duplicate.
+    session = await _loaded_session(existing_companies={"id-rte": "RTE"})
+    session.company_syncer.details["id-rte"] = {"website": "https://www.rte-france.com"}
+    get_or_create_mock = AsyncMock()
+    monkeypatch.setattr(session.company_syncer, "get_or_create", get_or_create_mock)
+
+    result = await upsert_companies(
+        session,
+        _settings(),
+        [CompanyRecord(name="Rte France", contact_email="alice.martin@rte-france.com")],
+        confirm=True,
+    )
+
+    get_or_create_mock.assert_not_called()
+    assert result.results[0].status == "matched"
+    assert result.results[0].page_id == "id-rte"
+
+
 async def test_upsert_companies_confirm_true_skips_siren_for_matched_company(monkeypatch):
     session = await _loaded_session(existing_companies={"new-company-id": "Artelys"})
     monkeypatch.setattr(
