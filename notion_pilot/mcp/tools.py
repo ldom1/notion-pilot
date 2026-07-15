@@ -17,7 +17,11 @@ from notion_pilot.mcp.models import (
 from notion_pilot.mcp.session import SyncerSession
 from notion_pilot.shared.config import Settings
 from notion_pilot.shared.prosper_client import enrich_company, enrich_person
-from notion_pilot.shared.siren_lookup import lookup_siren
+from notion_pilot.shared.siren_lookup import (
+    lookup_siren_candidates,
+    naf_section_to_sector,
+    tranche_to_size,
+)
 from notion_pilot.shared.utils.dedup import (
     DedupStatus,
     DuplicatePair,
@@ -75,6 +79,22 @@ def _company_dedup_signal(
             [{"type": "notion", "page_id": page_id, "name": name, "score": score}],
         )
     return "would_create", best_sort[0], best_sort[1], []
+
+
+def _registry_fields(candidate: dict[str, str]) -> dict[str, str]:
+    """Maps one lookup_siren_candidates() entry to the Notion fields it can
+    fill: sector, size, country. Omits any that don't resolve to a usable
+    value — callers only apply what's present."""
+    fields: dict[str, str] = {"country": "FR"}
+    sector = naf_section_to_sector(
+        candidate["section_activite_principale"], candidate["activite_principale"]
+    )
+    if sector:
+        fields["sector"] = sector
+    size = tranche_to_size(candidate["tranche_effectif_salarie"])
+    if size:
+        fields["size"] = size
+    return fields
 
 
 async def upsert_people(
@@ -154,14 +174,43 @@ async def upsert_companies(
             )
 
             siren = ""
+            siren_candidate_name = ""
+            enrichment_preview: dict[str, str] = {}
             if status == "would_create":
                 try:
-                    siren_match = await lookup_siren(record.name)
+                    siren_candidates = await lookup_siren_candidates(record.name)
                 except Exception:  # noqa: BLE001
-                    siren_match = None
-                if siren_match:
-                    siren = siren_match["siren"]
-                    best_name = siren_match["matched_name"]
+                    siren_candidates = []
+                if siren_candidates:
+                    top = siren_candidates[0]
+                    divergence = float(
+                        token_sort_ratio(normalize(record.name), normalize(top["matched_name"]))
+                    )
+                    if divergence < _DEDUP_MATCH_THRESHOLD:
+                        status = "needs_review"
+                        reason = (
+                            f"SIREN candidate {top['matched_name']!r} doesn't resemble "
+                            f"{record.name!r} (score {divergence:.0f}); verify before writing"
+                        )
+                        candidates = [
+                            {
+                                "type": "siren",
+                                "siren": c["siren"],
+                                "matched_name": c["matched_name"],
+                                "score": float(
+                                    token_sort_ratio(normalize(record.name), normalize(c["matched_name"]))
+                                ),
+                            }
+                            for c in siren_candidates
+                        ]
+                    else:
+                        siren = top["siren"]
+                        siren_candidate_name = top["matched_name"]
+                        enrichment_preview = {"siren": siren, **_registry_fields(top)}
+
+            if not record.website and not enrichment_preview.get("website") and record.contact_email:
+                domain = record.contact_email.split("@")[-1]
+                enrichment_preview["website"] = f"https://{domain}"
 
             results.append(
                 RecordResult(
@@ -170,8 +219,10 @@ async def upsert_companies(
                     score=score,
                     matched_name=best_name,
                     siren=siren,
+                    siren_candidate_name=siren_candidate_name,
                     reason=reason,
                     candidates=candidates,
+                    enrichment_preview=enrichment_preview,
                 )
             )
             continue
@@ -190,11 +241,11 @@ async def upsert_companies(
                 # The caller already confirmed this creation (and, per the preview
                 # step above, saw the SIREN candidate) — safe to write it now.
                 try:
-                    siren_match = await lookup_siren(record.name)
+                    siren_candidates = await lookup_siren_candidates(record.name)
                 except Exception:  # noqa: BLE001
-                    siren_match = None
-                if siren_match:
-                    siren = siren_match["siren"]
+                    siren_candidates = []
+                if siren_candidates:
+                    siren = siren_candidates[0]["siren"]
                     await session.company_syncer.ensure_siren_property()
                     await session.company_syncer._client.pages.update(
                         page_id, properties={"SIREN": {"rich_text": [{"text": {"content": siren}}]}}

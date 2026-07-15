@@ -107,7 +107,7 @@ async def test_upsert_people_batch_continues_after_one_error(monkeypatch):
 
 async def test_upsert_companies_dry_run_reports_would_create(monkeypatch):
     session = await _loaded_session(existing_companies={"id-edf": "EDF"})
-    monkeypatch.setattr("notion_pilot.mcp.tools.lookup_siren", AsyncMock(return_value=None))
+    monkeypatch.setattr("notion_pilot.mcp.tools.lookup_siren_candidates", AsyncMock(return_value=[]))
 
     result = await upsert_companies(session, [CompanyRecord(name="OVHcloud")], confirm=False)
 
@@ -115,24 +115,40 @@ async def test_upsert_companies_dry_run_reports_would_create(monkeypatch):
     assert result.results[0].siren == ""
 
 
-async def test_upsert_companies_dry_run_shows_siren_candidate(monkeypatch):
+async def test_upsert_companies_dry_run_shows_siren_candidate_and_enrichment(monkeypatch):
     session = await _loaded_session()
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.lookup_siren",
-        AsyncMock(return_value={"siren": "428895676", "matched_name": "ARTELYS"}),
+        "notion_pilot.mcp.tools.lookup_siren_candidates",
+        AsyncMock(
+            return_value=[
+                {
+                    "siren": "428895676",
+                    "matched_name": "ARTELYS",
+                    "section_activite_principale": "M",
+                    "activite_principale": "70.22Z",
+                    "tranche_effectif_salarie": "12",
+                }
+            ]
+        ),
     )
 
     result = await upsert_companies(session, [CompanyRecord(name="Artelys")], confirm=False)
 
     assert result.results[0].status == "would_create"
     assert result.results[0].siren == "428895676"
-    assert result.results[0].matched_name == "ARTELYS"
+    assert result.results[0].siren_candidate_name == "ARTELYS"
+    assert result.results[0].enrichment_preview == {
+        "siren": "428895676",
+        "sector": "Consulting",
+        "size": "11-50",
+        "country": "FR",
+    }
 
 
 async def test_upsert_companies_dry_run_survives_siren_lookup_failure(monkeypatch):
     session = await _loaded_session()
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.lookup_siren", AsyncMock(side_effect=RuntimeError("timeout"))
+        "notion_pilot.mcp.tools.lookup_siren_candidates", AsyncMock(side_effect=RuntimeError("timeout"))
     )
 
     result = await upsert_companies(session, [CompanyRecord(name="Artelys")], confirm=False)
@@ -157,7 +173,7 @@ async def test_upsert_companies_confirm_true_writes(monkeypatch):
     session = await _loaded_session()
     get_or_create_mock = AsyncMock(return_value="new-company-id")
     monkeypatch.setattr(session.company_syncer, "get_or_create", get_or_create_mock)
-    monkeypatch.setattr("notion_pilot.mcp.tools.lookup_siren", AsyncMock(return_value=None))
+    monkeypatch.setattr("notion_pilot.mcp.tools.lookup_siren_candidates", AsyncMock(return_value=[]))
 
     result = await upsert_companies(session, [CompanyRecord(name="OVHcloud")], confirm=True)
 
@@ -173,8 +189,8 @@ async def test_upsert_companies_confirm_true_writes_siren_for_new_company(monkey
         session.company_syncer, "get_or_create", AsyncMock(return_value="new-company-id")
     )
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.lookup_siren",
-        AsyncMock(return_value={"siren": "428895676", "matched_name": "ARTELYS"}),
+        "notion_pilot.mcp.tools.lookup_siren_candidates",
+        AsyncMock(return_value=[{"siren": "428895676", "matched_name": "ARTELYS"}]),
     )
     ensure_siren_mock = AsyncMock()
     monkeypatch.setattr(session.company_syncer, "ensure_siren_property", ensure_siren_mock)
@@ -196,7 +212,7 @@ async def test_upsert_companies_confirm_true_skips_siren_for_matched_company(mon
         session.company_syncer, "get_or_create", AsyncMock(return_value="new-company-id")
     )
     siren_mock = AsyncMock()
-    monkeypatch.setattr("notion_pilot.mcp.tools.lookup_siren", siren_mock)
+    monkeypatch.setattr("notion_pilot.mcp.tools.lookup_siren_candidates", siren_mock)
 
     result = await upsert_companies(session, [CompanyRecord(name="Artelys")], confirm=True)
 
@@ -246,11 +262,37 @@ async def test_upsert_companies_dry_run_partial_word_overlap_is_not_flagged(monk
     # creating a duplicate. Don't pick a single-token vs. multi-word-containing-that-token
     # pair for this "not flagged" test — it will score 100 and contradict the acronym test.
     session = await _loaded_session(existing_companies={"id-edf-r": "EDF Renouvelables"})
-    monkeypatch.setattr("notion_pilot.mcp.tools.lookup_siren", AsyncMock(return_value=None))
+    monkeypatch.setattr("notion_pilot.mcp.tools.lookup_siren_candidates", AsyncMock(return_value=[]))
 
     result = await upsert_companies(session, [CompanyRecord(name="EDF Trading")], confirm=False)
 
     assert result.results[0].status == "would_create"
+
+
+async def test_upsert_companies_dry_run_flags_diverging_siren_as_needs_review(monkeypatch):
+    session = await _loaded_session()
+    monkeypatch.setattr(
+        "notion_pilot.mcp.tools.lookup_siren_candidates",
+        AsyncMock(
+            return_value=[
+                {
+                    "siren": "409526167",
+                    "matched_name": "VCSP ROUTE FRANCE",
+                    "section_activite_principale": "F",
+                    "activite_principale": "42.11Z",
+                    "tranche_effectif_salarie": "01",
+                }
+            ]
+        ),
+    )
+
+    result = await upsert_companies(session, [CompanyRecord(name="Rte France")], confirm=False)
+
+    assert result.results[0].status == "needs_review"
+    assert result.results[0].siren == ""
+    assert result.results[0].candidates == [
+        {"type": "siren", "siren": "409526167", "matched_name": "VCSP ROUTE FRANCE", "score": 74.07407407407408}
+    ]
 
 
 async def test_upsert_people_dry_run_matches_by_email_despite_name_mismatch():

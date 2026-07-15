@@ -11,22 +11,6 @@ _SEARCH_URL = "https://recherche-entreprises.api.gouv.fr/search"
 _SIREN_LEN = 9
 
 
-async def lookup_siren(name: str) -> dict[str, str] | None:
-    """Returns the top match as {"siren": ..., "matched_name": ...}, or None
-    if there's no match or the API's identifier isn't SIREN-shaped."""
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.get(_SEARCH_URL, params={"q": name, "per_page": 1})
-        response.raise_for_status()
-    results = response.json().get("results") or []
-    if not results:
-        return None
-    top = results[0]
-    siren = top.get("siren", "")
-    if len(siren) != _SIREN_LEN:
-        return None
-    return {"siren": siren, "matched_name": top.get("nom_complet", "")}
-
-
 async def lookup_siren_candidates(name: str, per_page: int = 3) -> list[dict[str, str]]:
     """Returns up to `per_page` registry matches, best first. Each dict has
     siren, matched_name, section_activite_principale (NAF section letter),
