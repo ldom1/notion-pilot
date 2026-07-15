@@ -90,3 +90,38 @@ def test_find_people_duplicates_matches_on_name_and_company():
     assert len(pairs) == 1
     assert {pairs[0].id_a, pairs[0].id_b} == {"p1", "p2"}
     assert pairs[0].context_a == "EDF"
+
+
+def test_find_match_exact_email_skips_even_with_different_name():
+    candidates = [
+        {"name": "A. Martin", "company": "RTE", "page_id": "p1", "email": "alice.martin@rte-france.com"}
+    ]
+    result = find_match(
+        "MARTIN Alice", "Rte France", candidates, email="alice.martin@rte-france.com"
+    )
+    assert result.status == DedupStatus.SKIP
+    assert result.matched_name == "A. Martin"
+
+
+def test_find_match_exact_linkedin_skips_even_with_different_name():
+    candidates = [
+        {
+            "name": "A. Martin",
+            "company": "RTE",
+            "page_id": "p1",
+            "linkedin_url": "https://linkedin.com/in/amartin",
+        }
+    ]
+    result = find_match(
+        "MARTIN Alice",
+        "Rte France",
+        candidates,
+        linkedin_url="https://linkedin.com/in/amartin",
+    )
+    assert result.status == DedupStatus.SKIP
+
+
+def test_find_match_email_signal_ignored_when_no_candidate_has_it():
+    candidates = [{"name": "Alice Martin", "company": "Engie", "page_id": "xyz"}]
+    result = find_match("Bob Bernard", "OVHcloud", candidates, email="bob@ovhcloud.com")
+    assert result.status == DedupStatus.NEW

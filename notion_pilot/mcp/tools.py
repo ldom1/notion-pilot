@@ -39,7 +39,10 @@ async def upsert_people(
 
     for i, record in enumerate(records):
         if not confirm:
-            match = find_match(record.name, record.company, session.people_syncer._existing)
+            match = find_match(
+                record.name, record.company, session.people_syncer._existing,
+                email=record.email or "", linkedin_url=record.linkedin_url or "",
+            )
             if match.status == DedupStatus.SKIP:
                 status = "would_skip"
             elif match.status == DedupStatus.REVIEW:

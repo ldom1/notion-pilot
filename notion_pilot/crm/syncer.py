@@ -291,7 +291,10 @@ class NotionPeopleSyncer:
     async def upsert(
         self, person: PersonRecord, settings: "Settings | None" = None
     ) -> UpsertResult:
-        match = find_match(person.name, person.company, self._existing)
+        match = find_match(
+            person.name, person.company, self._existing,
+            email=person.email, linkedin_url=person.linkedin_url,
+        )
 
         if match.status == DedupStatus.SKIP:
             return UpsertResult(

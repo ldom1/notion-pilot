@@ -203,3 +203,25 @@ async def test_upsert_companies_confirm_true_skips_siren_for_matched_company(mon
     siren_mock.assert_not_called()
     assert result.results[0].status == "matched"
     assert result.results[0].siren == ""
+
+
+async def test_upsert_people_dry_run_matches_by_email_despite_name_mismatch():
+    session = await _loaded_session(
+        existing_people=[
+            {
+                "name": "A. Martin",
+                "company": "RTE",
+                "page_id": "p1",
+                "email": "alice.martin@rte-france.com",
+            }
+        ]
+    )
+
+    result = await upsert_people(
+        session,
+        [PersonRecord(name="MARTIN Alice", company="Rte France", email="alice.martin@rte-france.com")],
+        confirm=False,
+    )
+
+    assert result.results[0].status == "would_skip"
+    assert result.results[0].matched_name == "A. Martin"
