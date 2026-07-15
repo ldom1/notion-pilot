@@ -17,6 +17,7 @@ from notion_pilot.mcp.models import (
 from notion_pilot.mcp.session import SyncerSession
 from notion_pilot.shared.config import Settings
 from notion_pilot.shared.prosper_client import enrich_company, enrich_person
+from notion_pilot.shared.siren_lookup import lookup_siren
 from notion_pilot.shared.utils.dedup import (
     DedupStatus,
     DuplicatePair,
@@ -103,9 +104,24 @@ async def upsert_companies(
                     best_score = score
                     best_name = session.company_syncer.id_to_name(page_id)
             status = "matched" if best_score >= 85 else "would_create"
+
+            siren = ""
+            if status == "would_create":
+                try:
+                    siren_match = await lookup_siren(record.name)
+                except Exception:  # noqa: BLE001
+                    siren_match = None
+                if siren_match:
+                    siren = siren_match["siren"]
+                    best_name = siren_match["matched_name"]
+
             results.append(
                 RecordResult(
-                    name=record.name, status=status, score=best_score, matched_name=best_name
+                    name=record.name,
+                    status=status,
+                    score=best_score,
+                    matched_name=best_name,
+                    siren=siren,
                 )
             )
             continue
@@ -118,7 +134,25 @@ async def upsert_companies(
             known_before = set(session.company_syncer._id_to_name.keys())
             page_id = await session.company_syncer.get_or_create(record.name)
             status = "matched" if page_id in known_before else "created"
-            results.append(RecordResult(name=record.name, status=status, page_id=page_id))
+
+            siren = ""
+            if status == "created":
+                # The caller already confirmed this creation (and, per the preview
+                # step above, saw the SIREN candidate) — safe to write it now.
+                try:
+                    siren_match = await lookup_siren(record.name)
+                except Exception:  # noqa: BLE001
+                    siren_match = None
+                if siren_match:
+                    siren = siren_match["siren"]
+                    await session.company_syncer.ensure_siren_property()
+                    await session.company_syncer._client.pages.update(
+                        page_id, properties={"SIREN": {"rich_text": [{"text": {"content": siren}}]}}
+                    )
+
+            results.append(
+                RecordResult(name=record.name, status=status, page_id=page_id, siren=siren)
+            )
             if i < len(records) - 1:
                 await asyncio.sleep(_RATE_LIMIT_S)
         except Exception as exc:  # noqa: BLE001
