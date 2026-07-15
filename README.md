@@ -196,8 +196,8 @@ Tools:
 
 | Tool | Description |
 |---|---|
-| `upsert_people` | Upsert people into the Notion People database, dedup-checked. Defaults to a dry-run preview (`confirm=false`) — pass `confirm=true` to actually write. |
-| `upsert_companies` | Upsert companies into the Notion Companies database, dedup-checked. New companies get a SIREN candidate looked up by name via the French government's company registry, shown in the preview for approval and written on `confirm=true`. Defaults to a dry-run preview. |
+| `upsert_people` | Upsert people into the Notion People database, dedup-checked (exact email/LinkedIn match, then fuzzy name+company). Defaults to a dry-run preview (`confirm=false`) — pass `confirm=true` to actually write. A `needs_review` result can be created anyway with `force=true`. |
+| `upsert_companies` | Upsert companies into the Notion Companies database, dedup-checked (contact-email domain, exact name, acronym/subset name). New companies get SIREN + sector/size/country enriched — prosper first, falling back to the French government company registry — shown in the preview for approval and written on `confirm=true`. A `needs_review` result can be created anyway with `force=true`. |
 | `find_duplicates` | Find likely-duplicate People/Companies pairs already in Notion via fuzzy name matching. `target`: `people`, `companies`, or `both`. |
 | `enrich_people` | Enrich People records missing seniority/role/email via prosper's `enrich_person` MCP tool. Defaults to a dry-run preview. |
 | `enrich_companies` | Enrich Company records missing sector/size/country/LinkedIn via prosper's `enrich_company` MCP tool. Defaults to a dry-run preview. |
