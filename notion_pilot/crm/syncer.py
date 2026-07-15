@@ -1,14 +1,18 @@
 """Notion People and Company syncers with fuzzy dedup."""
 
 from dataclasses import dataclass, field
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import httpx
 from loguru import logger
 from notion_client import AsyncClient
 from rapidfuzz.fuzz import token_sort_ratio
 
+from notion_pilot.shared.prosper_client import resolve_company
 from notion_pilot.shared.utils.dedup import CandidateRecord, DedupStatus, find_match, normalize
+
+if TYPE_CHECKING:
+    from notion_pilot.shared.config import Settings
 
 
 @dataclass
@@ -72,6 +76,19 @@ class NotionCompanySyncer:
             "Content-Type": "application/json",
         }
 
+    async def ensure_siren_property(self) -> None:
+        """Idempotent: adds a SIREN rich_text property to the Companies DB
+        if it doesn't already have one. Only supports the standard databases
+        API path for now — data_sources schema updates go through a
+        different endpoint and aren't needed by any current workspace."""
+        if not self._standard_api:
+            return
+        db = await self._client.databases.retrieve(self._ds_id)
+        if "SIREN" in db.get("properties", {}):
+            return
+        await self._client.databases.update(self._ds_id, properties={"SIREN": {"rich_text": {}}})
+        logger.info("Added SIREN property to Companies DB {}", self._ds_id[:8])
+
     async def _query_page(self, cursor: str | None) -> dict[str, Any]:
         if self._standard_api:
             body: dict[str, object] = {"page_size": 100}
@@ -113,6 +130,10 @@ class NotionCompanySyncer:
                         detail["country"] = props["Country"]["select"]["name"]
                     if props.get("Sector", {}).get("select"):
                         detail["sector"] = props["Sector"]["select"]["name"]
+                    if props.get("SIREN", {}).get("rich_text"):
+                        detail["siren"] = "".join(
+                            t.get("plain_text", "") for t in props["SIREN"]["rich_text"]
+                        )
                     icon = page.get("icon") or {}
                     if icon.get("type") == "external":
                         detail["icon_url"] = (icon.get("external") or {}).get("url", "")
@@ -124,7 +145,7 @@ class NotionCompanySyncer:
             cursor = result["next_cursor"]
         logger.info("Companies snapshot: {} entries", len(self._name_to_id))
 
-    async def get_or_create(self, name: str) -> str:
+    async def get_or_create(self, name: str, settings: "Settings | None" = None) -> str:
         norm = normalize(name)
         best_score = 0.0
         best_id = ""
@@ -148,6 +169,23 @@ class NotionCompanySyncer:
         self._name_to_id[norm] = page_id
         self._id_to_name[page_id] = name
         logger.info("Created company: {} ({})", name, page_id)
+
+        if settings is not None:
+            try:
+                resolution = await resolve_company(name, settings)
+                best_match = resolution.get("best_match")
+                if resolution.get("confidence_level") == "high" and best_match:
+                    await self.ensure_siren_property()
+                    await self._client.pages.update(
+                        page_id,
+                        properties={
+                            "SIREN": {"rich_text": [{"text": {"content": best_match["siren"]}}]}
+                        },
+                    )
+                    logger.info("Auto-populated SIREN {} for {}", best_match["siren"], name)
+            except Exception:  # noqa: BLE001
+                logger.warning("SIREN resolution failed for {}; continuing without it", name)
+
         return page_id
 
 
@@ -250,7 +288,9 @@ class NotionPeopleSyncer:
             cursor = result["next_cursor"]
         logger.info("People snapshot: {} entries", len(self._existing))
 
-    async def upsert(self, person: PersonRecord) -> UpsertResult:
+    async def upsert(
+        self, person: PersonRecord, settings: "Settings | None" = None
+    ) -> UpsertResult:
         match = find_match(person.name, person.company, self._existing)
 
         if match.status == DedupStatus.SKIP:
@@ -270,7 +310,7 @@ class NotionPeopleSyncer:
 
         company_id = ""
         if person.company and self._company_syncer:
-            company_id = await self._company_syncer.get_or_create(person.company)
+            company_id = await self._company_syncer.get_or_create(person.company, settings=settings)
 
         properties: dict[str, object] = {
             "Nom": {"title": [{"text": {"content": person.name}}]},

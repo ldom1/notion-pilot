@@ -2,6 +2,9 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
+import pytest
+
 from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
 
 
@@ -79,6 +82,49 @@ class TestNotionCompanySyncer:
         await syncer.get_or_create("NewCorp")  # second call — should not create again
 
         assert client.pages.create.call_count == 1
+
+    async def test_ensure_siren_property_creates_when_missing(self):
+        client = AsyncMock()
+        client.databases.retrieve.return_value = {"properties": {"Name": {}}}
+        syncer = NotionCompanySyncer(client, "fake-ds-id", standard_api=True)
+
+        await syncer.ensure_siren_property()
+
+        client.databases.update.assert_awaited_once_with(
+            "fake-ds-id", properties={"SIREN": {"rich_text": {}}}
+        )
+
+    async def test_ensure_siren_property_skips_when_present(self):
+        client = AsyncMock()
+        client.databases.retrieve.return_value = {"properties": {"Name": {}, "SIREN": {}}}
+        syncer = NotionCompanySyncer(client, "fake-ds-id", standard_api=True)
+
+        await syncer.ensure_siren_property()
+
+        client.databases.update.assert_not_awaited()
+
+    async def test_load_snapshot_captures_siren_into_details(self):
+        # Reuses this file's existing `_mock_ds_query` helper (data_sources API path,
+        # same convention as `test_load_snapshot_populates_cache` above) rather than
+        # mocking `databases.retrieve` directly — `_query_page` under standard_api=True
+        # makes a raw httpx call outside the AsyncMock client, so the data_sources
+        # path is what's actually mockable here.
+        client = _mock_ds_query(
+            [
+                {
+                    "id": "pid1",
+                    "properties": {
+                        "Name": {"title": [{"plain_text": "Artelys"}]},
+                        "SIREN": {"rich_text": [{"plain_text": "428895676"}]},
+                    },
+                }
+            ]
+        )
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+
+        await syncer.load_snapshot()
+
+        assert syncer.details["pid1"]["siren"] == "428895676"
 
 
 def _make_people_page(page_id: str, name: str, company_page_ids: list[str] | None = None) -> dict:
@@ -262,3 +308,187 @@ async def test_load_snapshot_reads_optional_fields():
     assert candidate.get("seniority") == "vp"
     assert candidate.get("role_type") == ["engineering"]
     assert "linkedin.com/in/alice" in candidate.get("linkedin_url", "")
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_populates_siren_on_new_company(monkeypatch):
+    from notion_pilot.shared.config import Settings
+
+    client = AsyncMock()
+    client.pages.create.return_value = {"id": "new-page-id"}
+    client.databases.retrieve.return_value = {"properties": {"Name": {}, "SIREN": {}}}
+    syncer = NotionCompanySyncer(client, "fake-ds-id", standard_api=True)
+    settings = Settings(notion_telegram_msg_database_id="d")
+
+    async def fake_resolve(name, settings):
+        return {
+            "matches": [{"siren": "428895676", "name": "ARTELYS", "score": 0.95}],
+            "best_match": {"siren": "428895676", "name": "ARTELYS", "score": 0.95},
+            "confidence_level": "high",
+        }
+
+    monkeypatch.setattr("notion_pilot.crm.syncer.resolve_company", fake_resolve)
+
+    page_id = await syncer.get_or_create("Artelys", settings=settings)
+
+    assert page_id == "new-page-id"
+    client.pages.update.assert_awaited_once_with(
+        "new-page-id", properties={"SIREN": {"rich_text": [{"text": {"content": "428895676"}}]}}
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_skips_siren_on_medium_confidence(monkeypatch):
+    from notion_pilot.shared.config import Settings
+
+    client = AsyncMock()
+    client.pages.create.return_value = {"id": "new-page-id"}
+    syncer = NotionCompanySyncer(client, "fake-ds-id", standard_api=True)
+    settings = Settings(notion_telegram_msg_database_id="d")
+
+    async def fake_resolve(name, settings):
+        return {"matches": [], "best_match": None, "confidence_level": "medium"}
+
+    monkeypatch.setattr("notion_pilot.crm.syncer.resolve_company", fake_resolve)
+
+    await syncer.get_or_create("Ambiguous Co", settings=settings)
+
+    client.pages.update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_matched_existing_page_never_calls_resolve(monkeypatch):
+    from notion_pilot.shared.config import Settings
+
+    client = AsyncMock()
+    syncer = NotionCompanySyncer(client, "fake-ds-id", standard_api=True)
+    syncer._name_to_id["artelys"] = "existing-page-id"
+    settings = Settings(notion_telegram_msg_database_id="d")
+
+    called = False
+
+    async def fake_resolve(name, settings):
+        nonlocal called
+        called = True
+        return {"matches": [], "best_match": None, "confidence_level": "low"}
+
+    monkeypatch.setattr("notion_pilot.crm.syncer.resolve_company", fake_resolve)
+
+    page_id = await syncer.get_or_create("Artelys", settings=settings)
+
+    assert page_id == "existing-page-id"
+    assert called is False
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_ensures_siren_property_before_writing(monkeypatch):
+    from notion_pilot.shared.config import Settings
+
+    client = AsyncMock()
+    client.pages.create.return_value = {"id": "new-page-id"}
+    client.databases.retrieve.return_value = {"properties": {"Name": {}}}  # no SIREN yet
+    syncer = NotionCompanySyncer(client, "fake-ds-id", standard_api=True)
+    settings = Settings(notion_telegram_msg_database_id="d")
+
+    async def fake_resolve(name, settings):
+        return {
+            "matches": [{"siren": "428895676", "name": "ARTELYS", "score": 0.95}],
+            "best_match": {"siren": "428895676", "name": "ARTELYS", "score": 0.95},
+            "confidence_level": "high",
+        }
+
+    monkeypatch.setattr("notion_pilot.crm.syncer.resolve_company", fake_resolve)
+
+    await syncer.get_or_create("Artelys", settings=settings)
+
+    # Asserting each call happened independently doesn't prove ordering — a
+    # real workspace missing the property would fail the pages.update call if
+    # ensure_siren_property ran after it (or not at all). Check the actual
+    # call order on the shared client mock instead.
+    client.databases.update.assert_awaited_once_with(
+        "fake-ds-id", properties={"SIREN": {"rich_text": {}}}
+    )
+    relevant_calls = [
+        c[0] for c in client.mock_calls if c[0] in ("databases.update", "pages.update")
+    ]
+    assert relevant_calls == ["databases.update", "pages.update"]
+
+
+@pytest.mark.asyncio
+async def test_lead_path_populates_siren_via_people_upsert(monkeypatch):
+    """Regression test for the /lead gap: NotionPeopleSyncer.upsert must
+    forward settings to the company syncer's get_or_create, not just
+    _handle_company's direct call."""
+    from notion_pilot.crm.syncer import NotionPeopleSyncer, PersonRecord
+    from notion_pilot.shared.config import Settings
+
+    client = AsyncMock()
+    client.pages.create.side_effect = [{"id": "person-page-id"}, {"id": "new-company-id"}]
+    company_syncer = NotionCompanySyncer(client, "fake-companies-ds", standard_api=True)
+    people_syncer = NotionPeopleSyncer(client, "fake-people-ds", company_syncer)
+    settings = Settings(notion_telegram_msg_database_id="d")
+
+    resolved_with_settings: list[object] = []
+
+    async def fake_resolve(name, settings):
+        resolved_with_settings.append(settings)
+        return {"matches": [], "best_match": None, "confidence_level": "low"}
+
+    monkeypatch.setattr("notion_pilot.crm.syncer.resolve_company", fake_resolve)
+
+    await people_syncer.upsert(PersonRecord(name="Jean Dupont", company="NewCo"), settings=settings)
+
+    assert resolved_with_settings == [settings]
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_survives_resolve_company_connection_failure(monkeypatch):
+    """Regression test for the Critical finding: if prosper's MCP server is
+    unreachable, resolve_company can raise a raw connection exception (not
+    just return a structured error dict). get_or_create must still return the
+    already-created page_id instead of propagating the exception — the
+    company page creation must not depend on prosper's availability."""
+    from notion_pilot.shared.config import Settings
+
+    client = AsyncMock()
+    client.pages.create.return_value = {"id": "new-page-id"}
+    syncer = NotionCompanySyncer(client, "fake-ds-id", standard_api=True)
+    settings = Settings(notion_telegram_msg_database_id="d")
+
+    async def fake_resolve(name, settings):
+        raise httpx.ConnectError("connection refused")
+
+    monkeypatch.setattr("notion_pilot.crm.syncer.resolve_company", fake_resolve)
+
+    page_id = await syncer.get_or_create("Artelys", settings=settings)
+
+    assert page_id == "new-page-id"
+    client.pages.update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_lead_path_survives_resolve_company_connection_failure(monkeypatch):
+    """Regression test for the /lead blast radius: if resolve_company raises
+    while creating the company (inside get_or_create), the person page must
+    still get created afterwards — no orphaned company page with a silently
+    dropped person/deal."""
+    from notion_pilot.crm.syncer import NotionPeopleSyncer, PersonRecord
+    from notion_pilot.shared.config import Settings
+
+    client = AsyncMock()
+    client.pages.create.side_effect = [{"id": "new-company-id"}, {"id": "person-page-id"}]
+    company_syncer = NotionCompanySyncer(client, "fake-companies-ds", standard_api=True)
+    people_syncer = NotionPeopleSyncer(client, "fake-people-ds", company_syncer)
+    settings = Settings(notion_telegram_msg_database_id="d")
+
+    async def fake_resolve(name, settings):
+        raise Exception("boom")  # noqa: TRY002
+
+    monkeypatch.setattr("notion_pilot.crm.syncer.resolve_company", fake_resolve)
+
+    result = await people_syncer.upsert(
+        PersonRecord(name="Jean Dupont", company="NewCo"), settings=settings
+    )
+
+    assert result.status == "created"
+    assert result.page_id == "person-page-id"

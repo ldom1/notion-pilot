@@ -16,7 +16,7 @@ _SETTINGS = dict(notion_token="t", notion_telegram_msg_database_id="d", openrout
 
 
 def test_all_commands_defined():
-    for name in ["lead", "people", "company", "deal", "enrich", "knowledge"]:
+    for name in ["lead", "people", "company", "deal", "knowledge"]:
         assert name in COMMANDS, f"/{name} missing from COMMANDS"
 
 

@@ -18,7 +18,7 @@ from notion_client import AsyncClient
 
 from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer
 from notion_pilot.shared.config import load_settings
-from notion_pilot.shared.utils.enrichment import enrich_company, enrich_person
+from notion_pilot.shared.prosper_client import enrich_company, enrich_person
 
 _RATE_LIMIT_S = 0.4  # seconds between Notion writes to stay under rate limit
 _NOTION_BASE = "https://www.notion.so"
@@ -172,7 +172,15 @@ async def enrich_people(limit: int, dry_run: bool, report_dir: Path) -> None:
         position = candidate.get("position", "")
 
         logger.info("Enriching {} @ {}...", name, company)
-        enrichment = await enrich_person(name, company, settings, position=position)
+        try:
+            enrichment = await enrich_person(name, company, settings, position=position)
+        except Exception:  # noqa: BLE001
+            logger.exception("Enrichment failed for {} @ {} — skipping", name, company)
+            report.skipped_no_data += 1
+            report.rows.append(
+                PeopleRow(name, company, candidate["page_id"], "error", status="no_data")
+            )
+            continue
 
         props: dict[str, object] = {}
         if enrichment.email and not candidate.get("email"):
@@ -272,7 +280,13 @@ async def enrich_companies(limit: int, dry_run: bool, report_dir: Path) -> None:
         website = existing.get("website", "")
         domain = website.split("//")[-1].split("/")[0].removeprefix("www.") if website else ""
         logger.info("Enriching company {}{}...", name, f" (domain={domain})" if domain else "")
-        enrichment = await enrich_company(name, settings, domain=domain)
+        try:
+            enrichment = await enrich_company(name, settings, domain=domain)
+        except Exception:  # noqa: BLE001
+            logger.exception("Enrichment failed for company {} — skipping", name)
+            report.skipped_no_data += 1
+            report.rows.append(CompanyRow(name, page_id, "error", status="no_data"))
+            continue
 
         props: dict[str, object] = {}
         if enrichment.linkedin_url and not existing.get("linkedin_url"):

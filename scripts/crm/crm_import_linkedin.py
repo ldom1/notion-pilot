@@ -20,7 +20,7 @@ from notion_client import AsyncClient
 from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
 from notion_pilot.shared.config import load_settings
 from notion_pilot.shared.utils.dedup import DedupStatus, find_match
-from notion_pilot.shared.utils.enrichment import enrich_person
+from notion_pilot.shared.prosper_client import enrich_person
 
 _DEFAULT_CSV = Path("data/crm/linkedin/Connections.csv")
 _REVIEW_CSV = Path("data/crm/import-review.csv")
