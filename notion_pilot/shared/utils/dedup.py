@@ -76,3 +76,51 @@ def find_match(
     if best_score >= 75:
         return MatchResult(DedupStatus.REVIEW, best_score, best["name"], best["company"])
     return MatchResult(DedupStatus.NEW, best_score)
+
+
+_NOTION_BASE_URL = "https://www.notion.so"
+
+
+def notion_page_url(page_id: str) -> str:
+    return f"{_NOTION_BASE_URL}/{page_id.replace('-', '')}"
+
+
+@dataclass
+class DuplicatePair:
+    score: float
+    name_a: str
+    id_a: str
+    name_b: str
+    id_b: str
+    context_a: str = field(default="")
+    context_b: str = field(default="")
+
+
+def find_company_duplicates(id_to_name: dict[str, str], threshold: float) -> list[DuplicatePair]:
+    """Pairwise fuzzy-match every company name against every other. Pure — no Notion I/O."""
+    items = [(pid, name, normalize(name)) for pid, name in id_to_name.items()]
+    pairs: list[DuplicatePair] = []
+    for i, (id_a, name_a, norm_a) in enumerate(items):
+        for id_b, name_b, norm_b in items[i + 1 :]:
+            score = float(token_sort_ratio(norm_a, norm_b))
+            if score >= threshold:
+                pairs.append(DuplicatePair(score, name_a, id_a, name_b, id_b))
+    return sorted(pairs, key=lambda p: -p.score)
+
+
+def find_people_duplicates(
+    existing: list[CandidateRecord], threshold: float
+) -> list[DuplicatePair]:
+    """Pairwise fuzzy-match every person (name + company) against every other."""
+
+    def key(r: CandidateRecord) -> str:
+        return normalize(f"{r['name']} {r.get('company', '')}")
+
+    records = [(r["page_id"], r["name"], r.get("company", ""), key(r)) for r in existing]
+    pairs: list[DuplicatePair] = []
+    for i, (id_a, name_a, co_a, key_a) in enumerate(records):
+        for id_b, name_b, co_b, key_b in records[i + 1 :]:
+            score = float(token_sort_ratio(key_a, key_b))
+            if score >= threshold:
+                pairs.append(DuplicatePair(score, name_a, id_a, name_b, id_b, co_a, co_b))
+    return sorted(pairs, key=lambda p: -p.score)

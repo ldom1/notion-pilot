@@ -12,58 +12,20 @@ Usage:
 
 import argparse
 import asyncio
-from dataclasses import dataclass
 
 from loguru import logger
 from notion_client import AsyncClient
-from rapidfuzz.fuzz import token_sort_ratio
 
 from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer
 from notion_pilot.shared.config import load_settings
-from notion_pilot.shared.utils.dedup import normalize
+from notion_pilot.shared.utils.dedup import (
+    DuplicatePair,
+    find_company_duplicates,
+    find_people_duplicates,
+    notion_page_url,
+)
 
 _DEFAULT_THRESHOLD = 85
-_NOTION_URL = "https://www.notion.so"
-
-
-def _page_url(page_id: str) -> str:
-    return f"{_NOTION_URL}/{page_id.replace('-', '')}"
-
-
-@dataclass
-class DuplicatePair:
-    score: float
-    name_a: str
-    id_a: str
-    name_b: str
-    id_b: str
-    context_a: str = ""
-    context_b: str = ""
-
-
-def _find_company_duplicates(id_to_name: dict[str, str], threshold: float) -> list[DuplicatePair]:
-    items = [(pid, name, normalize(name)) for pid, name in id_to_name.items()]
-    pairs: list[DuplicatePair] = []
-    for i, (id_a, name_a, norm_a) in enumerate(items):
-        for id_b, name_b, norm_b in items[i + 1 :]:
-            score = float(token_sort_ratio(norm_a, norm_b))
-            if score >= threshold:
-                pairs.append(DuplicatePair(score, name_a, id_a, name_b, id_b))
-    return sorted(pairs, key=lambda p: -p.score)
-
-
-def _find_people_duplicates(existing: list[dict], threshold: float) -> list[DuplicatePair]:
-    def key(r: dict) -> str:
-        return normalize(f"{r['name']} {r.get('company', '')}")
-
-    records = [(r["page_id"], r["name"], r.get("company", ""), key(r)) for r in existing]
-    pairs: list[DuplicatePair] = []
-    for i, (id_a, name_a, co_a, key_a) in enumerate(records):
-        for id_b, name_b, co_b, key_b in records[i + 1 :]:
-            score = float(token_sort_ratio(key_a, key_b))
-            if score >= threshold:
-                pairs.append(DuplicatePair(score, name_a, id_a, name_b, id_b, co_a, co_b))
-    return sorted(pairs, key=lambda p: -p.score)
 
 
 def _print_pairs(pairs: list[DuplicatePair], label: str) -> None:
@@ -76,9 +38,9 @@ def _print_pairs(pairs: list[DuplicatePair], label: str) -> None:
         ctx_b = f" ({p.context_b})" if p.context_b else ""
         print(
             f"  [{p.score:.0f}]  {p.name_a}{ctx_a}\n"
-            f"         {_page_url(p.id_a)}\n"
+            f"         {notion_page_url(p.id_a)}\n"
             f"       vs {p.name_b}{ctx_b}\n"
-            f"         {_page_url(p.id_b)}"
+            f"         {notion_page_url(p.id_b)}"
         )
 
 
@@ -93,7 +55,7 @@ async def dedup_companies(threshold: float) -> None:
     logger.info(
         "Scanning {} companies for duplicates (threshold={})...", len(syncer._id_to_name), threshold
     )
-    pairs = _find_company_duplicates(syncer._id_to_name, threshold)
+    pairs = find_company_duplicates(syncer._id_to_name, threshold)
     _print_pairs(pairs, "Companies")
 
 
@@ -111,7 +73,7 @@ async def dedup_people(threshold: float) -> None:
     await people_syncer.load_snapshot()
     existing = [dict(r) for r in people_syncer._existing]
     logger.info("Scanning {} people for duplicates (threshold={})...", len(existing), threshold)
-    pairs = _find_people_duplicates(existing, threshold)
+    pairs = find_people_duplicates(existing, threshold)
     _print_pairs(pairs, "People")
 
 

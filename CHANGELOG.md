@@ -13,11 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.env.bootstrap.example` — template for bootstrapping Docker/devbox deploys
 - `InfisicalSettingsSource` (`notion_pilot/shared/config.py`) — pydantic-settings v2 custom source; SDK (Universal Auth) path for Docker, CLI-injected env vars for local dev; per-path errors are non-fatal (warns + continues)
 - `deploy.sh` — rewritten for Docker Compose (`git fetch → reset --hard → docker compose up --build -d`); replaces the old tag-based systemd script
+- MCP server (`notion_pilot/mcp/`) exposing the CRM vertical as tools: `upsert_people`, `upsert_companies`, `find_duplicates`, `enrich_people`, `enrich_companies`, `rank_contacts_for_pitch`, `search_people`, `search_companies`, `get_recent_people`, `get_open_leads`, `refresh_notion_snapshot`. Stdio transport, dry-run-by-default on all write tools.
+- `notion_pilot/shared/siren_lookup.py` — SIREN-by-name lookup via the French government's free company registry API (no key required); wired into `upsert_companies`, which surfaces the candidate SIREN in the `confirm=false` preview and only writes it once the caller repeats the call with `confirm=true`.
 
 ### Changed
 - `Makefile`: `dev` and `dev-backend` targets now wrap `launch_webserver.sh` with `infisical run --`; `deploy` delegates to `./deploy.sh`
 - `launch_webserver.sh`: removed `.env` file reading; secrets come from Infisical CLI injection (`infisical run -- ./launch_webserver.sh`)
 - Docker Compose: `env_file` changed from `.env` to `.env.bootstrap` (4 Infisical bootstrap vars only)
+
+### Removed
+- `scripts/crm/crm_enrich.py` — superseded by the MCP server's `enrich_people`/`enrich_companies` tools, which replicate its dry-run-by-default batch enrichment logic
+- `scripts/crm/crm_setup_deals_db.py` — one-off patch (hardcoded DB id) for a notion-client 3.x bug dropping DB properties on creation; `shared/workspace.py`'s DB-creation path already applies and verifies properties generically
 
 ### Fixed
 - Telegram CRM writes (`/people`, infer-confirm yes, multi-step commands): call `_enrich_settings_from_cockpit()` before handlers so People/Companies DB IDs from `cockpit_config.json` are used when env vars are unset (fixes `data_sources//query` 400 on save)

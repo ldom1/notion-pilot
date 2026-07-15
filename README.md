@@ -175,4 +175,39 @@ notion_pilot/
 └── media/             # Photo + voice download, on-device transcription
 ```
 
+## MCP server
+
+`notion_pilot/mcp/` exposes the CRM vertical's existing capabilities (fuzzy-dedup'd upsert, enrichment, duplicate scan, pitch-based ranking, read queries) as MCP tools over stdio, so any MCP-aware client (e.g. Claude Code, from this project or another) can ingest, dedup, enrich, and query Notion CRM data directly — without reinventing any of the matching/enrichment logic already proven in `crm/` and `shared/utils/`. It's a thin wrapper: `session.py` caches a `NotionCompanySyncer`/`NotionPeopleSyncer` snapshot for the process lifetime (background pre-warm at startup), and `tools.py` calls straight into the existing syncer/dedup/enrichment/prospection/queries functions.
+
+Register it as an MCP server (e.g. in a project's `.claude/settings.json`):
+
+```json
+{
+  "mcpServers": {
+    "notion-crm": {
+      "command": "uv",
+      "args": ["--directory", "/home/lgiron/lab_perso/notion-pilot", "run", "python", "-m", "notion_pilot.mcp.server"]
+    }
+  }
+}
+```
+
+Tools:
+
+| Tool | Description |
+|---|---|
+| `upsert_people` | Upsert people into the Notion People database, dedup-checked. Defaults to a dry-run preview (`confirm=false`) — pass `confirm=true` to actually write. |
+| `upsert_companies` | Upsert companies into the Notion Companies database, dedup-checked. New companies get a SIREN candidate looked up by name via the French government's company registry, shown in the preview for approval and written on `confirm=true`. Defaults to a dry-run preview. |
+| `find_duplicates` | Find likely-duplicate People/Companies pairs already in Notion via fuzzy name matching. `target`: `people`, `companies`, or `both`. |
+| `enrich_people` | Enrich People records missing seniority/role/email via prosper's `enrich_person` MCP tool. Defaults to a dry-run preview. |
+| `enrich_companies` | Enrich Company records missing sector/size/country/LinkedIn via prosper's `enrich_company` MCP tool. Defaults to a dry-run preview. |
+| `rank_contacts_for_pitch` | Rank existing CRM contacts by relevance to a B2B sales pitch (LLM-powered). |
+| `search_people` | Fuzzy-search existing People by name/company — read-only, no write. |
+| `search_companies` | Fuzzy-search existing Companies by name — read-only, no write. |
+| `get_recent_people` | People added to Notion in the last 7 days. |
+| `get_open_leads` | Open (non-closed) deals from the Deals database. |
+| `refresh_notion_snapshot` | Force-reload the cached People/Companies snapshot from Notion (use if the Telegram bot or web cockpit may have written since this session started). |
+
+All write tools default to `confirm=false` (dry-run preview, no Notion write) and require an explicit `confirm=true` to actually write.
+
 Contributions welcome. Short & sharp.
