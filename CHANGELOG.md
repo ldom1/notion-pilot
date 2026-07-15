@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `launch_webserver.sh`: removed `.env` file reading; secrets come from Infisical CLI injection (`infisical run -- ./launch_webserver.sh`)
 - Docker Compose: `env_file` changed from `.env` to `.env.bootstrap` (4 Infisical bootstrap vars only)
 
+### Removed
+- `scripts/crm/crm_enrich.py` — superseded by the MCP server's `enrich_people`/`enrich_companies` tools, which replicate its dry-run-by-default batch enrichment logic
+
 ### Fixed
 - Telegram CRM writes (`/people`, infer-confirm yes, multi-step commands): call `_enrich_settings_from_cockpit()` before handlers so People/Companies DB IDs from `cockpit_config.json` are used when env vars are unset (fixes `data_sources//query` 400 on save)
 - LinkedIn contact paste (`URL : Name, Company, Position`): deterministic parser in `contact_parse.py` bypasses LLM; rejects `[PERSON_NAME]` placeholders; fixes wrong name/company/position on infer-confirm save
