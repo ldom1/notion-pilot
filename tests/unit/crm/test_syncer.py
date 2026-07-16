@@ -131,7 +131,7 @@ def _make_people_page(page_id: str, name: str, company_page_ids: list[str] | Non
     return {
         "id": page_id,
         "properties": {
-            "Nom": {"type": "title", "title": [{"plain_text": name}]},
+            "Name": {"type": "title", "title": [{"plain_text": name}]},
             "Company": {
                 "type": "relation",
                 "relation": [{"id": cid} for cid in (company_page_ids or [])],
@@ -203,6 +203,39 @@ class TestNotionPeopleSyncer:
         assert result.status in ("skipped", "review")
         client.pages.create.assert_not_called()
 
+    async def test_upsert_review_range_without_force_returns_review(self):
+        # Same fixture as the force=True test below, minus force: "Pierre Dupont" vs
+        # existing "Jean Dupont" @ "Acme Corp" scores 81.8 via token_sort_ratio — a
+        # genuine REVIEW-band match (75-85), verified independently — not SKIP, unlike
+        # the older test_upsert_review_range_does_not_create fixture above (which
+        # actually resolves to SKIP at score 100.0 and therefore never exercises this
+        # branch). This proves the early-return still holds without force: no page
+        # gets created.
+        people = [_make_people_page("p1", "Jean Dupont", ["c1"])]
+        companies = [_make_company_page("c1", "Acme Corp")]
+        syncer, client = await self._make_syncer(people, companies)
+
+        result = await syncer.upsert(PersonRecord(name="Pierre Dupont", company="Acme Corp"))
+
+        assert result.status == "review"
+        client.pages.create.assert_not_called()
+
+    async def test_upsert_review_range_with_force_creates_with_override(self):
+        # Same company (exact match, reused — no extra company-create call) but a
+        # different first name than the existing person: "Pierre Dupont" vs
+        # "Jean Dupont" @ "Acme Corp" scores 81.8 via token_sort_ratio, landing
+        # squarely in the REVIEW band (75-85), verified independently — not SKIP.
+        people = [_make_people_page("p1", "Jean Dupont", ["c1"])]
+        companies = [_make_company_page("c1", "Acme Corp")]
+        syncer, client = await self._make_syncer(people, companies)
+
+        result = await syncer.upsert(
+            PersonRecord(name="Pierre Dupont", company="Acme Corp", force=True)
+        )
+
+        assert result.status == "created_with_override"
+        client.pages.create.assert_called_once()
+
     async def test_upsert_sets_linkedin_and_email(self):
         syncer, client = await self._make_syncer([], [])
 
@@ -217,12 +250,6 @@ class TestNotionPeopleSyncer:
         props = client.pages.create.call_args.kwargs["properties"]
         assert props["Linkedin"]["url"] == "https://linkedin.com/in/newperson"
         assert props["Email - pro"]["email"] == "new@newcorp.com"
-
-    async def test_upsert_sets_dans_mon_reseau(self):
-        syncer, client = await self._make_syncer([], [])
-        await syncer.upsert(PersonRecord(name="X", company="Y"))
-        props = client.pages.create.call_args.kwargs["properties"]
-        assert props["In my network"]["select"]["name"] == "Yes"
 
     async def test_upsert_sets_phone_seniority_role_type(self):
         syncer, client = await TestNotionPeopleSyncer._make_syncer(TestNotionPeopleSyncer, [], [])
@@ -244,7 +271,7 @@ class TestNotionPeopleSyncer:
 
 def _make_people_page_no_company(page_id: str, name: str, email: str = "") -> dict:
     props: dict = {
-        "Nom": {"title": [{"plain_text": name}]},
+        "Name": {"title": [{"plain_text": name}]},
         "Company": {"relation": []},
     }
     if email:
@@ -286,7 +313,7 @@ async def test_load_snapshot_reads_optional_fields():
             {
                 "id": "p1",
                 "properties": {
-                    "Nom": {"title": [{"plain_text": "Alice Martin"}]},
+                    "Name": {"title": [{"plain_text": "Alice Martin"}]},
                     "Company": {"relation": []},
                     "Position": {"rich_text": [{"plain_text": "VP Engineering"}]},
                     "Seniority": {"select": {"name": "vp"}},

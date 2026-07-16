@@ -2,7 +2,7 @@
 
 import asyncio
 
-from rapidfuzz.fuzz import token_sort_ratio
+from rapidfuzz.fuzz import token_set_ratio, token_sort_ratio
 
 from notion_pilot.crm.prospection import rank_contacts
 from notion_pilot.crm.queries import get_open_leads, get_recent_people
@@ -16,8 +16,12 @@ from notion_pilot.mcp.models import (
 )
 from notion_pilot.mcp.session import SyncerSession
 from notion_pilot.shared.config import Settings
-from notion_pilot.shared.prosper_client import enrich_company, enrich_person
-from notion_pilot.shared.siren_lookup import lookup_siren
+from notion_pilot.shared.prosper_client import CompanyEnrichment, enrich_company, enrich_person
+from notion_pilot.shared.siren_lookup import (
+    lookup_siren_candidates,
+    naf_section_to_sector,
+    tranche_to_size,
+)
 from notion_pilot.shared.utils.dedup import (
     DedupStatus,
     DuplicatePair,
@@ -25,10 +29,73 @@ from notion_pilot.shared.utils.dedup import (
     find_match,
     find_people_duplicates,
     normalize,
+    normalize_domain,
     notion_page_url,
 )
 
 _RATE_LIMIT_S = 0.4  # stay under Notion's write rate limit
+
+_DEDUP_MATCH_THRESHOLD = 85.0
+_DEDUP_REVIEW_THRESHOLD = 90.0  # token_set_ratio, catches acronym/subset containment
+
+
+def _company_dedup_signal(
+    record: CompanyRecord,
+    id_to_name: dict[str, str],
+    details: dict[str, dict[str, str]],
+) -> tuple[str, float, str, str, list[dict[str, object]]]:
+    """4-signal decision chain, in strict precedence order — exactly one
+    status comes out, never a mix: domain_match > confident name match
+    (token_sort_ratio) > acronym/subset name match (token_set_ratio) >
+    would_create. Returns (status, score, best_name, best_page_id, candidates)."""
+    norm = normalize(record.name)
+
+    if record.contact_email and "@" in record.contact_email:
+        email_domain = normalize_domain(record.contact_email.split("@")[-1])
+        for page_id, name in id_to_name.items():
+            website = details.get(page_id, {}).get("website", "")
+            if website and normalize_domain(website) == email_domain:
+                return "matched", 100.0, name, page_id, []
+
+    best_sort = (0.0, "", "")  # score, name, page_id
+    best_set = (0.0, "", "")
+    for page_id, name in id_to_name.items():
+        cached_norm = normalize(name)
+        sort_score = float(token_sort_ratio(norm, cached_norm))
+        if sort_score > best_sort[0]:
+            best_sort = (sort_score, name, page_id)
+        set_score = float(token_set_ratio(norm, cached_norm))
+        if set_score > best_set[0]:
+            best_set = (set_score, name, page_id)
+
+    if best_sort[0] >= _DEDUP_MATCH_THRESHOLD:
+        return "matched", best_sort[0], best_sort[1], best_sort[2], []
+    if best_set[0] >= _DEDUP_REVIEW_THRESHOLD:
+        score, name, page_id = best_set
+        return (
+            "needs_review",
+            score,
+            name,
+            page_id,
+            [{"type": "notion", "page_id": page_id, "name": name, "score": score}],
+        )
+    return "would_create", best_sort[0], best_sort[1], best_sort[2], []
+
+
+def _registry_fields(candidate: dict[str, str]) -> dict[str, str]:
+    """Maps one lookup_siren_candidates() entry to the Notion fields it can
+    fill: sector, size, country. Omits any that don't resolve to a usable
+    value — callers only apply what's present."""
+    fields: dict[str, str] = {"country": "FR"}
+    sector = naf_section_to_sector(
+        candidate["section_activite_principale"], candidate["activite_principale"]
+    )
+    if sector:
+        fields["sector"] = sector
+    size = tranche_to_size(candidate["tranche_effectif_salarie"])
+    if size:
+        fields["size"] = size
+    return fields
 
 
 async def upsert_people(
@@ -39,7 +106,13 @@ async def upsert_people(
 
     for i, record in enumerate(records):
         if not confirm:
-            match = find_match(record.name, record.company, session.people_syncer._existing)
+            match = find_match(
+                record.name,
+                record.company,
+                session.people_syncer._existing,
+                email=record.email or "",
+                linkedin_url=record.linkedin_url or "",
+            )
             if match.status == DedupStatus.SKIP:
                 status = "would_skip"
             elif match.status == DedupStatus.REVIEW:
@@ -67,6 +140,7 @@ async def upsert_people(
                 phone=record.phone or "",
                 seniority=record.seniority or "",
                 role_type=record.role_type or [],
+                force=record.force,
             )
             outcome = await session.people_syncer.upsert(syncer_record)
             results.append(
@@ -88,70 +162,181 @@ async def upsert_people(
 
 
 async def upsert_companies(
-    session: SyncerSession, records: list[CompanyRecord], confirm: bool = False
+    session: SyncerSession, settings: Settings, records: list[CompanyRecord], confirm: bool = False
 ) -> BatchResult:
     await session.ensure_loaded()
     results: list[RecordResult] = []
 
     for i, record in enumerate(records):
         if not confirm:
-            norm = normalize(record.name)
-            best_score = 0.0
-            best_name = ""
-            for cached_norm, page_id in session.company_syncer._name_to_id.items():
-                score = float(token_sort_ratio(norm, cached_norm))
-                if score > best_score:
-                    best_score = score
-                    best_name = session.company_syncer.id_to_name(page_id)
-            status = "matched" if best_score >= 85 else "would_create"
+            status, score, best_name, best_page_id, candidates = _company_dedup_signal(
+                record, session.company_syncer._id_to_name, session.company_syncer.details
+            )
+            reason = (
+                f"name similarity to existing company {best_name!r} (score {score:.0f})"
+                if status == "needs_review"
+                else ""
+            )
 
             siren = ""
+            siren_candidate_name = ""
+            enrichment_preview: dict[str, str] = {}
             if status == "would_create":
                 try:
-                    siren_match = await lookup_siren(record.name)
+                    siren_candidates = await lookup_siren_candidates(record.name)
                 except Exception:  # noqa: BLE001
-                    siren_match = None
-                if siren_match:
-                    siren = siren_match["siren"]
-                    best_name = siren_match["matched_name"]
+                    siren_candidates = []
+                if siren_candidates:
+                    top = siren_candidates[0]
+                    divergence = float(
+                        token_sort_ratio(normalize(record.name), normalize(top["matched_name"]))
+                    )
+                    if divergence < _DEDUP_MATCH_THRESHOLD:
+                        status = "needs_review"
+                        reason = (
+                            f"SIREN candidate {top['matched_name']!r} doesn't resemble "
+                            f"{record.name!r} (score {divergence:.0f}); verify before writing"
+                        )
+                        candidates = [
+                            {
+                                "type": "siren",
+                                "siren": c["siren"],
+                                "matched_name": c["matched_name"],
+                                "score": float(
+                                    token_sort_ratio(
+                                        normalize(record.name), normalize(c["matched_name"])
+                                    )
+                                ),
+                            }
+                            for c in siren_candidates
+                        ]
+                    else:
+                        siren = top["siren"]
+                        siren_candidate_name = top["matched_name"]
+                        enrichment_preview = {"siren": siren, **_registry_fields(top)}
+
+            if (
+                not record.website
+                and not enrichment_preview.get("website")
+                and record.contact_email
+            ):
+                domain = record.contact_email.split("@")[-1]
+                enrichment_preview["website"] = f"https://{domain}"
 
             results.append(
                 RecordResult(
                     name=record.name,
                     status=status,
-                    score=best_score,
+                    score=score,
                     matched_name=best_name,
                     siren=siren,
+                    siren_candidate_name=siren_candidate_name,
+                    reason=reason,
+                    candidates=candidates,
+                    enrichment_preview=enrichment_preview,
                 )
             )
             continue
 
         try:
-            # get_or_create (existing code, unchanged) returns an existing page_id on a
-            # fuzzy match >= 85 or creates a new one, but doesn't tell the caller which
-            # happened. Snapshot the known page_ids first so we can tell the two apart
-            # afterwards without touching get_or_create itself.
-            known_before = set(session.company_syncer._id_to_name.keys())
-            page_id = await session.company_syncer.get_or_create(record.name)
-            status = "matched" if page_id in known_before else "created"
+            dedup_status, dedup_score, dedup_best_name, dedup_page_id, dedup_candidates = (
+                _company_dedup_signal(
+                    record, session.company_syncer._id_to_name, session.company_syncer.details
+                )
+            )
+            if dedup_status == "needs_review" and not record.force:
+                results.append(
+                    RecordResult(
+                        name=record.name,
+                        status="needs_review",
+                        score=dedup_score,
+                        matched_name=dedup_best_name,
+                        candidates=dedup_candidates,
+                        reason=f"name similarity to existing company {dedup_best_name!r} "
+                        f"(score {dedup_score:.0f})",
+                    )
+                )
+                continue
+
+            if dedup_status == "matched":
+                # Our own dedup signal (domain match or confident name match) is
+                # authoritative — it always wins over get_or_create's separate,
+                # weaker name-only check, so a domain match with a low name-similarity
+                # score (e.g. "RTE" vs "Rte France") can't slip past it into a duplicate.
+                page_id = dedup_page_id
+                created_new = False
+            else:
+                known_before = set(session.company_syncer._id_to_name.keys())
+                page_id = await session.company_syncer.get_or_create(record.name)
+                created_new = page_id not in known_before
+
+            if not created_new:
+                status = "matched"
+            elif dedup_status == "needs_review":  # only reachable here when record.force is True
+                status = "created_with_override"
+            else:
+                status = "created"
 
             siren = ""
-            if status == "created":
-                # The caller already confirmed this creation (and, per the preview
-                # step above, saw the SIREN candidate) — safe to write it now.
+            siren_candidate_name = ""
+            reason = (
+                f"created despite name similarity to {dedup_best_name!r} (score {dedup_score:.0f})"
+                if status == "created_with_override"
+                else ""
+            )
+
+            if created_new:
+                props: dict[str, object] = {}
                 try:
-                    siren_match = await lookup_siren(record.name)
+                    enrichment = await enrich_company(record.name, settings)
                 except Exception:  # noqa: BLE001
-                    siren_match = None
-                if siren_match:
-                    siren = siren_match["siren"]
-                    await session.company_syncer.ensure_siren_property()
-                    await session.company_syncer._client.pages.update(
-                        page_id, properties={"SIREN": {"rich_text": [{"text": {"content": siren}}]}}
+                    enrichment = CompanyEnrichment()
+                if enrichment.sector:
+                    props["Sector"] = {"select": {"name": enrichment.sector}}
+                if enrichment.size:
+                    props["Size"] = {"select": {"name": enrichment.size}}
+                if enrichment.country:
+                    props["Country"] = {"select": {"name": enrichment.country}}
+                if enrichment.linkedin_url:
+                    props["Linkedin"] = {"url": enrichment.linkedin_url}
+
+                try:
+                    siren_candidates = await lookup_siren_candidates(record.name)
+                except Exception:  # noqa: BLE001
+                    siren_candidates = []
+                if siren_candidates:
+                    top = siren_candidates[0]
+                    divergence = float(
+                        token_sort_ratio(normalize(record.name), normalize(top["matched_name"]))
                     )
+                    if divergence >= _DEDUP_MATCH_THRESHOLD:
+                        siren = top["siren"]
+                        siren_candidate_name = top["matched_name"]
+                        await session.company_syncer.ensure_siren_property()
+                        props["SIREN"] = {"rich_text": [{"text": {"content": siren}}]}
+                        for field, value in _registry_fields(top).items():
+                            key = {"sector": "Sector", "size": "Size", "country": "Country"}[field]
+                            if key not in props:
+                                props[key] = {"select": {"name": value}}
+
+                website = record.website or enrichment.website or ""
+                if not website and record.contact_email:
+                    website = f"https://{record.contact_email.split('@')[-1]}"
+                if website:
+                    props["Website"] = {"url": website}
+
+                if props:
+                    await session.company_syncer._client.pages.update(page_id, properties=props)
 
             results.append(
-                RecordResult(name=record.name, status=status, page_id=page_id, siren=siren)
+                RecordResult(
+                    name=record.name,
+                    status=status,
+                    page_id=page_id,
+                    siren=siren,
+                    siren_candidate_name=siren_candidate_name,
+                    reason=reason,
+                )
             )
             if i < len(records) - 1:
                 await asyncio.sleep(_RATE_LIMIT_S)

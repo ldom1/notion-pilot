@@ -25,11 +25,12 @@ class PersonRecord:
     phone: str = field(default="")
     seniority: str = field(default="")
     role_type: list[str] = field(default_factory=list)
+    force: bool = field(default=False)
 
 
 @dataclass
 class UpsertResult:
-    status: Literal["created", "skipped", "review"]
+    status: Literal["created", "created_with_override", "skipped", "review"]
     page_id: str = field(default="")
     score: float = field(default=0.0)
     matched_name: str = field(default="")
@@ -249,7 +250,7 @@ class NotionPeopleSyncer:
             result = await self._query_page(cursor)
             for page in result["results"]:
                 props = page["properties"]
-                name_prop = props.get("Nom", {})
+                name_prop = props.get("Name", {})
                 name = name_prop["title"][0]["plain_text"] if name_prop.get("title") else ""
                 if not name:
                     continue
@@ -291,7 +292,13 @@ class NotionPeopleSyncer:
     async def upsert(
         self, person: PersonRecord, settings: "Settings | None" = None
     ) -> UpsertResult:
-        match = find_match(person.name, person.company, self._existing)
+        match = find_match(
+            person.name,
+            person.company,
+            self._existing,
+            email=person.email,
+            linkedin_url=person.linkedin_url,
+        )
 
         if match.status == DedupStatus.SKIP:
             return UpsertResult(
@@ -300,7 +307,7 @@ class NotionPeopleSyncer:
                 matched_name=match.matched_name,
                 matched_company=match.matched_company,
             )
-        if match.status == DedupStatus.REVIEW:
+        if match.status == DedupStatus.REVIEW and not person.force:
             return UpsertResult(
                 "review",
                 score=match.score,
@@ -313,8 +320,7 @@ class NotionPeopleSyncer:
             company_id = await self._company_syncer.get_or_create(person.company, settings=settings)
 
         properties: dict[str, object] = {
-            "Nom": {"title": [{"text": {"content": person.name}}]},
-            "In my network": {"select": {"name": "Yes"}},
+            "Name": {"title": [{"text": {"content": person.name}}]},
         }
         if person.position:
             properties["Position"] = {"rich_text": [{"text": {"content": person.position}}]}
@@ -342,4 +348,7 @@ class NotionPeopleSyncer:
         page_id: str = page["id"]
         self._existing.append({"name": person.name, "company": person.company, "page_id": page_id})
         logger.info("Created person: {} @ {} ({})", person.name, person.company, page_id)
-        return UpsertResult("created", page_id=page_id)
+        return UpsertResult(
+            "created_with_override" if match.status == DedupStatus.REVIEW else "created",
+            page_id=page_id,
+        )

@@ -15,6 +15,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `deploy.sh` — rewritten for Docker Compose (`git fetch → reset --hard → docker compose up --build -d`); replaces the old tag-based systemd script
 - MCP server (`notion_pilot/mcp/`) exposing the CRM vertical as tools: `upsert_people`, `upsert_companies`, `find_duplicates`, `enrich_people`, `enrich_companies`, `rank_contacts_for_pitch`, `search_people`, `search_companies`, `get_recent_people`, `get_open_leads`, `refresh_notion_snapshot`. Stdio transport, dry-run-by-default on all write tools.
 - `notion_pilot/shared/siren_lookup.py` — SIREN-by-name lookup via the French government's free company registry API (no key required); wired into `upsert_companies`, which surfaces the candidate SIREN in the `confirm=false` preview and only writes it once the caller repeats the call with `confirm=true`.
+- `notion_pilot/shared/utils/dedup.py`: `find_match()` now matches people on an exact email/LinkedIn
+  URL first, ahead of fuzzy name+company scoring.
+- `upsert_companies`/`upsert_people`: `needs_review` status with actionable `candidates` and a
+  human-readable `reason`; a per-record `force=True` input bypasses a `needs_review` dedup block on
+  `confirm=true` (status comes back as `created_with_override`) without bypassing the SIREN
+  confidence gate.
+- `upsert_companies` on creation now attempts prosper's `enrich_company` and, for anything prosper
+  didn't fill, falls back to the French government registry data already being queried for SIREN:
+  sector (from the NAF code), size (from the headcount bracket), country (`"FR"`), and — failing
+  everything else — a website guessed from a supplied `contact_email`'s domain. Shown in the
+  `confirm=false` preview as `enrichment_preview` before being written.
 
 ### Changed
 - `Makefile`: `dev` and `dev-backend` targets now wrap `launch_webserver.sh` with `infisical run --`; `deploy` delegates to `./deploy.sh`
@@ -26,6 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scripts/crm/crm_setup_deals_db.py` — one-off patch (hardcoded DB id) for a notion-client 3.x bug dropping DB properties on creation; `shared/workspace.py`'s DB-creation path already applies and verifies properties generically
 
 ### Fixed
+- `notion_pilot/crm/syncer.py`: `NotionPeopleSyncer` now reads/writes the People DB's real title
+  property (`"Name"`) instead of a stale `"Nom"` — every person-creation call (MCP, `/people`,
+  `/lead`, email-import, LinkedIn-import) was silently failing against this workspace; dropped the
+  nonexistent `"In my network"` property too.
+- `upsert_companies`: replaced the single fuzzy-name threshold with a 4-signal dedup chain (contact
+  email domain match, exact/near-exact name, acronym/subset name via `token_set_ratio`) so
+  "Rte France" now gets flagged against the existing "RTE" company instead of creating a duplicate.
+- `upsert_companies`: a SIREN candidate whose registry name diverges too far from the input name (e.g.
+  "Rte France" → an unrelated "VCSP ROUTE FRANCE") is now rejected instead of silently attached.
 - Telegram CRM writes (`/people`, infer-confirm yes, multi-step commands): call `_enrich_settings_from_cockpit()` before handlers so People/Companies DB IDs from `cockpit_config.json` are used when env vars are unset (fixes `data_sources//query` 400 on save)
 - LinkedIn contact paste (`URL : Name, Company, Position`): deterministic parser in `contact_parse.py` bypasses LLM; rejects `[PERSON_NAME]` placeholders; fixes wrong name/company/position on infer-confirm save
 - Comma contact lines: deterministic parse only on explicit `/people`; smart routing uses LLM

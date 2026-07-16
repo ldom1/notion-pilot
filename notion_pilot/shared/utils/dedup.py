@@ -45,6 +45,16 @@ def normalize(text: str) -> str:
     return "".join(c for c in nfkd if not unicodedata.combining(c))
 
 
+def normalize_domain(value: str) -> str:
+    """Lowercase a domain or URL and strip scheme/path/leading www — for
+    equality checks only (e.g. "https://www.rte-france.com/" ==
+    "rte-france.com")."""
+    domain = value.lower().strip().split("://")[-1].split("/")[0]
+    if domain.startswith("www."):
+        domain = domain[len("www.") :]
+    return domain
+
+
 def _key(name: str, company: str) -> str:
     return normalize(f"{name} {company}")
 
@@ -53,10 +63,28 @@ def find_match(
     name: str,
     company: str,
     candidates: list[CandidateRecord],
+    email: str = "",
+    linkedin_url: str = "",
 ) -> MatchResult:
-    """Return best fuzzy match from candidates. Each must have: name, company, page_id."""
+    """Return best fuzzy match from candidates. Each must have: name, company, page_id.
+    An exact (case-insensitive) email or LinkedIn URL match on an existing candidate is
+    treated as decisive and skips the fuzzy name+company scoring entirely."""
     if not candidates:
         return MatchResult(DedupStatus.NEW, 0.0)
+
+    norm_email = normalize(email) if email else ""
+    if norm_email:
+        for c in candidates:
+            c_email = c.get("email", "")
+            if c_email and normalize(c_email) == norm_email:
+                return MatchResult(DedupStatus.SKIP, 100.0, c["name"], c["company"])
+
+    norm_linkedin = normalize(linkedin_url) if linkedin_url else ""
+    if norm_linkedin:
+        for c in candidates:
+            c_linkedin = c.get("linkedin_url", "")
+            if c_linkedin and normalize(c_linkedin) == norm_linkedin:
+                return MatchResult(DedupStatus.SKIP, 100.0, c["name"], c["company"])
 
     key = _key(name, company)
     best_score = 0.0
