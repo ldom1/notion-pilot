@@ -280,6 +280,105 @@ class NotionCompanySyncer:
             enrichment_preview=enrichment_preview,
         )
 
+    async def upsert(
+        self, record: CompanyRecord, settings: "Settings | None" = None
+    ) -> CompanyUpsertResult:
+        """Write path: dedup check → get-or-create → SIREN + enrichment write."""
+        signal = self._dedup_signal(record)
+        dedup_status = signal.status
+        dedup_score = signal.score
+        dedup_best_name = signal.best_name
+        dedup_page_id = signal.best_page_id
+        dedup_candidates = signal.candidates
+
+        if dedup_status == "needs_review" and not record.force:
+            return CompanyUpsertResult(
+                status="needs_review",
+                score=dedup_score,
+                matched_name=dedup_best_name,
+                candidates=dedup_candidates,
+                reason=f"name similarity to existing company {dedup_best_name!r} "
+                f"(score {dedup_score:.0f})",
+            )
+
+        if dedup_status == "matched":
+            # Our own dedup signal (domain match or confident name match) is
+            # authoritative — it always wins over get_or_create's separate,
+            # weaker name-only check.
+            page_id = dedup_page_id
+            created_new = False
+        else:
+            known_before = set(self._id_to_name.keys())
+            page_id = await self.get_or_create(record.name)
+            created_new = page_id not in known_before
+
+        status: Literal["matched", "created", "created_with_override"]
+        if not created_new:
+            status = "matched"
+        elif dedup_status == "needs_review":  # only reachable here when record.force is True
+            status = "created_with_override"
+        else:
+            status = "created"
+
+        siren = ""
+        siren_candidate_name = ""
+        reason = (
+            f"created despite name similarity to {dedup_best_name!r} (score {dedup_score:.0f})"
+            if status == "created_with_override"
+            else ""
+        )
+
+        if created_new:
+            props: dict[str, object] = {}
+            try:
+                enrichment = await enrich_company(record.name, cast("Settings", settings))
+            except Exception:  # noqa: BLE001
+                enrichment = CompanyEnrichment()
+            if enrichment.sector:
+                props["Sector"] = {"select": {"name": enrichment.sector}}
+            if enrichment.size:
+                props["Size"] = {"select": {"name": enrichment.size}}
+            if enrichment.country:
+                props["Country"] = {"select": {"name": enrichment.country}}
+            if enrichment.linkedin_url:
+                props["Linkedin"] = {"url": enrichment.linkedin_url}
+
+            try:
+                siren_candidates = await lookup_siren_candidates(record.name)
+            except Exception:  # noqa: BLE001
+                siren_candidates = []
+            if siren_candidates:
+                top = siren_candidates[0]
+                divergence = float(
+                    token_sort_ratio(normalize(record.name), normalize(top["matched_name"]))
+                )
+                if divergence >= _DEDUP_MATCH_THRESHOLD:
+                    siren = top["siren"]
+                    siren_candidate_name = top["matched_name"]
+                    await self.ensure_siren_property()
+                    props["SIREN"] = {"rich_text": [{"text": {"content": siren}}]}
+                    for field_name, value in _registry_fields(top).items():
+                        key = {"sector": "Sector", "size": "Size", "country": "Country"}[field_name]
+                        if key not in props:
+                            props[key] = {"select": {"name": value}}
+
+            website = record.website or enrichment.website or ""
+            if not website and record.contact_email:
+                website = f"https://{record.contact_email.split('@')[-1]}"
+            if website:
+                props["Website"] = {"url": website}
+
+            if props:
+                await self._client.pages.update(page_id, properties=props)
+
+        return CompanyUpsertResult(
+            status=status,
+            page_id=page_id,
+            siren=siren,
+            siren_candidate_name=siren_candidate_name,
+            reason=reason,
+        )
+
     async def _query_page(self, cursor: str | None) -> dict[str, Any]:
         if self._standard_api:
             body: dict[str, object] = {"page_size": 100}
