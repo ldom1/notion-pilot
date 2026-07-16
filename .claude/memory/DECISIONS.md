@@ -152,5 +152,32 @@ updated:
 **Rationale:** A title-property rename or schema change on a live, in-use Notion database is a real structural change with consequences the agent can't fully see (existing views/filters/formulas referencing `"Name"`), and picking "fix the code" vs. "fix the DB" has architecture-wide consequences (`shared/workspace.py` creates new workspaces with `Nom`/`In my network`, so fixing only the code would diverge new-workspace behavior from this DB). See `[[2026-07-15-mcp-server-test]]` for the full investigation.
 **Affects:** [Non-Obvious Decisions](ARCHITECTURE.md#non-obvious-decisions)
 
+### 2026-07-16 — People DB schema mismatch: change the code, not the live database
+
+**Decision:** Resolve the 2026-07-15 "Nom"/"Name" schema mismatch (see entry above) by changing `NotionPeopleSyncer` to write `"Name"` and drop `"In my network"`, and aligning `shared/workspace.py`'s People DB template (both `_seed_people()` and `create_crm_workspace()`) to the same schema — not by patching the live Notion database.
+**Rejected:** Patching the live People DB (rename `Name`→`Nom`, add `In my network` back).
+**Rationale:** User's explicit call when presented with both options. `"Name"` already matches every other DB template in `workspace.py`; changing the code is the smaller, safer surface area and needs no live-data schema migration.
+**Affects:** [Key Modules](ARCHITECTURE.md#key-modules)
+
+### 2026-07-16 — Company dedup: 4-signal decision chain, `token_set_ratio` acronym trade-off accepted as-is
+
+**Decision:** `upsert_companies` dedup now runs a strict chain — domain match (contact email domain vs. an existing company's Website domain) → `token_sort_ratio >= 85` → `token_set_ratio >= 90` (catches acronym/subset containment, e.g. "RTE" vs "Rte France") → else create. `needs_review` carries typed `candidates`. Enforced identically on `confirm=true`, not just in preview.
+**Rejected:** Word-stripping name normalization and a separate acronym-length heuristic (proposed during review, verified empirically to be either redundant with `token_set_ratio` or based on a wrong premise about the codebase's dedup scan behavior).
+**Rationale:** `token_set_ratio` scoring 100 for any full-token-subset pair (e.g. "EDF" vs "EDF Trading") is a deliberate accepted trade-off, not a bug to engineer around — it's exactly the containment signal needed to catch the "Rte France"/"RTE" incident, and the false-positive risk (unrelated names sharing one word) was verified low (e.g. "EDF Group" vs "EDF Trading" scores far below threshold).
+**Affects:** [Non-Obvious Decisions](ARCHITECTURE.md#non-obvious-decisions)
+
+### 2026-07-16 — SIREN confidence gate + `force` never bypasses it
+
+**Decision:** `lookup_siren_candidates` returns top-3 registry matches instead of top-1. Before attaching SIREN/enrichment data, gate on `token_sort_ratio(record.name, candidate.matched_name) >= 85` — below that, skip the entire registry-derived block (SIREN and sector/size/country) and return `needs_review` with the candidates, rather than silently attaching a wrong-but-confident SIREN. `force=True` bypasses only the Notion-dedup `needs_review` block; it never bypasses this SIREN gate, since a wrong SIREN match corrupts data regardless of dedup intent.
+**Rejected:** A length-ratio-only SIREN check; letting `force=True` skip every gate uniformly.
+**Rationale:** Directly fixes the "Rte France" → wrong-SIREN incident (real SIREN belonged to an unrelated "VCSP ROUTE FRANCE"). Keeping the SIREN gate independent of `force` means overriding a flagged duplicate can never also silently corrupt enrichment data.
+**Affects:** [Non-Obvious Decisions](ARCHITECTURE.md#non-obvious-decisions)
+
+### 2026-07-16 — Never commit real third-party PII as test-fixture data
+
+**Decision:** Test fixtures must use fictional placeholder people/companies, never a real name or email copied from a live incident report or production data, even when it's convenient for realism.
+**Rejected:** Using the real contact from `[[2026-07-15-mcp-server-test]]`'s incident report as literal fixture data (what actually happened this session — caught only by the harness's permission classifier after it was already committed and pushed to a public repo, not by self-review).
+**Rationale:** Real PII in fixtures ends up in git history, pushed to remotes, and referenced in PRs — a privacy exposure that requires a disruptive history rewrite + force-push to fix once discovered, versus zero cost to use a fictional name upfront. See `[[2026-07-16-mcp-crm-fixes]]` for the full incident and remediation.
+
 ## Template
 <!-- added by ai-dotfiles upgrade -->

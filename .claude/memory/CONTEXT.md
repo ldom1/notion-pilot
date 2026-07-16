@@ -18,6 +18,8 @@ updated:
 
 `develop` (2026-07-15) — PR #16 (thin CRM sync layer: SIREN auto-population + enrichment migration to prosper, squash `0d22d45`) and PR #18 (MCP server, squash `8e705b7`) both merged. See [[2026-07-14-crm-rationalization-execution]] and `[[2026-07-15-mcp-server-test]]` for details.
 
+**PR #19 open, not yet merged** (`mcp-crm-fixes` → `develop`): fixes all four bugs found in the live test above — People DB schema mismatch, "Rte France"/"RTE" duplicate creation, wrong-SIREN attachment, no fallback enrichment. See [[2026-07-16-mcp-crm-fixes]].
+
 ## What's New (2026-06-04, UX polish)
 
 ### Cockpit layout
@@ -87,10 +89,11 @@ web/
 <!-- added by ai-dotfiles upgrade -->
 
 - MCP server (`notion_pilot/mcp/`) merged to `develop` 2026-07-15 (PR #18, squash `8e705b7`) — 11 tools (upsert/dedup/enrich/rank/search/read), registered in this repo's `.claude/settings.json` as `notion-crm` (needs a Claude Code restart to connect for real via stdio).
-- **Blocked:** live-tested the MCP server against real Notion data (first contact from Artelys Crystal HPC lead-gen CSVs). Companies create fine (including a new SIREN auto-lookup, 1/2 correct in the test — see `[[2026-07-15-mcp-server-test]]`). **People creation is broken on every path** (MCP, `/people`, `/lead`, email/LinkedIn import) — `syncer.py` writes to `"Nom"`/`"In my network"` properties that don't exist on the live People DB (it has `"Name"` as title, no `"In my network"`). Needs a user decision on which side to fix — see DECISIONS.md 2026-07-15 entry.
+- **Resolved (2026-07-16), shipped in open PR #19, not yet merged:** the live-test blocker above (People DB schema mismatch) plus the "Rte France"/"RTE" duplicate, wrong-SIREN-attachment, and no-fallback-enrichment bugs from `[[2026-07-15-mcp-server-test]]` are all fixed. See `[[2026-07-16-mcp-crm-fixes]]` and DECISIONS.md 2026-07-16 entry.
 
 ## Open Questions
 <!-- added by ai-dotfiles upgrade -->
 
-- People DB schema fix: patch the live Notion database (rename `Name`→`Nom`, add `In my network`) or change the code (and `shared/workspace.py`'s new-workspace schema) to use `Name` instead? Blocking further CRM writes until decided.
-- Should `upsert_companies`' SIREN lookup show multiple candidates (not just top-1) given the demonstrated false-positive on a short/generic company name?
+- Both prior open questions here are resolved (schema fix: changed the code, not the live DB; SIREN lookup: now returns top-3 candidates with a name-divergence gate) — see DECISIONS.md 2026-07-16 entry.
+- **New:** `web/server.py`'s `/lead` and web-cockpit person-create path independently writes to the same wrong `"Nom"` property — same root cause as the fixed bug, different code path, not covered by PR #19. Needs its own fix.
+- **New:** archive the stale, empty "Rte France" duplicate Notion page (`39e6c451-9465-81d1-ad4e-f80e58fc3070`) — deferred until PR #19 is merged and the original live test is re-run to confirm it now resolves to `needs_review` against "RTE" instead of creating a duplicate.

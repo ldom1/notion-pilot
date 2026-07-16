@@ -126,9 +126,9 @@ Target: 4 custom knowledge DBs — Notions, Ideas, Tools, Data & Technology.
 ## Now
 <!-- added by ai-dotfiles upgrade -->
 
-- **Blocking bug (2026-07-15, live-test discovered):** `NotionPeopleSyncer.upsert()` (`notion_pilot/crm/syncer.py:316-317`) hardcodes Notion properties `"Nom"`/`"In my network"` that don't exist on the live People data source (it actually has `"Name"` as the title property, and no `"In my network"` at all). Blocks person creation on **every** path — MCP, `/people`, `/lead`, email import, LinkedIn import — not just MCP. Needs a user decision: patch the live DB schema to match the code (rename `Name`→`Nom`, add `In my network`), or change the code to match this DB and update `shared/workspace.py`'s `create_crm_workspace()` too for consistency. See [DECISIONS.md](DECISIONS.md) 2026-07-15 entry and `[[2026-07-15-mcp-server-test]]`.
-- SIREN auto-lookup in `upsert_companies` (merged 2026-07-15) has a real accuracy gap on short/generic/domain-derived company names — verified a false-positive top-1 match in live testing. Consider: surface top-3 gov-API candidates instead of top-1, or require a minimum name-similarity floor before treating a match as confident.
-- `RecordResult.matched_name` gets silently overwritten by the SIREN registry's name when a company is `would_create`, discarding the original fuzzy-dedup near-match name — should be a separate field.
+- **PR #19 open, not yet merged** (`mcp-crm-fixes` → `develop`): fixes the People DB schema bug, the "Rte France"/"RTE" duplicate-creation bug, the SIREN accuracy gap, and the `matched_name` overwrite bug all listed below (formerly the "blocking bug" / SIREN accuracy / matched_name entries in this section, now shipped). See [DECISIONS.md](DECISIONS.md) 2026-07-16 entry and `[[2026-07-16-mcp-crm-fixes]]`. Needs review/merge decision.
+- **New, found during PR #19's whole-branch review, not fixed in that PR:** `web/server.py`'s `/lead` and web-cockpit person-create path independently writes to the same wrong `"Nom"` property — same root cause, different code path. Needs its own fix.
+- **New, deferred until PR #19 merges:** archive the stale, empty "Rte France" duplicate Notion page (`39e6c451-9465-81d1-ad4e-f80e58fc3070`) — only after re-running the original live test to confirm it now resolves to `needs_review` against "RTE" instead of creating a duplicate.
 
 ## Next
 <!-- added by ai-dotfiles upgrade -->
