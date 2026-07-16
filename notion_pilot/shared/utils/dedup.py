@@ -51,7 +51,7 @@ def normalize_domain(value: str) -> str:
     "rte-france.com")."""
     domain = value.lower().strip().split("://")[-1].split("/")[0]
     if domain.startswith("www."):
-        domain = domain[len("www."):]
+        domain = domain[len("www.") :]
     return domain
 
 

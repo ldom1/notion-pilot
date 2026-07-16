@@ -95,7 +95,12 @@ def test_find_people_duplicates_matches_on_name_and_company():
 
 def test_find_match_exact_email_skips_even_with_different_name():
     candidates = [
-        {"name": "A. Martin", "company": "RTE", "page_id": "p1", "email": "alice.martin@rte-france.com"}
+        {
+            "name": "A. Martin",
+            "company": "RTE",
+            "page_id": "p1",
+            "email": "alice.martin@rte-france.com",
+        }
     ]
     result = find_match(
         "MARTIN Alice", "Rte France", candidates, email="alice.martin@rte-france.com"

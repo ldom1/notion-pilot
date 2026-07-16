@@ -53,7 +53,8 @@ class RecordResult(BaseModel):
     error_message: str = ""
     siren: str = ""
     siren_candidate_name: str = Field(
-        default="", description="Registry match name, kept separate from matched_name (Notion dedup)"
+        default="",
+        description="Registry match name, kept separate from matched_name (Notion dedup)",
     )
     reason: str = Field(default="", description="Explanation for needs_review or a force override")
     candidates: list[dict[str, str | float]] = Field(

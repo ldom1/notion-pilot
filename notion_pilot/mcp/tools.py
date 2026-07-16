@@ -107,8 +107,11 @@ async def upsert_people(
     for i, record in enumerate(records):
         if not confirm:
             match = find_match(
-                record.name, record.company, session.people_syncer._existing,
-                email=record.email or "", linkedin_url=record.linkedin_url or "",
+                record.name,
+                record.company,
+                session.people_syncer._existing,
+                email=record.email or "",
+                linkedin_url=record.linkedin_url or "",
             )
             if match.status == DedupStatus.SKIP:
                 status = "would_skip"
@@ -200,7 +203,9 @@ async def upsert_companies(
                                 "siren": c["siren"],
                                 "matched_name": c["matched_name"],
                                 "score": float(
-                                    token_sort_ratio(normalize(record.name), normalize(c["matched_name"]))
+                                    token_sort_ratio(
+                                        normalize(record.name), normalize(c["matched_name"])
+                                    )
                                 ),
                             }
                             for c in siren_candidates
@@ -210,7 +215,11 @@ async def upsert_companies(
                         siren_candidate_name = top["matched_name"]
                         enrichment_preview = {"siren": siren, **_registry_fields(top)}
 
-            if not record.website and not enrichment_preview.get("website") and record.contact_email:
+            if (
+                not record.website
+                and not enrichment_preview.get("website")
+                and record.contact_email
+            ):
                 domain = record.contact_email.split("@")[-1]
                 enrichment_preview["website"] = f"https://{domain}"
 

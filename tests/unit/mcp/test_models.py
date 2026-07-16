@@ -1,6 +1,12 @@
 """Unit tests for mcp/models.py — pure data, no I/O."""
 
-from notion_pilot.mcp.models import BatchResult, CompanyRecord, PersonRecord, RecordResult, summarize
+from notion_pilot.mcp.models import (
+    BatchResult,
+    CompanyRecord,
+    PersonRecord,
+    RecordResult,
+    summarize,
+)
 
 
 def test_person_record_requires_name_and_company():
