@@ -128,7 +128,7 @@ async def test_upsert_people_batch_continues_after_one_error(monkeypatch):
 async def test_upsert_companies_dry_run_reports_would_create(monkeypatch):
     session = await _loaded_session(existing_companies={"id-edf": "EDF"})
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.lookup_siren_candidates", AsyncMock(return_value=[])
+        "notion_pilot.crm.syncer.lookup_siren_candidates", AsyncMock(return_value=[])
     )
 
     result = await upsert_companies(
@@ -142,7 +142,7 @@ async def test_upsert_companies_dry_run_reports_would_create(monkeypatch):
 async def test_upsert_companies_dry_run_shows_siren_candidate_and_enrichment(monkeypatch):
     session = await _loaded_session()
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.lookup_siren_candidates",
+        "notion_pilot.crm.syncer.lookup_siren_candidates",
         AsyncMock(
             return_value=[
                 {
@@ -174,7 +174,7 @@ async def test_upsert_companies_dry_run_shows_siren_candidate_and_enrichment(mon
 async def test_upsert_companies_dry_run_survives_siren_lookup_failure(monkeypatch):
     session = await _loaded_session()
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.lookup_siren_candidates",
+        "notion_pilot.crm.syncer.lookup_siren_candidates",
         AsyncMock(side_effect=RuntimeError("timeout")),
     )
 
@@ -205,10 +205,10 @@ async def test_upsert_companies_confirm_true_writes(monkeypatch):
     get_or_create_mock = AsyncMock(return_value="new-company-id")
     monkeypatch.setattr(session.company_syncer, "get_or_create", get_or_create_mock)
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.lookup_siren_candidates", AsyncMock(return_value=[])
+        "notion_pilot.crm.syncer.lookup_siren_candidates", AsyncMock(return_value=[])
     )
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.enrich_company", AsyncMock(return_value=CompanyEnrichment())
+        "notion_pilot.crm.syncer.enrich_company", AsyncMock(return_value=CompanyEnrichment())
     )
 
     result = await upsert_companies(
@@ -227,7 +227,7 @@ async def test_upsert_companies_confirm_true_writes_siren_and_registry_fallback(
         session.company_syncer, "get_or_create", AsyncMock(return_value="new-company-id")
     )
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.lookup_siren_candidates",
+        "notion_pilot.crm.syncer.lookup_siren_candidates",
         AsyncMock(
             return_value=[
                 {
@@ -241,7 +241,7 @@ async def test_upsert_companies_confirm_true_writes_siren_and_registry_fallback(
         ),
     )
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.enrich_company", AsyncMock(return_value=CompanyEnrichment())
+        "notion_pilot.crm.syncer.enrich_company", AsyncMock(return_value=CompanyEnrichment())
     )
     ensure_siren_mock = AsyncMock()
     monkeypatch.setattr(session.company_syncer, "ensure_siren_property", ensure_siren_mock)
@@ -273,7 +273,7 @@ async def test_upsert_companies_confirm_true_prosper_enrichment_takes_priority_o
         session.company_syncer, "get_or_create", AsyncMock(return_value="new-company-id")
     )
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.lookup_siren_candidates",
+        "notion_pilot.crm.syncer.lookup_siren_candidates",
         AsyncMock(
             return_value=[
                 {
@@ -287,7 +287,7 @@ async def test_upsert_companies_confirm_true_prosper_enrichment_takes_priority_o
         ),
     )
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.enrich_company",
+        "notion_pilot.crm.syncer.enrich_company",
         AsyncMock(return_value=CompanyEnrichment(sector="Research", size="1-10")),
     )
     monkeypatch.setattr(session.company_syncer, "ensure_siren_property", AsyncMock())
@@ -334,7 +334,7 @@ async def test_upsert_companies_confirm_true_skips_siren_for_matched_company(mon
         session.company_syncer, "get_or_create", AsyncMock(return_value="new-company-id")
     )
     siren_mock = AsyncMock()
-    monkeypatch.setattr("notion_pilot.mcp.tools.lookup_siren_candidates", siren_mock)
+    monkeypatch.setattr("notion_pilot.crm.syncer.lookup_siren_candidates", siren_mock)
 
     result = await upsert_companies(
         session, _settings(), [CompanyRecord(name="Artelys")], confirm=True
@@ -367,10 +367,10 @@ async def test_upsert_companies_confirm_true_force_bypasses_needs_review(monkeyp
         session.company_syncer, "get_or_create", AsyncMock(return_value="new-company-id")
     )
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.lookup_siren_candidates", AsyncMock(return_value=[])
+        "notion_pilot.crm.syncer.lookup_siren_candidates", AsyncMock(return_value=[])
     )
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.enrich_company", AsyncMock(return_value=CompanyEnrichment())
+        "notion_pilot.crm.syncer.enrich_company", AsyncMock(return_value=CompanyEnrichment())
     )
 
     result = await upsert_companies(
@@ -392,11 +392,11 @@ async def test_upsert_companies_confirm_true_force_does_not_bypass_siren_confide
         session.company_syncer, "get_or_create", AsyncMock(return_value="new-company-id")
     )
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.lookup_siren_candidates",
+        "notion_pilot.crm.syncer.lookup_siren_candidates",
         AsyncMock(return_value=[{"siren": "409526167", "matched_name": "VCSP ROUTE FRANCE"}]),
     )
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.enrich_company", AsyncMock(return_value=CompanyEnrichment())
+        "notion_pilot.crm.syncer.enrich_company", AsyncMock(return_value=CompanyEnrichment())
     )
     ensure_siren_mock = AsyncMock()
     monkeypatch.setattr(session.company_syncer, "ensure_siren_property", ensure_siren_mock)
@@ -420,7 +420,7 @@ async def test_upsert_companies_confirm_true_force_bypasses_dedup_but_not_siren_
         session.company_syncer, "get_or_create", AsyncMock(return_value="new-company-id")
     )
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.lookup_siren_candidates",
+        "notion_pilot.crm.syncer.lookup_siren_candidates",
         AsyncMock(
             return_value=[
                 {
@@ -434,7 +434,7 @@ async def test_upsert_companies_confirm_true_force_bypasses_dedup_but_not_siren_
         ),
     )
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.enrich_company", AsyncMock(return_value=CompanyEnrichment())
+        "notion_pilot.crm.syncer.enrich_company", AsyncMock(return_value=CompanyEnrichment())
     )
     ensure_siren_mock = AsyncMock()
     monkeypatch.setattr(session.company_syncer, "ensure_siren_property", ensure_siren_mock)
@@ -449,7 +449,7 @@ async def test_upsert_companies_confirm_true_force_bypasses_dedup_but_not_siren_
 
 
 async def test_upsert_companies_dry_run_flags_acronym_as_needs_review():
-    # No lookup_siren mock needed — needs_review short-circuits _company_dedup_signal
+    # No lookup_siren mock needed — needs_review short-circuits _dedup_signal
     # before the SIREN block is ever reached.
     session = await _loaded_session(existing_companies={"id-rte": "RTE"})
 
@@ -493,7 +493,7 @@ async def test_upsert_companies_dry_run_partial_word_overlap_is_not_flagged(monk
     # pair for this "not flagged" test — it will score 100 and contradict the acronym test.
     session = await _loaded_session(existing_companies={"id-edf-r": "EDF Renouvelables"})
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.lookup_siren_candidates", AsyncMock(return_value=[])
+        "notion_pilot.crm.syncer.lookup_siren_candidates", AsyncMock(return_value=[])
     )
 
     result = await upsert_companies(
@@ -506,7 +506,7 @@ async def test_upsert_companies_dry_run_partial_word_overlap_is_not_flagged(monk
 async def test_upsert_companies_dry_run_flags_diverging_siren_as_needs_review(monkeypatch):
     session = await _loaded_session()
     monkeypatch.setattr(
-        "notion_pilot.mcp.tools.lookup_siren_candidates",
+        "notion_pilot.crm.syncer.lookup_siren_candidates",
         AsyncMock(
             return_value=[
                 {
@@ -534,6 +534,23 @@ async def test_upsert_companies_dry_run_flags_diverging_siren_as_needs_review(mo
             "score": 74.07407407407408,
         }
     ]
+
+
+async def test_upsert_companies_dry_run_isolates_preview_failure_per_record(monkeypatch):
+    # New coverage: an unexpected exception in preview() must degrade only
+    # this one record to status="error", not crash the whole dry-run batch —
+    # mirrors the existing confirm=True isolation test
+    # (test_upsert_people_batch_continues_after_one_error) for the preview path.
+    session = await _loaded_session()
+    preview_mock = AsyncMock(side_effect=RuntimeError("unexpected syncer failure"))
+    monkeypatch.setattr(session.company_syncer, "preview", preview_mock)
+
+    result = await upsert_companies(
+        session, _settings(), [CompanyRecord(name="Broken Co")], confirm=False
+    )
+
+    assert result.results[0].status == "error"
+    assert "unexpected syncer failure" in result.results[0].error_message
 
 
 async def test_upsert_people_dry_run_matches_by_email_despite_name_mismatch():
