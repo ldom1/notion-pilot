@@ -1,6 +1,6 @@
 """Unit tests for crm/syncer.py — mocked Notion client."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -125,6 +125,138 @@ class TestNotionCompanySyncer:
         await syncer.load_notion_snapshot()
 
         assert syncer.details["pid1"]["siren"] == "428895676"
+
+    async def test_preview_would_create_no_siren_candidates(self):
+        client = _mock_ds_query([])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+
+        from unittest.mock import AsyncMock as _AsyncMock
+
+        from notion_pilot.crm.syncer import CompanyRecord
+
+        with patch("notion_pilot.crm.syncer.lookup_siren_candidates", _AsyncMock(return_value=[])):
+            preview = await syncer.preview(CompanyRecord(name="OVHcloud"))
+
+        assert preview.status == "would_create"
+        assert preview.siren == ""
+
+    async def test_preview_would_create_confident_siren_candidate(self):
+        client = _mock_ds_query([])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+
+        from notion_pilot.crm.syncer import CompanyRecord
+
+        with patch(
+            "notion_pilot.crm.syncer.lookup_siren_candidates",
+            AsyncMock(
+                return_value=[
+                    {
+                        "siren": "428895676",
+                        "matched_name": "ARTELYS",
+                        "section_activite_principale": "M",
+                        "activite_principale": "70.22Z",
+                        "tranche_effectif_salarie": "12",
+                    }
+                ]
+            ),
+        ):
+            preview = await syncer.preview(CompanyRecord(name="Artelys"))
+
+        assert preview.status == "would_create"
+        assert preview.siren == "428895676"
+        assert preview.siren_candidate_name == "ARTELYS"
+        assert preview.enrichment_preview == {
+            "siren": "428895676",
+            "sector": "Consulting",
+            "size": "11-50",
+            "country": "FR",
+        }
+
+    async def test_preview_flags_diverging_siren_as_needs_review(self):
+        client = _mock_ds_query([])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+
+        from notion_pilot.crm.syncer import CompanyRecord
+
+        with patch(
+            "notion_pilot.crm.syncer.lookup_siren_candidates",
+            AsyncMock(
+                return_value=[
+                    {
+                        "siren": "409526167",
+                        "matched_name": "VCSP ROUTE FRANCE",
+                        "section_activite_principale": "F",
+                        "activite_principale": "42.11Z",
+                        "tranche_effectif_salarie": "01",
+                    }
+                ]
+            ),
+        ):
+            preview = await syncer.preview(CompanyRecord(name="Rte France"))
+
+        assert preview.status == "needs_review"
+        assert preview.siren == ""
+        assert preview.candidates == [
+            {
+                "type": "siren",
+                "siren": "409526167",
+                "matched_name": "VCSP ROUTE FRANCE",
+                "score": 74.07407407407408,
+            }
+        ]
+
+    async def test_preview_flags_acronym_as_needs_review(self):
+        client = _mock_ds_query([_make_company_page("id-rte", "RTE")])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+
+        from notion_pilot.crm.syncer import CompanyRecord
+
+        preview = await syncer.preview(CompanyRecord(name="Rte France"))
+
+        assert preview.status == "needs_review"
+        assert preview.candidates == [
+            {"type": "notion", "page_id": "id-rte", "name": "RTE", "score": 100.0}
+        ]
+
+    async def test_preview_domain_match_wins_over_needs_review(self):
+        client = _mock_ds_query([_make_company_page("id-rte", "RTE")])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+        syncer.details["id-rte"] = {"website": "https://www.rte-france.com"}
+
+        from notion_pilot.crm.syncer import CompanyRecord
+
+        preview = await syncer.preview(
+            CompanyRecord(name="Rte France", contact_email="alice.martin@rte-france.com")
+        )
+
+        assert preview.status == "matched"
+        assert preview.matched_name == "RTE"
+
+    async def test_preview_matched_company_never_shows_website_guess(self):
+        # Regression guard: the matched company below has NO existing website
+        # in `details` — before the fix gating the website-derivation on
+        # status == "would_create", this would have populated
+        # enrichment_preview["website"] from contact_email even though
+        # status="matched" means no write (and therefore no property update)
+        # will ever happen for this record.
+        client = _mock_ds_query([_make_company_page("id-rte", "RTE")])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+        syncer.details["id-rte"] = {"website": "https://www.rte-france.com"}
+
+        from notion_pilot.crm.syncer import CompanyRecord
+
+        preview = await syncer.preview(
+            CompanyRecord(name="RTE", contact_email="alice.martin@rte-france.com")
+        )
+
+        assert preview.status == "matched"
+        assert preview.enrichment_preview == {}
 
 
 def _make_people_page(page_id: str, name: str, company_page_ids: list[str] | None = None) -> dict:

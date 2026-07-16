@@ -97,6 +97,22 @@ class UpsertResult:
     matched_company: str = field(default="")
 
 
+def _registry_fields(candidate: dict[str, str]) -> dict[str, str]:
+    """Maps one lookup_siren_candidates() entry to the Notion fields it can
+    fill: sector, size, country. Omits any that don't resolve to a usable
+    value — callers only apply what's present."""
+    fields: dict[str, str] = {"country": "FR"}
+    sector = naf_section_to_sector(
+        candidate["section_activite_principale"], candidate["activite_principale"]
+    )
+    if sector:
+        fields["sector"] = sector
+    size = tranche_to_size(candidate["tranche_effectif_salarie"])
+    if size:
+        fields["size"] = size
+    return fields
+
+
 class NotionCompanySyncer:
     """Load Companies snapshot from Notion; resolve or create on demand.
 
@@ -149,6 +165,120 @@ class NotionCompanySyncer:
             return
         await self._client.databases.update(self._ds_id, properties={"SIREN": {"rich_text": {}}})
         logger.info("Added SIREN property to Companies DB {}", self._ds_id[:8])
+
+    def _dedup_signal(self, record: CompanyRecord) -> CompanyDedupSignal:
+        """4-signal decision chain, in strict precedence order — exactly one
+        status comes out, never a mix: domain_match > confident name match
+        (token_sort_ratio) > acronym/subset name match (token_set_ratio) >
+        would_create."""
+        norm = normalize(record.name)
+
+        if record.contact_email and "@" in record.contact_email:
+            email_domain = normalize_domain(record.contact_email.split("@")[-1])
+            for page_id, name in self._id_to_name.items():
+                website = self.details.get(page_id, {}).get("website", "")
+                if website and normalize_domain(website) == email_domain:
+                    return CompanyDedupSignal("matched", 100.0, name, page_id, [])
+
+        best_sort = (0.0, "", "")  # score, name, page_id
+        best_set = (0.0, "", "")
+        for page_id, name in self._id_to_name.items():
+            cached_norm = normalize(name)
+            sort_score = float(token_sort_ratio(norm, cached_norm))
+            if sort_score > best_sort[0]:
+                best_sort = (sort_score, name, page_id)
+            set_score = float(token_set_ratio(norm, cached_norm))
+            if set_score > best_set[0]:
+                best_set = (set_score, name, page_id)
+
+        if best_sort[0] >= _DEDUP_MATCH_THRESHOLD:
+            return CompanyDedupSignal("matched", best_sort[0], best_sort[1], best_sort[2], [])
+        if best_set[0] >= _DEDUP_REVIEW_THRESHOLD:
+            score, name, page_id = best_set
+            return CompanyDedupSignal(
+                "needs_review",
+                score,
+                name,
+                page_id,
+                [{"type": "notion", "page_id": page_id, "name": name, "score": score}],
+            )
+        return CompanyDedupSignal("would_create", best_sort[0], best_sort[1], best_sort[2], [])
+
+    async def preview(self, record: CompanyRecord) -> CompanyPreview:
+        """Read-only: dedup signal + SIREN candidate lookup. Never writes to Notion."""
+        signal = self._dedup_signal(record)
+        status = signal.status
+        score = signal.score
+        best_name = signal.best_name
+        candidates = signal.candidates
+        reason = (
+            f"name similarity to existing company {best_name!r} (score {score:.0f})"
+            if status == "needs_review"
+            else ""
+        )
+
+        siren = ""
+        siren_candidate_name = ""
+        enrichment_preview: dict[str, str] = {}
+        if status == "would_create":
+            try:
+                siren_candidates = await lookup_siren_candidates(record.name)
+            except Exception:  # noqa: BLE001
+                siren_candidates = []
+            if siren_candidates:
+                top = siren_candidates[0]
+                divergence = float(
+                    token_sort_ratio(normalize(record.name), normalize(top["matched_name"]))
+                )
+                if divergence < _DEDUP_MATCH_THRESHOLD:
+                    status = "needs_review"
+                    reason = (
+                        f"SIREN candidate {top['matched_name']!r} doesn't resemble "
+                        f"{record.name!r} (score {divergence:.0f}); verify before writing"
+                    )
+                    candidates = [
+                        {
+                            "type": "siren",
+                            "siren": c["siren"],
+                            "matched_name": c["matched_name"],
+                            "score": float(
+                                token_sort_ratio(
+                                    normalize(record.name), normalize(c["matched_name"])
+                                )
+                            ),
+                        }
+                        for c in siren_candidates
+                    ]
+                else:
+                    siren = top["siren"]
+                    siren_candidate_name = top["matched_name"]
+                    enrichment_preview = {"siren": siren, **_registry_fields(top)}
+
+            # Gated on the (possibly just-downgraded) status, not unconditionally:
+            # upsert()'s equivalent website guess only ever runs inside `if
+            # created_new:`, i.e. only when a fresh company page will actually
+            # be written. Showing a website guess for a "matched" or
+            # SIREN-downgraded "needs_review" record here would imply a write
+            # that (without record.force) will never happen.
+            if (
+                status == "would_create"
+                and not record.website
+                and not enrichment_preview.get("website")
+                and record.contact_email
+            ):
+                domain = record.contact_email.split("@")[-1]
+                enrichment_preview["website"] = f"https://{domain}"
+
+        return CompanyPreview(
+            status=status,
+            score=score,
+            matched_name=best_name,
+            siren=siren,
+            siren_candidate_name=siren_candidate_name,
+            reason=reason,
+            candidates=candidates,
+            enrichment_preview=enrichment_preview,
+        )
 
     async def _query_page(self, cursor: str | None) -> dict[str, Any]:
         if self._standard_api:
