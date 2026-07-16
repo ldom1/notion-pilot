@@ -499,6 +499,13 @@ class TelegramAdapter:
                     reply = await dispatch_read(read_cmd, settings)
                     await _send_reply(msg, reply)
                     return
+                from notion_pilot.shared.models import all_urls as _telegram_all_urls
+
+                if len(_telegram_all_urls(incoming.text or "")) >= 2:
+                    await _send_reply(
+                        msg, "Processing… (multiple links found, this may take a moment)"
+                    )
+
                 infer_result = await infer_and_confirm(incoming.text or "", settings)
                 if infer_result is not None:
                     inferred_type, confirmation, extracted = infer_result
