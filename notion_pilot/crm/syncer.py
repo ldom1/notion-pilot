@@ -6,13 +6,32 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 import httpx
 from loguru import logger
 from notion_client import AsyncClient
-from rapidfuzz.fuzz import token_sort_ratio
+from rapidfuzz.fuzz import token_set_ratio, token_sort_ratio  # noqa: F401
 
-from notion_pilot.shared.prosper_client import resolve_company
-from notion_pilot.shared.utils.dedup import CandidateRecord, DedupStatus, find_match, normalize
+from notion_pilot.shared.prosper_client import (  # noqa: F401
+    CompanyEnrichment,
+    enrich_company,
+    resolve_company,
+)
+from notion_pilot.shared.siren_lookup import (
+    lookup_siren_candidates,  # noqa: F401
+    naf_section_to_sector,  # noqa: F401
+    tranche_to_size,  # noqa: F401
+)
+from notion_pilot.shared.utils.dedup import (
+    CandidateRecord,
+    DedupStatus,
+    find_match,
+    normalize,
+    normalize_domain,  # noqa: F401
+)
 
 if TYPE_CHECKING:
     from notion_pilot.shared.config import Settings
+
+
+_DEDUP_MATCH_THRESHOLD = 85.0
+_DEDUP_REVIEW_THRESHOLD = 90.0  # token_set_ratio, catches acronym/subset containment
 
 
 @dataclass
@@ -26,6 +45,47 @@ class PersonRecord:
     seniority: str = field(default="")
     role_type: list[str] = field(default_factory=list)
     force: bool = field(default=False)
+
+
+@dataclass
+class CompanyRecord:
+    name: str
+    website: str = field(default="")
+    contact_email: str = field(default="")
+    force: bool = field(default=False)
+
+
+@dataclass
+class CompanyDedupSignal:
+    status: Literal["matched", "needs_review", "would_create"]
+    score: float = field(default=0.0)
+    best_name: str = field(default="")
+    best_page_id: str = field(default="")
+    candidates: list[dict[str, object]] = field(default_factory=list)
+
+
+@dataclass
+class CompanyPreview:
+    status: Literal["matched", "needs_review", "would_create"]
+    score: float = field(default=0.0)
+    matched_name: str = field(default="")
+    siren: str = field(default="")
+    siren_candidate_name: str = field(default="")
+    reason: str = field(default="")
+    candidates: list[dict[str, object]] = field(default_factory=list)
+    enrichment_preview: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class CompanyUpsertResult:
+    status: Literal["matched", "created", "created_with_override", "needs_review"]
+    page_id: str = field(default="")
+    score: float = field(default=0.0)
+    matched_name: str = field(default="")
+    siren: str = field(default="")
+    siren_candidate_name: str = field(default="")
+    reason: str = field(default="")
+    candidates: list[dict[str, object]] = field(default_factory=list)
 
 
 @dataclass
