@@ -12,12 +12,15 @@ from notion_pilot.shared.llm.source_hints import infer_source_label
 _URL_RE = re.compile(r"https?://[^\s<>\[\]()]+", re.IGNORECASE)
 
 
+def all_urls(text: str) -> list[str]:
+    """Return every HTTP(S) URL in ``text``, in order, with trailing punctuation trimmed."""
+    return [m.group(0).rstrip(").,]\\\"'") for m in _URL_RE.finditer(text)]
+
+
 def _first_url(text: str) -> str | None:
     """Return the first HTTP(S) URL in ``text``, with trailing punctuation trimmed."""
-    match = _URL_RE.search(text)
-    if not match:
-        return None
-    return match.group(0).rstrip(").,]\\\"'")
+    urls = all_urls(text)
+    return urls[0] if urls else None
 
 
 class MediaType(str, Enum):
