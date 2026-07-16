@@ -22,14 +22,20 @@ class NotionDatabaseWriter:
         self.client = client
         self.database_id = database_id
 
-    async def create_page(self, properties: _HasNotionProperties) -> str:
-        """Create a new page in the database with the given content following the notion database structure."""
+    async def create_page(
+        self, properties: _HasNotionProperties, children: list[dict[str, Any]] | None = None
+    ) -> str:
+        """Create a new page in the database with the given properties, and
+        optionally an initial set of body blocks (``children``)."""
         logger.info(f"Creating page in database {self.database_id} for {properties.name}...")
+        kwargs: dict[str, Any] = {
+            "parent": {"type": "database_id", "database_id": self.database_id},
+            "properties": properties.to_notion_properties(),
+        }
+        if children:
+            kwargs["children"] = children
         try:
-            page = await self.client.pages.create(
-                parent={"type": "database_id", "database_id": self.database_id},
-                properties=properties.to_notion_properties(),
-            )
+            page = await self.client.pages.create(**kwargs)
             return str(page["id"])
         except APIResponseError as e:
             logger.error(
