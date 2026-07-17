@@ -117,3 +117,25 @@
 **Decision:** When creating a lead, `company_name` is sent to the backend. Backend searches Companies DB by exact title, auto-detects the relation property in Deals DB pointing to Companies DB, and sets the relation silently.  
 **Rejected:** Requiring the user to manually select the company in the modal  
 **Rationale:** The company name is already on the lead card. Auto-detection of the relation property avoids hardcoding property names. Silent failure (skip, don't error) if name doesn't match exactly.
+
+### 2026-06-30 — CRM schema: Activities as operational core, Meetings as separate tool
+**Decision:** Activities DB is the CRM's event log (what happened, next step). Meetings stays as a separate personal tool; linking is optional via "Advanced Deal?" checkbox → Notion automation creates the Activity automatically.  
+**Rejected:** Mandatory mirroring (every meeting must create an Activity), or merging Meetings into Activities  
+**Rationale:** Mandatory mirroring causes double-entry friction. Self-enforcing incentive: checking "Advanced Deal?" auto-creates the Activity, so the dashboard stays accurate only if the checkbox is used. Meetings retains its personal use outside CRM flow.
+
+### 2026-06-30 — CRM formulas: Notion Formula 1.0 API constraints
+**Decision:** All formula expressions submitted via PATCH /databases use binary-only `or()`/`and()` nesting and inline dateBetween expressions (no cross-formula property references).  
+**Rejected:** Using the Formula 2.0 syntax from the Notion UI editor (`or(A, B, C)`, `prop("Days Since Last Activity")`)  
+**Rationale:** Notion Formula 1.0 API returns 400 on: `or()`/`and()` with 3+ args, and formula properties referencing other formula properties. The binary nesting and inlining produce semantically identical results.
+
+### 2026-07-02 — Company enrichment: SIREN property + Notion page icon for logo
+
+**Decision:** Added a `SIREN` (rich_text) property to the Companies DB, populated whenever a company is matched in Prosper. Company logos are stored as the Notion page `icon` (external URL, Clearbit favicon lookup on the company's website domain) rather than a dedicated Logo property.
+**Rejected:** Adding a dedicated `Logo` URL property; leaving SIREN unstored and re-searching Prosper on every enrichment pass.
+**Rationale:** SIREN is the durable key for re-enriching a company later without re-disambiguating between similarly-named entities (a real pain point — many searches returned 5-15 candidates for common names). Notion's native page icon renders in the UI immediately with zero schema change, and Prosper itself has no logo data (only French SIREN/NAF/financial registry data) — Clearbit lookup on Website is the practical fallback.
+**How to apply:** Any future company enrichment should check `SIREN` first before re-querying Prosper; only search when it's empty.
+
+### 2026-06-30 — CRM "No Answer" as terminal stage
+**Decision:** "No Answer" is a terminal stage (Days Since = 0, Temperature = "—", excluded from Stale Deal). "Waiting for a Response" is active (ball in their court, still tracked).  
+**Rejected:** Treating "No Answer" as just another waiting state  
+**Rationale:** No Answer means "stopped trying — 3 unanswered attempts". It is an explicit decision to park the deal, not a passive state. Keeping it active corrupts the pipeline and temperature metrics.
