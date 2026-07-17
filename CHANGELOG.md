@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `/people`: pasting a markdown-formatted contact (`[Name](linkedin_url), Company :`, optionally
+  followed by a repeated LinkedIn URL line) is now parsed deterministically, bypassing the LLM;
+  falls through to the LLM (rather than guessing) if a second URL in the message disagrees with
+  the markdown link's URL.
+
+### Fixed
+- Telegram CRM errors (both the immediate-dispatch and step-by-step field-filling paths) now show
+  a consistent, sanitized message — always the exception class name, never a raw Notion SDK error
+  (which could leak page/database IDs or schema internals) — instead of a generic
+  "Failed to save to Notion" with no detail on one path and an unsanitized raw message on the other.
+
+### Added
 - **Infisical secret manager** — all app secrets now live in Infisical (`Dom Universe` project, `prod` env, `/global` + `/notion-pilot` folders); `.env` replaced by `.env.bootstrap` (4 vars: client_id, client_secret, project_id, env)
 - `infisical.json` — project config for the Infisical CLI (`infisical run --` local dev workflow)
 - `.env.bootstrap.example` — template for bootstrapping Docker/devbox deploys
