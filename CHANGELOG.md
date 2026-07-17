@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Multi-link Telegram messages (≥2 URLs) now produce a richer Notion knowledge page: each link
+  gets a heading + factual bullets (description, language, stars, topics where available) in the
+  page body, plus a set-level Description summarizing the links as a whole — instead of a one-line
+  Description with a blank body. A "Processing…" reply is sent first since this path is slower.
+
+### Added
 - **Infisical secret manager** — all app secrets now live in Infisical (`Dom Universe` project, `prod` env, `/global` + `/notion-pilot` folders); `.env` replaced by `.env.bootstrap` (4 vars: client_id, client_secret, project_id, env)
 - `infisical.json` — project config for the Infisical CLI (`infisical run --` local dev workflow)
 - `.env.bootstrap.example` — template for bootstrapping Docker/devbox deploys
