@@ -6,13 +6,32 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 import httpx
 from loguru import logger
 from notion_client import AsyncClient
-from rapidfuzz.fuzz import token_sort_ratio
+from rapidfuzz.fuzz import token_set_ratio, token_sort_ratio  # noqa: F401
 
-from notion_pilot.shared.prosper_client import resolve_company
-from notion_pilot.shared.utils.dedup import CandidateRecord, DedupStatus, find_match, normalize
+from notion_pilot.shared.prosper_client import (  # noqa: F401
+    CompanyEnrichment,
+    enrich_company,
+    resolve_company,
+)
+from notion_pilot.shared.siren_lookup import (
+    lookup_siren_candidates,  # noqa: F401
+    naf_section_to_sector,  # noqa: F401
+    tranche_to_size,  # noqa: F401
+)
+from notion_pilot.shared.utils.dedup import (
+    CandidateRecord,
+    DedupStatus,
+    find_match,
+    normalize,
+    normalize_domain,  # noqa: F401
+)
 
 if TYPE_CHECKING:
     from notion_pilot.shared.config import Settings
+
+
+_DEDUP_MATCH_THRESHOLD = 85.0
+_DEDUP_REVIEW_THRESHOLD = 90.0  # token_set_ratio, catches acronym/subset containment
 
 
 @dataclass
@@ -29,12 +48,69 @@ class PersonRecord:
 
 
 @dataclass
+class CompanyRecord:
+    name: str
+    website: str = field(default="")
+    contact_email: str = field(default="")
+    force: bool = field(default=False)
+
+
+@dataclass
+class CompanyDedupSignal:
+    status: Literal["matched", "needs_review", "would_create"]
+    score: float = field(default=0.0)
+    best_name: str = field(default="")
+    best_page_id: str = field(default="")
+    candidates: list[dict[str, object]] = field(default_factory=list)
+
+
+@dataclass
+class CompanyPreview:
+    status: Literal["matched", "needs_review", "would_create"]
+    score: float = field(default=0.0)
+    matched_name: str = field(default="")
+    siren: str = field(default="")
+    siren_candidate_name: str = field(default="")
+    reason: str = field(default="")
+    candidates: list[dict[str, object]] = field(default_factory=list)
+    enrichment_preview: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class CompanyUpsertResult:
+    status: Literal["matched", "created", "created_with_override", "needs_review"]
+    page_id: str = field(default="")
+    score: float = field(default=0.0)
+    matched_name: str = field(default="")
+    siren: str = field(default="")
+    siren_candidate_name: str = field(default="")
+    reason: str = field(default="")
+    candidates: list[dict[str, object]] = field(default_factory=list)
+
+
+@dataclass
 class UpsertResult:
     status: Literal["created", "created_with_override", "skipped", "review"]
     page_id: str = field(default="")
     score: float = field(default=0.0)
     matched_name: str = field(default="")
     matched_company: str = field(default="")
+
+
+def _registry_fields(candidate: dict[str, str]) -> dict[str, str]:
+    """Maps one lookup_siren_candidates() entry to the Notion fields it can
+    fill: sector, size, country. Omits any that don't resolve to a usable
+    value — callers only apply what's present."""
+    fields: dict[str, str] = {"country": "FR"}
+    sector = naf_section_to_sector(
+        candidate["section_activite_principale"], candidate["activite_principale"]
+    )
+    if sector:
+        fields["sector"] = sector
+    size = tranche_to_size(candidate["tranche_effectif_salarie"])
+    if size:
+        fields["size"] = size
+    return fields
 
 
 class NotionCompanySyncer:
@@ -89,6 +165,283 @@ class NotionCompanySyncer:
             return
         await self._client.databases.update(self._ds_id, properties={"SIREN": {"rich_text": {}}})
         logger.info("Added SIREN property to Companies DB {}", self._ds_id[:8])
+
+    def _dedup_signal(self, record: CompanyRecord) -> CompanyDedupSignal:
+        """4-signal decision chain, in strict precedence order — exactly one
+        status comes out, never a mix: domain_match > confident name match
+        (token_sort_ratio) > acronym/subset name match (token_set_ratio) >
+        would_create."""
+        norm = normalize(record.name)
+
+        if record.contact_email and "@" in record.contact_email:
+            email_domain = normalize_domain(record.contact_email.split("@")[-1])
+            for page_id, name in self._id_to_name.items():
+                website = self.details.get(page_id, {}).get("website", "")
+                if website and normalize_domain(website) == email_domain:
+                    return CompanyDedupSignal("matched", 100.0, name, page_id, [])
+
+        best_sort = (0.0, "", "")  # score, name, page_id
+        best_set = (0.0, "", "")
+        for page_id, name in self._id_to_name.items():
+            cached_norm = normalize(name)
+            sort_score = float(token_sort_ratio(norm, cached_norm))
+            if sort_score > best_sort[0]:
+                best_sort = (sort_score, name, page_id)
+            set_score = float(token_set_ratio(norm, cached_norm))
+            if set_score > best_set[0]:
+                best_set = (set_score, name, page_id)
+
+        if best_sort[0] >= _DEDUP_MATCH_THRESHOLD:
+            return CompanyDedupSignal("matched", best_sort[0], best_sort[1], best_sort[2], [])
+        if best_set[0] >= _DEDUP_REVIEW_THRESHOLD:
+            score, name, page_id = best_set
+            return CompanyDedupSignal(
+                "needs_review",
+                score,
+                name,
+                page_id,
+                [{"type": "notion", "page_id": page_id, "name": name, "score": score}],
+            )
+        return CompanyDedupSignal("would_create", best_sort[0], best_sort[1], best_sort[2], [])
+
+    async def preview(self, record: CompanyRecord) -> CompanyPreview:
+        """Read-only: dedup signal + SIREN candidate lookup. Never writes to Notion."""
+        signal = self._dedup_signal(record)
+        status = signal.status
+        score = signal.score
+        best_name = signal.best_name
+        candidates = signal.candidates
+        reason = (
+            f"name similarity to existing company {best_name!r} (score {score:.0f})"
+            if status == "needs_review"
+            else ""
+        )
+
+        siren = ""
+        siren_candidate_name = ""
+        enrichment_preview: dict[str, str] = {}
+        if status == "would_create":
+            try:
+                siren_candidates = await lookup_siren_candidates(record.name)
+            except Exception:  # noqa: BLE001
+                siren_candidates = []
+            if siren_candidates:
+                top = siren_candidates[0]
+                divergence = float(
+                    token_sort_ratio(normalize(record.name), normalize(top["matched_name"]))
+                )
+                if divergence < _DEDUP_MATCH_THRESHOLD:
+                    status = "needs_review"
+                    reason = (
+                        f"SIREN candidate {top['matched_name']!r} doesn't resemble "
+                        f"{record.name!r} (score {divergence:.0f}); verify before writing"
+                    )
+                    candidates = [
+                        {
+                            "type": "siren",
+                            "siren": c["siren"],
+                            "matched_name": c["matched_name"],
+                            "score": float(
+                                token_sort_ratio(
+                                    normalize(record.name), normalize(c["matched_name"])
+                                )
+                            ),
+                        }
+                        for c in siren_candidates
+                    ]
+                else:
+                    siren = top["siren"]
+                    siren_candidate_name = top["matched_name"]
+                    enrichment_preview = {"siren": siren, **_registry_fields(top)}
+
+            # Gated on the (possibly just-downgraded) status, not unconditionally:
+            # upsert()'s equivalent website guess only ever runs inside `if
+            # created_new:`, i.e. only when a fresh company page will actually
+            # be written. Showing a website guess for a "matched" or
+            # SIREN-downgraded "needs_review" record here would imply a write
+            # that (without record.force) will never happen.
+            if (
+                status == "would_create"
+                and not record.website
+                and not enrichment_preview.get("website")
+                and record.contact_email
+            ):
+                domain = record.contact_email.split("@")[-1]
+                enrichment_preview["website"] = f"https://{domain}"
+
+        return CompanyPreview(
+            status=status,
+            score=score,
+            matched_name=best_name,
+            siren=siren,
+            siren_candidate_name=siren_candidate_name,
+            reason=reason,
+            candidates=candidates,
+            enrichment_preview=enrichment_preview,
+        )
+
+    async def upsert(
+        self, record: CompanyRecord, settings: "Settings | None" = None
+    ) -> CompanyUpsertResult:
+        """Write path: dedup check → SIREN pre-check (would_create path only) →
+        get-or-create → enrichment write."""
+        signal = self._dedup_signal(record)
+        dedup_status = signal.status
+        dedup_score = signal.score
+        dedup_best_name = signal.best_name
+        dedup_page_id = signal.best_page_id
+        dedup_candidates = signal.candidates
+
+        if dedup_status == "needs_review" and not record.force:
+            return CompanyUpsertResult(
+                status="needs_review",
+                score=dedup_score,
+                matched_name=dedup_best_name,
+                candidates=dedup_candidates,
+                reason=f"name similarity to existing company {dedup_best_name!r} "
+                f"(score {dedup_score:.0f})",
+            )
+
+        siren_candidates: list[dict[str, str]] = []
+        siren_lookup_done = False
+        siren_override_reason = ""
+        if dedup_status == "would_create":
+            # No NAME-based concern was raised, but the SIREN registry lookup
+            # is itself an independent dedup signal — preview() already
+            # downgrades to needs_review when its only registry match
+            # diverges from the input name. upsert() must match that
+            # contract instead of silently creating the company just because
+            # the name signal alone looked clean.
+            try:
+                siren_candidates = await lookup_siren_candidates(record.name)
+            except Exception:  # noqa: BLE001
+                siren_candidates = []
+            siren_lookup_done = True
+            if siren_candidates:
+                top = siren_candidates[0]
+                divergence = float(
+                    token_sort_ratio(normalize(record.name), normalize(top["matched_name"]))
+                )
+                if divergence < _DEDUP_MATCH_THRESHOLD:
+                    if not record.force:
+                        return CompanyUpsertResult(
+                            status="needs_review",
+                            reason=f"SIREN candidate {top['matched_name']!r} doesn't resemble "
+                            f"{record.name!r} (score {divergence:.0f}); verify before writing",
+                            candidates=[
+                                {
+                                    "type": "siren",
+                                    "siren": c["siren"],
+                                    "matched_name": c["matched_name"],
+                                    "score": float(
+                                        token_sort_ratio(
+                                            normalize(record.name), normalize(c["matched_name"])
+                                        )
+                                    ),
+                                }
+                                for c in siren_candidates
+                            ],
+                        )
+                    siren_override_reason = (
+                        f"created despite SIREN candidate {top['matched_name']!r} not "
+                        f"resembling {record.name!r} (score {divergence:.0f})"
+                    )
+
+        if dedup_status == "matched":
+            # Our own dedup signal (domain match or confident name match) is
+            # authoritative — it always wins over get_or_create's separate,
+            # weaker name-only check.
+            page_id = dedup_page_id
+            created_new = False
+        else:
+            known_before = set(self._id_to_name.keys())
+            # force_create=True when overriding a needs_review dedup block: force=True
+            # means "create a distinct new company", so get_or_create's own separate
+            # name-similarity check (a weaker, independent signal) must not be allowed
+            # to silently re-attach to the very company the caller is overriding.
+            page_id = await self.get_or_create(
+                record.name, force_create=(dedup_status == "needs_review")
+            )
+            created_new = page_id not in known_before
+
+        status: Literal["matched", "created", "created_with_override"]
+        if not created_new:
+            status = "matched"
+        elif dedup_status == "needs_review" or siren_override_reason:
+            # needs_review: only reachable here when record.force is True.
+            # siren_override_reason: force=True bypassed the SIREN-divergence
+            # pre-check above instead — an override either way.
+            status = "created_with_override"
+        else:
+            status = "created"
+
+        siren = ""
+        siren_candidate_name = ""
+        reason = (
+            (
+                f"created despite name similarity to {dedup_best_name!r} (score {dedup_score:.0f})"
+                if dedup_status == "needs_review"
+                else siren_override_reason
+            )
+            if status == "created_with_override"
+            else ""
+        )
+
+        if created_new:
+            props: dict[str, object] = {}
+            try:
+                enrichment = await enrich_company(record.name, cast("Settings", settings))
+            except Exception:  # noqa: BLE001
+                enrichment = CompanyEnrichment()
+            if enrichment.sector:
+                props["Sector"] = {"select": {"name": enrichment.sector}}
+            if enrichment.size:
+                props["Size"] = {"select": {"name": enrichment.size}}
+            if enrichment.country:
+                props["Country"] = {"select": {"name": enrichment.country}}
+            if enrichment.linkedin_url:
+                props["Linkedin"] = {"url": enrichment.linkedin_url}
+
+            if not siren_lookup_done:
+                # would_create already looked this up above; only the
+                # needs_review+force path (which skips that pre-check by
+                # design — force explicitly authorizes proceeding) still
+                # needs its own lookup here.
+                try:
+                    siren_candidates = await lookup_siren_candidates(record.name)
+                except Exception:  # noqa: BLE001
+                    siren_candidates = []
+            if siren_candidates:
+                top = siren_candidates[0]
+                divergence = float(
+                    token_sort_ratio(normalize(record.name), normalize(top["matched_name"]))
+                )
+                if divergence >= _DEDUP_MATCH_THRESHOLD:
+                    siren = top["siren"]
+                    siren_candidate_name = top["matched_name"]
+                    await self.ensure_siren_property()
+                    props["SIREN"] = {"rich_text": [{"text": {"content": siren}}]}
+                    for field_name, value in _registry_fields(top).items():
+                        key = {"sector": "Sector", "size": "Size", "country": "Country"}[field_name]
+                        if key not in props:
+                            props[key] = {"select": {"name": value}}
+
+            website = record.website or enrichment.website or ""
+            if not website and record.contact_email:
+                website = f"https://{record.contact_email.split('@')[-1]}"
+            if website:
+                props["Website"] = {"url": website}
+
+            if props:
+                await self._client.pages.update(page_id, properties=props)
+
+        return CompanyUpsertResult(
+            status=status,
+            page_id=page_id,
+            siren=siren,
+            siren_candidate_name=siren_candidate_name,
+            reason=reason,
+        )
 
     async def _query_page(self, cursor: str | None) -> dict[str, Any]:
         if self._standard_api:
@@ -146,17 +499,20 @@ class NotionCompanySyncer:
             cursor = result["next_cursor"]
         logger.info("Companies snapshot: {} entries", len(self._name_to_id))
 
-    async def get_or_create(self, name: str, settings: "Settings | None" = None) -> str:
+    async def get_or_create(
+        self, name: str, settings: "Settings | None" = None, *, force_create: bool = False
+    ) -> str:
         norm = normalize(name)
-        best_score = 0.0
-        best_id = ""
-        for cached_norm, pid in self._name_to_id.items():
-            score = float(token_sort_ratio(norm, cached_norm))
-            if score > best_score:
-                best_score = score
-                best_id = pid
-        if best_score >= 85 and best_id:
-            return best_id
+        if not force_create:
+            best_score = 0.0
+            best_id = ""
+            for cached_norm, pid in self._name_to_id.items():
+                score = float(token_sort_ratio(norm, cached_norm))
+                if score > best_score:
+                    best_score = score
+                    best_id = pid
+            if best_score >= 85 and best_id:
+                return best_id
         parent = (
             {"type": "database_id", "database_id": self._ds_id}
             if self._standard_api
