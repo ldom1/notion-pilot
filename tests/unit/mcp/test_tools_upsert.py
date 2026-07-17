@@ -308,24 +308,24 @@ async def test_upsert_companies_confirm_true_domain_match_wins_without_calling_g
 ):
     # Regression test for the live-incident duplicate: a domain match (highest-precedence
     # dedup signal) must be authoritative on confirm=True, never falling through to
-    # get_or_create's own separate, weaker name-only check. "Rte France" vs "RTE" scores
+    # get_or_create's own separate, weaker name-only check. "Vantree Energy" vs "Vantree" scores
     # well below get_or_create's internal 85 threshold on name alone — if the dedup
     # signal's "matched" result were ignored, get_or_create would create a duplicate.
-    session = await _loaded_session(existing_companies={"id-rte": "RTE"})
-    session.company_syncer.details["id-rte"] = {"website": "https://www.rte-france.com"}
+    session = await _loaded_session(existing_companies={"id-vantree": "Vantree"})
+    session.company_syncer.details["id-vantree"] = {"website": "https://www.vantree-energy.example"}
     get_or_create_mock = AsyncMock()
     monkeypatch.setattr(session.company_syncer, "get_or_create", get_or_create_mock)
 
     result = await upsert_companies(
         session,
         _settings(),
-        [CompanyRecord(name="Rte France", contact_email="alice.martin@rte-france.com")],
+        [CompanyRecord(name="Vantree Energy", contact_email="alice.martin@vantree-energy.example")],
         confirm=True,
     )
 
     get_or_create_mock.assert_not_called()
     assert result.results[0].status == "matched"
-    assert result.results[0].page_id == "id-rte"
+    assert result.results[0].page_id == "id-vantree"
 
 
 async def test_upsert_companies_confirm_true_skips_siren_for_matched_company(monkeypatch):
@@ -346,23 +346,23 @@ async def test_upsert_companies_confirm_true_skips_siren_for_matched_company(mon
 
 
 async def test_upsert_companies_confirm_true_blocks_needs_review_without_force(monkeypatch):
-    session = await _loaded_session(existing_companies={"id-rte": "RTE"})
+    session = await _loaded_session(existing_companies={"id-vantree": "Vantree"})
     get_or_create_mock = AsyncMock()
     monkeypatch.setattr(session.company_syncer, "get_or_create", get_or_create_mock)
 
     result = await upsert_companies(
-        session, _settings(), [CompanyRecord(name="Rte France")], confirm=True
+        session, _settings(), [CompanyRecord(name="Vantree Energy")], confirm=True
     )
 
     get_or_create_mock.assert_not_called()
     assert result.results[0].status == "needs_review"
     assert result.results[0].candidates == [
-        {"type": "notion", "page_id": "id-rte", "name": "RTE", "score": 100.0}
+        {"type": "notion", "page_id": "id-vantree", "name": "Vantree", "score": 100.0}
     ]
 
 
 async def test_upsert_companies_confirm_true_force_bypasses_needs_review(monkeypatch):
-    session = await _loaded_session(existing_companies={"id-rte": "RTE"})
+    session = await _loaded_session(existing_companies={"id-vantree": "Vantree"})
     monkeypatch.setattr(
         session.company_syncer, "get_or_create", AsyncMock(return_value="new-company-id")
     )
@@ -374,12 +374,12 @@ async def test_upsert_companies_confirm_true_force_bypasses_needs_review(monkeyp
     )
 
     result = await upsert_companies(
-        session, _settings(), [CompanyRecord(name="Rte France", force=True)], confirm=True
+        session, _settings(), [CompanyRecord(name="Vantree Energy", force=True)], confirm=True
     )
 
     assert result.results[0].status == "created_with_override"
     assert result.results[0].page_id == "new-company-id"
-    assert "RTE" in result.results[0].reason
+    assert "Vantree" in result.results[0].reason
 
 
 async def test_upsert_companies_confirm_true_force_does_not_bypass_siren_confidence_gate(
@@ -415,7 +415,7 @@ async def test_upsert_companies_confirm_true_force_bypasses_dedup_but_not_siren_
     # becomes created_with_override), but a diverging SIREN candidate present at the
     # same time is still independently rejected by the SIREN confidence gate — force
     # must not bleed into that separate check.
-    session = await _loaded_session(existing_companies={"id-rte": "RTE"})
+    session = await _loaded_session(existing_companies={"id-vantree": "Vantree"})
     monkeypatch.setattr(
         session.company_syncer, "get_or_create", AsyncMock(return_value="new-company-id")
     )
@@ -440,7 +440,7 @@ async def test_upsert_companies_confirm_true_force_bypasses_dedup_but_not_siren_
     monkeypatch.setattr(session.company_syncer, "ensure_siren_property", ensure_siren_mock)
 
     result = await upsert_companies(
-        session, _settings(), [CompanyRecord(name="Rte France", force=True)], confirm=True
+        session, _settings(), [CompanyRecord(name="Vantree Energy", force=True)], confirm=True
     )
 
     ensure_siren_mock.assert_not_called()
@@ -451,39 +451,39 @@ async def test_upsert_companies_confirm_true_force_bypasses_dedup_but_not_siren_
 async def test_upsert_companies_dry_run_flags_acronym_as_needs_review():
     # No lookup_siren mock needed — needs_review short-circuits _dedup_signal
     # before the SIREN block is ever reached.
-    session = await _loaded_session(existing_companies={"id-rte": "RTE"})
+    session = await _loaded_session(existing_companies={"id-vantree": "Vantree"})
 
     result = await upsert_companies(
-        session, _settings(), [CompanyRecord(name="Rte France")], confirm=False
+        session, _settings(), [CompanyRecord(name="Vantree Energy")], confirm=False
     )
 
     assert result.results[0].status == "needs_review"
     assert result.results[0].candidates == [
-        {"type": "notion", "page_id": "id-rte", "name": "RTE", "score": 100.0}
+        {"type": "notion", "page_id": "id-vantree", "name": "Vantree", "score": 100.0}
     ]
 
 
 async def test_upsert_companies_dry_run_domain_match_wins_over_needs_review():
     # No lookup_siren mock needed — a domain match returns "matched" before the
     # SIREN block is ever reached.
-    session = await _loaded_session(existing_companies={"id-rte": "RTE"})
-    session.company_syncer.details["id-rte"] = {"website": "https://www.rte-france.com"}
+    session = await _loaded_session(existing_companies={"id-vantree": "Vantree"})
+    session.company_syncer.details["id-vantree"] = {"website": "https://www.vantree-energy.example"}
 
     result = await upsert_companies(
         session,
         _settings(),
-        [CompanyRecord(name="Rte France", contact_email="alice.martin@rte-france.com")],
+        [CompanyRecord(name="Vantree Energy", contact_email="alice.martin@vantree-energy.example")],
         confirm=False,
     )
 
     assert result.results[0].status == "matched"
-    assert result.results[0].matched_name == "RTE"
+    assert result.results[0].matched_name == "Vantree"
 
 
 async def test_upsert_companies_dry_run_partial_word_overlap_is_not_flagged(monkeypatch):
     # "EDF Renouvelables" vs "EDF Trading" share the word "EDF" but neither name's
-    # full token set is contained in the other's (unlike "RTE" vs "Rte France", where
-    # "RTE" alone is 100% of a token in "Rte France"). Verified: token_set_ratio == 42.9,
+    # full token set is contained in the other's (unlike "Vantree" vs "Vantree Energy", where
+    # "Vantree" alone is 100% of a token in "Vantree Energy"). Verified: token_set_ratio == 42.9,
     # well below the 90 needs_review floor. IMPORTANT: any single-token name that is a
     # complete subset of a longer name's tokens ALWAYS scores 100 on token_set_ratio,
     # no matter how many extra distinguishing words the longer name has — e.g. "EDF" vs
@@ -521,7 +521,7 @@ async def test_upsert_companies_dry_run_flags_diverging_siren_as_needs_review(mo
     )
 
     result = await upsert_companies(
-        session, _settings(), [CompanyRecord(name="Rte France")], confirm=False
+        session, _settings(), [CompanyRecord(name="Vantree Energy")], confirm=False
     )
 
     assert result.results[0].status == "needs_review"
@@ -531,7 +531,7 @@ async def test_upsert_companies_dry_run_flags_diverging_siren_as_needs_review(mo
             "type": "siren",
             "siren": "409526167",
             "matched_name": "VCSP ROUTE FRANCE",
-            "score": 74.07407407407408,
+            "score": 32.25806451612904,
         }
     ]
 
@@ -558,9 +558,9 @@ async def test_upsert_people_dry_run_matches_by_email_despite_name_mismatch():
         existing_people=[
             {
                 "name": "A. Martin",
-                "company": "RTE",
+                "company": "Vantree",
                 "page_id": "p1",
-                "email": "alice.martin@rte-france.com",
+                "email": "alice.martin@vantree-energy.example",
             }
         ]
     )
@@ -569,7 +569,9 @@ async def test_upsert_people_dry_run_matches_by_email_despite_name_mismatch():
         session,
         [
             PersonRecord(
-                name="MARTIN Alice", company="Rte France", email="alice.martin@rte-france.com"
+                name="MARTIN Alice",
+                company="Vantree Energy",
+                email="alice.martin@vantree-energy.example",
             )
         ],
         confirm=False,

@@ -33,14 +33,14 @@ class TestNotionCompanySyncer:
         client = _mock_ds_query(
             [
                 _make_company_page("id-edf", "EDF"),
-                _make_company_page("id-rte", "RTE"),
+                _make_company_page("id-vantree", "Vantree"),
             ]
         )
         syncer = NotionCompanySyncer(client, "fake-ds-id")
         await syncer.load_notion_snapshot()
 
         assert syncer.id_to_name("id-edf") == "EDF"
-        assert syncer.id_to_name("id-rte") == "RTE"
+        assert syncer.id_to_name("id-vantree") == "Vantree"
         assert syncer.id_to_name("unknown") == ""
 
     async def test_get_or_create_returns_existing_on_exact_match(self):
@@ -195,7 +195,7 @@ class TestNotionCompanySyncer:
                 ]
             ),
         ):
-            preview = await syncer.preview(CompanyRecord(name="Rte France"))
+            preview = await syncer.preview(CompanyRecord(name="Vantree Energy"))
 
         assert preview.status == "needs_review"
         assert preview.siren == ""
@@ -204,38 +204,40 @@ class TestNotionCompanySyncer:
                 "type": "siren",
                 "siren": "409526167",
                 "matched_name": "VCSP ROUTE FRANCE",
-                "score": 74.07407407407408,
+                "score": 32.25806451612904,
             }
         ]
 
     async def test_preview_flags_acronym_as_needs_review(self):
-        client = _mock_ds_query([_make_company_page("id-rte", "RTE")])
+        client = _mock_ds_query([_make_company_page("id-vantree", "Vantree")])
         syncer = NotionCompanySyncer(client, "fake-ds-id")
         await syncer.load_notion_snapshot()
 
         from notion_pilot.crm.syncer import CompanyRecord
 
-        preview = await syncer.preview(CompanyRecord(name="Rte France"))
+        preview = await syncer.preview(CompanyRecord(name="Vantree Energy"))
 
         assert preview.status == "needs_review"
         assert preview.candidates == [
-            {"type": "notion", "page_id": "id-rte", "name": "RTE", "score": 100.0}
+            {"type": "notion", "page_id": "id-vantree", "name": "Vantree", "score": 100.0}
         ]
 
     async def test_preview_domain_match_wins_over_needs_review(self):
-        client = _mock_ds_query([_make_company_page("id-rte", "RTE")])
+        client = _mock_ds_query([_make_company_page("id-vantree", "Vantree")])
         syncer = NotionCompanySyncer(client, "fake-ds-id")
         await syncer.load_notion_snapshot()
-        syncer.details["id-rte"] = {"website": "https://www.rte-france.com"}
+        syncer.details["id-vantree"] = {"website": "https://www.vantree-energy.example"}
 
         from notion_pilot.crm.syncer import CompanyRecord
 
         preview = await syncer.preview(
-            CompanyRecord(name="Rte France", contact_email="alice.martin@rte-france.com")
+            CompanyRecord(
+                name="Vantree Energy", contact_email="alice.martin@vantree-energy.example"
+            )
         )
 
         assert preview.status == "matched"
-        assert preview.matched_name == "RTE"
+        assert preview.matched_name == "Vantree"
 
     async def test_preview_matched_company_never_shows_website_guess(self):
         # Regression guard: the matched company below has NO existing website
@@ -244,15 +246,15 @@ class TestNotionCompanySyncer:
         # enrichment_preview["website"] from contact_email even though
         # status="matched" means no write (and therefore no property update)
         # will ever happen for this record.
-        client = _mock_ds_query([_make_company_page("id-rte", "RTE")])
+        client = _mock_ds_query([_make_company_page("id-vantree", "Vantree")])
         syncer = NotionCompanySyncer(client, "fake-ds-id")
         await syncer.load_notion_snapshot()
-        syncer.details["id-rte"] = {"website": "https://www.rte-france.com"}
+        syncer.details["id-vantree"] = {"website": "https://www.vantree-energy.example"}
 
         from notion_pilot.crm.syncer import CompanyRecord
 
         preview = await syncer.preview(
-            CompanyRecord(name="RTE", contact_email="alice.martin@rte-france.com")
+            CompanyRecord(name="Vantree", contact_email="alice.martin@vantree-energy.example")
         )
 
         assert preview.status == "matched"
@@ -324,42 +326,44 @@ class TestNotionCompanySyncer:
     async def test_upsert_domain_match_wins_without_calling_get_or_create(self, monkeypatch):
         from notion_pilot.crm.syncer import CompanyRecord
 
-        client = _mock_ds_query([_make_company_page("id-rte", "RTE")])
+        client = _mock_ds_query([_make_company_page("id-vantree", "Vantree")])
         syncer = NotionCompanySyncer(client, "fake-ds-id")
         await syncer.load_notion_snapshot()
-        syncer.details["id-rte"] = {"website": "https://www.rte-france.com"}
+        syncer.details["id-vantree"] = {"website": "https://www.vantree-energy.example"}
         get_or_create_mock = AsyncMock()
         monkeypatch.setattr(syncer, "get_or_create", get_or_create_mock)
 
         result = await syncer.upsert(
-            CompanyRecord(name="Rte France", contact_email="alice.martin@rte-france.com")
+            CompanyRecord(
+                name="Vantree Energy", contact_email="alice.martin@vantree-energy.example"
+            )
         )
 
         get_or_create_mock.assert_not_called()
         assert result.status == "matched"
-        assert result.page_id == "id-rte"
+        assert result.page_id == "id-vantree"
 
     async def test_upsert_blocks_needs_review_without_force(self, monkeypatch):
         from notion_pilot.crm.syncer import CompanyRecord
 
-        client = _mock_ds_query([_make_company_page("id-rte", "RTE")])
+        client = _mock_ds_query([_make_company_page("id-vantree", "Vantree")])
         syncer = NotionCompanySyncer(client, "fake-ds-id")
         await syncer.load_notion_snapshot()
         get_or_create_mock = AsyncMock()
         monkeypatch.setattr(syncer, "get_or_create", get_or_create_mock)
 
-        result = await syncer.upsert(CompanyRecord(name="Rte France"))
+        result = await syncer.upsert(CompanyRecord(name="Vantree Energy"))
 
         get_or_create_mock.assert_not_called()
         assert result.status == "needs_review"
         assert result.candidates == [
-            {"type": "notion", "page_id": "id-rte", "name": "RTE", "score": 100.0}
+            {"type": "notion", "page_id": "id-vantree", "name": "Vantree", "score": 100.0}
         ]
 
     async def test_upsert_force_bypasses_dedup_but_not_siren_gate(self, monkeypatch):
         from notion_pilot.crm.syncer import CompanyEnrichment, CompanyRecord
 
-        client = _mock_ds_query([_make_company_page("id-rte", "RTE")])
+        client = _mock_ds_query([_make_company_page("id-vantree", "Vantree")])
         syncer = NotionCompanySyncer(client, "fake-ds-id")
         await syncer.load_notion_snapshot()
         monkeypatch.setattr(syncer, "get_or_create", AsyncMock(return_value="new-company-id"))
@@ -384,7 +388,7 @@ class TestNotionCompanySyncer:
         ensure_siren_mock = AsyncMock()
         monkeypatch.setattr(syncer, "ensure_siren_property", ensure_siren_mock)
 
-        result = await syncer.upsert(CompanyRecord(name="Rte France", force=True))
+        result = await syncer.upsert(CompanyRecord(name="Vantree Energy", force=True))
 
         ensure_siren_mock.assert_not_called()
         assert result.status == "created_with_override"
@@ -407,7 +411,7 @@ class TestNotionCompanySyncer:
     async def test_upsert_force_true_needs_review_always_creates_new_page(self, monkeypatch):
         from notion_pilot.crm.syncer import CompanyEnrichment, CompanyRecord
 
-        client = _mock_ds_query([_make_company_page("id-rte", "RTE")])
+        client = _mock_ds_query([_make_company_page("id-vantree", "Vantree")])
         syncer = NotionCompanySyncer(client, "fake-ds-id")
         await syncer.load_notion_snapshot()
         monkeypatch.setattr(
@@ -420,9 +424,9 @@ class TestNotionCompanySyncer:
         get_or_create_spy = AsyncMock(wraps=syncer.get_or_create)
         monkeypatch.setattr(syncer, "get_or_create", get_or_create_spy)
 
-        result = await syncer.upsert(CompanyRecord(name="Rte France", force=True))
+        result = await syncer.upsert(CompanyRecord(name="Vantree Energy", force=True))
 
-        get_or_create_spy.assert_awaited_once_with("Rte France", force_create=True)
+        get_or_create_spy.assert_awaited_once_with("Vantree Energy", force_create=True)
         assert result.status == "created_with_override"
         assert result.page_id == "new-company-id"
 
