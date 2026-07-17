@@ -22,9 +22,9 @@ load_dotenv()
 
 NOTION_API = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"
-MEETINGS_ID   = "e94cc98f-2f66-4c53-ac6d-62b9d8f7d5aa"
+MEETINGS_ID = "e94cc98f-2f66-4c53-ac6d-62b9d8f7d5aa"
 COMMERCIAL_ID = "4890e1d6-178d-4a42-af06-7bbe0cef09fe"
-COMPANIES_ID  = "cfc21198-9684-47ef-98ae-fc5657511998"
+COMPANIES_ID = "cfc21198-9684-47ef-98ae-fc5657511998"
 
 
 async def main() -> None:
@@ -103,7 +103,9 @@ async def main() -> None:
         )
         if r2.status_code == 200:
             applied2 = list(r2.json().get("properties", {}).keys())
-            logger.info("✅ Meetings fully patched (incl. Deal relation). Properties now: {}", applied2)
+            logger.info(
+                "✅ Meetings fully patched (incl. Deal relation). Properties now: {}", applied2
+            )
         elif r2.status_code == 400:
             logger.warning(
                 "⚠️  Deal relation returned 400 — a back-relation named 'Deal' may already exist "

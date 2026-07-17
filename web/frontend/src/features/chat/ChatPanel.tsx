@@ -338,7 +338,7 @@ export function ChatPanel(): React.ReactElement {
   const [sessionId, setSessionId] = useState<string>(() => crypto.randomUUID());
   const [chatHistory, setChatHistory] = useState<HistoryEntry[]>([]);
   const [chatMessages, setChatMessages] = useState<UiMessage[]>([]);
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [thinkingMsg, setThinkingMsg] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
   const [conversations, setConversations] = useState<ConversationMeta[]>([]);
@@ -376,7 +376,7 @@ export function ChatPanel(): React.ReactElement {
   useEffect(() => {
     const el = historyRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [chatMessages, statusMsg]);
+  }, [chatMessages, thinkingMsg]);
 
   // ── Load a past conversation ─────────────────────────────────────────────
 
@@ -395,7 +395,7 @@ export function ChatPanel(): React.ReactElement {
       );
       setChatMessages(msgs);
       setChatHistory(conv.history);
-      setStatusMsg(null);
+      setThinkingMsg(null);
       setDealWizard(null);
     } catch (err) {
       console.error("Failed to load conversation", err);
@@ -422,7 +422,7 @@ export function ChatPanel(): React.ReactElement {
     setSessionId(crypto.randomUUID());
     setChatHistory([]);
     setChatMessages([]);
-    setStatusMsg(null);
+    setThinkingMsg(null);
     setDealWizard(null);
   }
 
@@ -434,7 +434,7 @@ export function ChatPanel(): React.ReactElement {
 
     setInputValue("");
     setSending(true);
-    setStatusMsg(null);
+    setThinkingMsg("Searching your data…");
     setDealWizard(null);
 
     // Append user bubble
@@ -455,9 +455,9 @@ export function ChatPanel(): React.ReactElement {
 
       for await (const event of stream as AsyncIterable<SSEEvent>) {
         if (event.type === "status") {
-          setStatusMsg(event.message ?? null);
+          setThinkingMsg(event.message ?? null);
         } else if (event.type === "log") {
-          setStatusMsg(String(event.message ?? ""));
+          setThinkingMsg(String(event.message ?? ""));
         } else if (event.type === "token") {
           tokenBuffer += String((event as SSEEvent & { content?: string }).content ?? "");
           const captured = tokenBuffer;
@@ -477,7 +477,7 @@ export function ChatPanel(): React.ReactElement {
             setSessionId(resultEvent.session_id);
           }
         } else if (event.type === "error") {
-          setStatusMsg(`Error: ${event.message ?? "unknown"}`);
+          setThinkingMsg(`Error: ${event.message ?? "unknown"}`);
         }
       }
 
@@ -503,11 +503,11 @@ export function ChatPanel(): React.ReactElement {
         { role: "assistant", content: finalContent },
       ]);
 
-      setStatusMsg(null);
+      setThinkingMsg(null);
       await reloadConversations();
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Request failed";
-      setStatusMsg(`✗ ${errMsg}`);
+      setThinkingMsg(`✗ ${errMsg}`);
     } finally {
       setSending(false);
     }
@@ -620,7 +620,14 @@ export function ChatPanel(): React.ReactElement {
                 onAddLead={handleAddLead}
               />
             ))}
-            {statusMsg && <div className="chat-status">{statusMsg}</div>}
+            {thinkingMsg && (
+              <div className="chat-msg assistant">
+                <div className="chat-bubble chat-thinking">
+                  <span className="thinking-dots"><span /><span /><span /></span>
+                  <span className="thinking-label">{thinkingMsg}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {dealWizard && (

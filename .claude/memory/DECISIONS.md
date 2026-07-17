@@ -1,3 +1,8 @@
+---
+type: decisions
+updated:
+---
+
 # Decisions
 
 <!-- Append-only ADR log. Never delete entries. -->
@@ -119,23 +124,81 @@
 **Rationale:** The company name is already on the lead card. Auto-detection of the relation property avoids hardcoding property names. Silent failure (skip, don't error) if name doesn't match exactly.
 
 ### 2026-06-30 — CRM schema: Activities as operational core, Meetings as separate tool
-**Decision:** Activities DB is the CRM's event log (what happened, next step). Meetings stays as a separate personal tool; linking is optional via "Advanced Deal?" checkbox → Notion automation creates the Activity automatically.  
-**Rejected:** Mandatory mirroring (every meeting must create an Activity), or merging Meetings into Activities  
+**Decision:** Activities DB is the CRM's event log (what happened, next step). Meetings stays as a separate personal tool; linking is optional via "Advanced Deal?" checkbox → Notion automation creates the Activity automatically.
+**Rejected:** Mandatory mirroring (every meeting must create an Activity), or merging Meetings into Activities
 **Rationale:** Mandatory mirroring causes double-entry friction. Self-enforcing incentive: checking "Advanced Deal?" auto-creates the Activity, so the dashboard stays accurate only if the checkbox is used. Meetings retains its personal use outside CRM flow.
 
 ### 2026-06-30 — CRM formulas: Notion Formula 1.0 API constraints
-**Decision:** All formula expressions submitted via PATCH /databases use binary-only `or()`/`and()` nesting and inline dateBetween expressions (no cross-formula property references).  
-**Rejected:** Using the Formula 2.0 syntax from the Notion UI editor (`or(A, B, C)`, `prop("Days Since Last Activity")`)  
+**Decision:** All formula expressions submitted via PATCH /databases use binary-only `or()`/`and()` nesting and inline dateBetween expressions (no cross-formula property references).
+**Rejected:** Using the Formula 2.0 syntax from the Notion UI editor (`or(A, B, C)`, `prop("Days Since Last Activity")`)
 **Rationale:** Notion Formula 1.0 API returns 400 on: `or()`/`and()` with 3+ args, and formula properties referencing other formula properties. The binary nesting and inlining produce semantically identical results.
 
-### 2026-07-02 — Company enrichment: SIREN property + Notion page icon for logo
+### 2026-06-30 — CRM "No Answer" as terminal stage
+**Decision:** "No Answer" is a terminal stage (Days Since = 0, Temperature = "—", excluded from Stale Deal). "Waiting for a Response" is active (ball in their court, still tracked).
+**Rejected:** Treating "No Answer" as just another waiting state
+**Rationale:** No Answer means "stopped trying — 3 unanswered attempts". It is an explicit decision to park the deal, not a passive state. Keeping it active corrupts the pipeline and temperature metrics.
 
+### 2026-07-02 — Company enrichment: SIREN property + Notion page icon for logo
 **Decision:** Added a `SIREN` (rich_text) property to the Companies DB, populated whenever a company is matched in Prosper. Company logos are stored as the Notion page `icon` (external URL, Clearbit favicon lookup on the company's website domain) rather than a dedicated Logo property.
 **Rejected:** Adding a dedicated `Logo` URL property; leaving SIREN unstored and re-searching Prosper on every enrichment pass.
 **Rationale:** SIREN is the durable key for re-enriching a company later without re-disambiguating between similarly-named entities (a real pain point — many searches returned 5-15 candidates for common names). Notion's native page icon renders in the UI immediately with zero schema change, and Prosper itself has no logo data (only French SIREN/NAF/financial registry data) — Clearbit lookup on Website is the practical fallback.
 **How to apply:** Any future company enrichment should check `SIREN` first before re-querying Prosper; only search when it's empty.
 
-### 2026-06-30 — CRM "No Answer" as terminal stage
-**Decision:** "No Answer" is a terminal stage (Days Since = 0, Temperature = "—", excluded from Stale Deal). "Waiting for a Response" is active (ball in their court, still tracked).  
-**Rejected:** Treating "No Answer" as just another waiting state  
-**Rationale:** No Answer means "stopped trying — 3 unanswered attempts". It is an explicit decision to park the deal, not a passive state. Keeping it active corrupts the pipeline and temperature metrics.
+### 2026-07-13 — MCP server wraps existing CRM code as a thin translation layer
+**Decision:** New `notion_pilot/mcp/` package exposes the CRM vertical (upsert, dedup, enrichment, ranking, read queries) as MCP tools over stdio via `FastMCP`. `tools.py` calls straight into existing `crm/syncer.py`, `shared/utils/dedup.py`, `shared/utils/enrichment.py`, `crm/prospection.py`, `crm/queries.py` — zero duplicated business logic. Required one prerequisite refactor: `scripts/crm/crm_dedup.py`'s private pairwise duplicate-finder moved into `shared/utils/dedup.py` (as `find_company_duplicates`/`find_people_duplicates`/`notion_page_url`) so both the CLI script and the new `find_duplicates` tool share the same code.
+**Rejected:** Reimplementing dedup/enrichment/ranking logic inside the MCP layer; an HTTP/SSE transport (deferred — stdio matches the existing `code-index`/`qmd` local MCP server pattern already in use, no auth surface to design for a single-user local tool).
+**Rationale:** notion-pilot's CRM logic (fuzzy dedup thresholds, 4-tier enrichment waterfall, LLM ranking) is already proven; the only new thing an MCP interface adds is exposing it to any MCP-aware client instead of only Telegram/CLI.
+**Affects:** [Key Modules](ARCHITECTURE.md#key-modules), [Non-Obvious Decisions](ARCHITECTURE.md#non-obvious-decisions)
+
+### 2026-07-13 — Every MCP write tool defaults to confirm=false (dry-run)
+**Decision:** `upsert_people`, `upsert_companies`, `enrich_people`, `enrich_companies` all default to `confirm=false`: compute and return the outcome (dedup status, matched record, fields that would be filled) without calling any Notion write endpoint. Caller reviews the preview, then re-calls with `confirm=true` to actually write.
+**Rejected:** Always-write tools with no preview step; a separate explicit "preview" tool duplicating each write tool's logic.
+**Rationale:** Mirrors `crm_enrich.py`'s existing `--dry-run` flag, generalized to every write tool. An LLM caller (e.g. Claude) can show the user what would happen before committing an irreversible Notion write.
+**Affects:** [Non-Obvious Decisions](ARCHITECTURE.md#non-obvious-decisions)
+
+### 2026-07-09 — Enrichment migrated to prosper; /enrich removed from Telegram
+**Decision:** Move the four-tier Apollo/Brave/Perplexity/LLM enrichment cascade (person and company) from `notion_pilot/shared/utils/enrichment.py` to prosper, exposed as `enrich_person`/`enrich_company` MCP tools. Remove the `/enrich` Telegram command entirely rather than rewire it to call prosper live.
+**Rejected:** Keeping enrichment logic in notion-pilot; rewiring `/enrich` to call prosper's MCP server directly from the bot (would introduce a live network dependency into the Telegram interaction path with no fallback story)
+**Rationale:** Prosper is becoming the company-intelligence/lead-gen platform; centralizing all external enrichment-provider calls there avoids duplicating Apollo/Brave integration across two repos. Removing `/enrich` rather than rewiring it sidesteps a reliability question entirely — enrichment is now invoked by calling prosper's MCP tools directly (from a Claude session or a script), not through the bot. See [[prosper]] and the CRM responsibility rationalization spec for the full design.
+
+### 2026-07-14 — Rebase feat/mcp-crm-server onto feat/crm-rationalization-notion-pilot rather than defer
+**Decision:** As soon as the enrichment.py→prosper_client migration (2026-07-09 entry above) was confirmed to break the uncommitted `feat/mcp-crm-server` branch, rebase it immediately (stash uncommitted work → move branch pointer to the new tip, since it had zero commits → pop stash → fix the one mechanical import) rather than leave the branches to diverge further.
+**Rejected:** Leaving `feat/mcp-crm-server` on its stale base and deferring reconciliation to whenever it's actually merged.
+**Rationale:** The two branches touch overlapping code (`shared/utils/dedup.py`, the enrichment call path) and were going to need reconciliation eventually regardless; doing it immediately, while both sets of changes were still fresh in context, was cheaper and lower-risk than an open-ended deferral where the branches could drift further apart.
+**Affects:** [Non-Obvious Decisions](ARCHITECTURE.md#non-obvious-decisions)
+
+### 2026-07-15 — Do not auto-patch the live People DB schema on discovering the Nom/Name mismatch
+**Decision:** When live-testing the newly merged MCP server found that `NotionPeopleSyncer.upsert()` writes to `"Nom"`/`"In my network"` properties that don't exist on the real People data source (which has `"Name"` as its title property and no `"In my network"` at all — blocking person creation on every code path), leave the live schema untouched and surface the finding + two remediation options to the user rather than picking one and patching production data.
+**Rejected:** Silently patching the live Notion database schema (rename title property, add missing select) to unblock the test; silently changing the code to match this DB's schema instead.
+**Rationale:** A title-property rename or schema change on a live, in-use Notion database is a real structural change with consequences the agent can't fully see (existing views/filters/formulas referencing `"Name"`), and picking "fix the code" vs. "fix the DB" has architecture-wide consequences (`shared/workspace.py` creates new workspaces with `Nom`/`In my network`, so fixing only the code would diverge new-workspace behavior from this DB). See `[[2026-07-15-mcp-server-test]]` for the full investigation.
+**Affects:** [Non-Obvious Decisions](ARCHITECTURE.md#non-obvious-decisions)
+
+### 2026-07-16 — People DB schema mismatch: change the code, not the live database
+
+**Decision:** Resolve the 2026-07-15 "Nom"/"Name" schema mismatch (see entry above) by changing `NotionPeopleSyncer` to write `"Name"` and drop `"In my network"`, and aligning `shared/workspace.py`'s People DB template (both `_seed_people()` and `create_crm_workspace()`) to the same schema — not by patching the live Notion database.
+**Rejected:** Patching the live People DB (rename `Name`→`Nom`, add `In my network` back).
+**Rationale:** User's explicit call when presented with both options. `"Name"` already matches every other DB template in `workspace.py`; changing the code is the smaller, safer surface area and needs no live-data schema migration.
+**Affects:** [Key Modules](ARCHITECTURE.md#key-modules)
+
+### 2026-07-16 — Company dedup: 4-signal decision chain, `token_set_ratio` acronym trade-off accepted as-is
+
+**Decision:** `upsert_companies` dedup now runs a strict chain — domain match (contact email domain vs. an existing company's Website domain) → `token_sort_ratio >= 85` → `token_set_ratio >= 90` (catches acronym/subset containment, e.g. "RTE" vs "Rte France") → else create. `needs_review` carries typed `candidates`. Enforced identically on `confirm=true`, not just in preview.
+**Rejected:** Word-stripping name normalization and a separate acronym-length heuristic (proposed during review, verified empirically to be either redundant with `token_set_ratio` or based on a wrong premise about the codebase's dedup scan behavior).
+**Rationale:** `token_set_ratio` scoring 100 for any full-token-subset pair (e.g. "EDF" vs "EDF Trading") is a deliberate accepted trade-off, not a bug to engineer around — it's exactly the containment signal needed to catch the "Rte France"/"RTE" incident, and the false-positive risk (unrelated names sharing one word) was verified low (e.g. "EDF Group" vs "EDF Trading" scores far below threshold).
+**Affects:** [Non-Obvious Decisions](ARCHITECTURE.md#non-obvious-decisions)
+
+### 2026-07-16 — SIREN confidence gate + `force` never bypasses it
+
+**Decision:** `lookup_siren_candidates` returns top-3 registry matches instead of top-1. Before attaching SIREN/enrichment data, gate on `token_sort_ratio(record.name, candidate.matched_name) >= 85` — below that, skip the entire registry-derived block (SIREN and sector/size/country) and return `needs_review` with the candidates, rather than silently attaching a wrong-but-confident SIREN. `force=True` bypasses only the Notion-dedup `needs_review` block; it never bypasses this SIREN gate, since a wrong SIREN match corrupts data regardless of dedup intent.
+**Rejected:** A length-ratio-only SIREN check; letting `force=True` skip every gate uniformly.
+**Rationale:** Directly fixes the "Rte France" → wrong-SIREN incident (real SIREN belonged to an unrelated "VCSP ROUTE FRANCE"). Keeping the SIREN gate independent of `force` means overriding a flagged duplicate can never also silently corrupt enrichment data.
+**Affects:** [Non-Obvious Decisions](ARCHITECTURE.md#non-obvious-decisions)
+
+### 2026-07-16 — Never commit real third-party PII as test-fixture data
+
+**Decision:** Test fixtures must use fictional placeholder people/companies, never a real name or email copied from a live incident report or production data, even when it's convenient for realism.
+**Rejected:** Using the real contact from `[[2026-07-15-mcp-server-test]]`'s incident report as literal fixture data (what actually happened this session — caught only by the harness's permission classifier after it was already committed and pushed to a public repo, not by self-review).
+**Rationale:** Real PII in fixtures ends up in git history, pushed to remotes, and referenced in PRs — a privacy exposure that requires a disruptive history rewrite + force-push to fix once discovered, versus zero cost to use a fictional name upfront. See `[[2026-07-16-mcp-crm-fixes]]` for the full incident and remediation.
+
+## Template
+<!-- added by ai-dotfiles upgrade -->

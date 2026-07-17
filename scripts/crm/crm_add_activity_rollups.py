@@ -36,8 +36,8 @@ NOTION_API = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"
 
 COMMERCIAL_ID = "4890e1d6-178d-4a42-af06-7bbe0cef09fe"
-PEOPLE_ID     = "11b5f43c-a19a-4bec-9489-7c6897ed30fb"
-COMPANIES_ID  = "cfc21198-9684-47ef-98ae-fc5657511998"
+PEOPLE_ID = "11b5f43c-a19a-4bec-9489-7c6897ed30fb"
+COMPANIES_ID = "cfc21198-9684-47ef-98ae-fc5657511998"
 
 # The name of the Activities back-relation on each DB.
 # Verified by probe: "Activities" on all three parent DBs.
@@ -104,7 +104,9 @@ async def main() -> None:
 
         logger.info("Deals: creating Last Activity Date rollup…")
         await patch_db(
-            client, token, COMMERCIAL_ID,
+            client,
+            token,
+            COMMERCIAL_ID,
             {
                 "Last Activity Date": {
                     "rollup": {
@@ -120,7 +122,9 @@ async def main() -> None:
         # Step 1: formulas that don't depend on other new formulas
         logger.info("Deals: adding base formulas (Days Since Last Activity, Deal Age)…")
         await patch_db(
-            client, token, COMMERCIAL_ID,
+            client,
+            token,
+            COMMERCIAL_ID,
             {
                 "Days Since Last Activity": {
                     "formula": {
@@ -132,14 +136,10 @@ async def main() -> None:
                     }
                 },
                 "Deal Age (days)": {
-                    "formula": {
-                        "expression": 'dateBetween(now(), prop("Created time"), "days")'
-                    }
+                    "formula": {"expression": 'dateBetween(now(), prop("Created time"), "days")'}
                 },
                 "Next Step Scheduled": {
-                    "formula": {
-                        "expression": 'not(empty(prop("Next Step Date")))'
-                    }
+                    "formula": {"expression": 'not(empty(prop("Next Step Date")))'}
                 },
             },
         )
@@ -155,7 +155,9 @@ async def main() -> None:
 
         logger.info("Deals: adding Deal Temperature and Stale Deal formulas…")
         await patch_db(
-            client, token, COMMERCIAL_ID,
+            client,
+            token,
+            COMMERCIAL_ID,
             {
                 "Deal Temperature": {
                     "formula": {
@@ -187,7 +189,9 @@ async def main() -> None:
 
         logger.info("People: creating Last Activity Date rollup…")
         await patch_db(
-            client, token, PEOPLE_ID,
+            client,
+            token,
+            PEOPLE_ID,
             {
                 "Last Activity Date": {
                     "rollup": {
@@ -202,7 +206,9 @@ async def main() -> None:
 
         logger.info("People: adding formula…")
         await patch_db(
-            client, token, PEOPLE_ID,
+            client,
+            token,
+            PEOPLE_ID,
             {
                 "Days Since Last Activity": {
                     "formula": {
@@ -220,7 +226,9 @@ async def main() -> None:
 
         logger.info("Companies: creating Last Activity Date rollup…")
         await patch_db(
-            client, token, COMPANIES_ID,
+            client,
+            token,
+            COMPANIES_ID,
             {
                 "Last Activity Date": {
                     "rollup": {
@@ -235,7 +243,9 @@ async def main() -> None:
 
         logger.info("Companies: adding formula…")
         await patch_db(
-            client, token, COMPANIES_ID,
+            client,
+            token,
+            COMPANIES_ID,
             {
                 "Days Since Last Activity": {
                     "formula": {

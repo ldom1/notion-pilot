@@ -3,31 +3,17 @@ scripts:
 
   - id: refresh_people
     label: Refresh People
-    description: Dedup + enrich contacts in one pass — flags duplicates then fills missing data
+    description: Scan People for likely duplicates (read-only report; enrichment is now via the MCP enrich_people tool)
     path: scripts/crm/crm_refresh_people.py
     args: []
     category: CRM
-    params:
-      - id: dry_run
-        label: Dry run (preview only, no writes)
-        type: boolean
-        flag: --dry-run
-        default: false
-        help: "Preview duplicates and enrichment results without modifying Notion"
 
   - id: refresh_companies
     label: Refresh Companies
-    description: Dedup + enrich companies in one pass — flags duplicates then fills missing data
+    description: Scan Companies for likely duplicates (read-only report; enrichment is now via the MCP enrich_companies tool)
     path: scripts/crm/crm_refresh_companies.py
     args: []
     category: CRM
-    params:
-      - id: dry_run
-        label: Dry run (preview only, no writes)
-        type: boolean
-        flag: --dry-run
-        default: false
-        help: "Preview duplicates and enrichment results without modifying Notion"
 
   - id: import_linkedin
     label: Import LinkedIn

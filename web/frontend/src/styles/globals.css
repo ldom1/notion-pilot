@@ -1,6 +1,10 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: system-ui, -apple-system, sans-serif; background: #f5f4ff; color: #1a1a1a; min-height: 100vh; }
 
+/* ── Canonical spinner (all page-level and inline loading states) ── */
+.spinner { border: 3px solid #ece8ff; border-top-color: #6e56cf; border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+.spinner-center { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+
 /* ── Header ── */
 .hdr { display: flex; align-items: center; gap: 1rem; padding: 0 2rem; height: 54px; background: #fff; border-bottom: 1px solid #ece8ff; position: sticky; top: 0; z-index: 100; }
 .hdr-logo { font-weight: 900; font-size: 1rem; color: #6e56cf; text-decoration: none; letter-spacing: -0.3px; }
@@ -14,6 +18,7 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f5f4ff; c
 
 /* ── Layout ── */
 .main { max-width: 1080px; margin: 0 auto; padding: 1.75rem 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+@media (max-width: 600px) { .main { padding: 1rem 0.75rem; gap: 1rem; } }
 
 /* ── Panel (card) ── */
 .panel { background: #fff; border: 1px solid #ece8ff; border-radius: 12px; padding: 1.4rem 1.5rem; }
@@ -167,7 +172,7 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f5f4ff; c
 .log-wrap { margin-top: 1rem; border-radius: 9px; overflow: hidden; border: 1px solid #222; }
 .log-hdr { display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0.9rem; background: #1a1a2e; border-bottom: 1px solid #333; }
 .log-label { font-family: 'SF Mono', 'Fira Mono', monospace; font-size: 0.72rem; color: #888; flex: 1; }
-.log-spinner { width: 10px; height: 10px; border: 2px solid #333; border-top-color: #6e56cf; border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+.log-spinner { width: 10px; height: 10px; border: 2px solid #3a3a5c; border-top-color: #6e56cf; border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
 .log-spinner.hidden { display: none; }
 .hidden { display: none !important; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -209,8 +214,10 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f5f4ff; c
 .deal-wizard-success-text { font-size: 0.9rem; font-weight: 700; color: #1a1a1a; }
 
 /* ── Chat layout ── */
-.chat-container { display: flex; gap: 1rem; align-items: stretch; height: 280px; }
+.chat-container { display: flex; gap: 1rem; align-items: stretch; height: 340px; }
 .chat-sidebar { width: 168px; flex-shrink: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+@media (max-width: 600px) { .chat-sidebar { display: none; } }
+@media (max-width: 600px) { .chat-container { height: 300px; } }
 .chat-sidebar-label { font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #bbb; padding: 0 0.1rem; }
 .conv-list { display: flex; flex-direction: column; gap: 0.25rem; flex: 1; overflow-y: auto; }
 .conv-item { background: none; border: 1px solid transparent; border-radius: 6px; padding: 0.4rem 0.55rem; cursor: pointer; text-align: left; width: 100%; transition: background .1s; }
@@ -250,7 +257,14 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f5f4ff; c
 .chat-bubble { max-width: 75%; padding: 0.6rem 0.9rem; border-radius: 9px; font-size: 0.85rem; line-height: 1.55; }
 .chat-msg.user .chat-bubble { background: #6e56cf; color: #fff; border-radius: 9px 9px 2px 9px; }
 .chat-msg.assistant .chat-bubble { background: #f5f4ff; border: 1px solid #ece8ff; border-radius: 9px 9px 9px 2px; }
-.chat-status { font-size: 0.75rem; color: #999; padding: 0.35rem 0.65rem; }
+/* Thinking bubble */
+.chat-thinking { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.85rem; opacity: 0.85; }
+.thinking-dots { display: flex; gap: 0.25rem; align-items: center; flex-shrink: 0; }
+.thinking-dots span { width: 6px; height: 6px; border-radius: 50%; background: #6e56cf; animation: thinking-bounce 1.2s ease-in-out infinite; }
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes thinking-bounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
+.thinking-label { font-size: 0.78rem; color: #999; font-style: italic; }
 
 .leads-grid { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
 .lead-card { border: 1px solid #ece8ff; border-radius: 8px; padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.75rem; background: #fff; }

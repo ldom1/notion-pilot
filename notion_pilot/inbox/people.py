@@ -33,8 +33,8 @@ def build_people_pipeline(settings: Settings) -> MessageHandler | None:
         nonlocal snapshots_loaded
         try:
             if not snapshots_loaded:
-                await company_syncer.load_snapshot()
-                await people_syncer.load_snapshot()
+                await company_syncer.load_notion_snapshot()
+                await people_syncer.load_notion_snapshot()
                 snapshots_loaded = True
             result = await people_syncer.upsert(_person_from_incoming(incoming))
             logger.info("People sync result for {}: {}", incoming.sender, result.status)

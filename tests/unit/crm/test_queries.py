@@ -1,9 +1,10 @@
 """Unit tests for crm/queries.py."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from notion_pilot.crm.queries import get_open_leads, get_inbox_items, get_recent_people
+import pytest
+
+from notion_pilot.crm.queries import get_inbox_items, get_open_leads, get_recent_people
 from notion_pilot.shared.config import Settings
 
 _BASE = dict(notion_telegram_msg_database_id="kb-db", notion_token="tok")
@@ -77,25 +78,38 @@ async def test_get_inbox_items_filters_not_analysed():
 
 @pytest.mark.asyncio
 async def test_get_recent_people_returns_list():
-    s = Settings(**_BASE, notion_people_data_source_id="ppl-db")
-    mock_notion_client = AsyncMock()
-    mock_notion_client.data_sources.query = AsyncMock(
-        return_value={
-            "results": [
-                {
-                    "id": "p3",
-                    "properties": {
-                        "Name": {"type": "title", "title": [{"plain_text": "Jean Dupont"}]},
-                        "Company": {"rich_text": [{"plain_text": "Artelys"}]},
-                    },
-                }
-            ]
-        }
+    settings = Settings(
+        notion_token="secret_test",
+        notion_telegram_msg_database_id="db-id",
+        notion_people_data_source_id="people-db-id",
     )
-    with patch("notion_pilot.crm.queries.AsyncClient", return_value=mock_notion_client):
-        result = await get_recent_people(s)
-    assert result[0]["name"] == "Jean Dupont"
-    assert result[0]["company"] == "Artelys"
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "results": [
+            {
+                "properties": {
+                    "Name": {"type": "title", "title": [{"plain_text": "Alice"}]},
+                    "Company": {"type": "rich_text", "rich_text": [{"plain_text": "Acme"}]},
+                }
+            }
+        ]
+    }
+    mock_resp.raise_for_status = MagicMock()
+
+    with patch("notion_pilot.crm.queries.httpx.AsyncClient") as mock_cls:
+        mock_client = AsyncMock()
+        mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(return_value=mock_resp)
+
+        result = await get_recent_people(settings)
+
+    assert result == [{"name": "Alice", "company": "Acme"}]
+    mock_client.post.assert_awaited_once()
+    call_args = mock_client.post.call_args
+    assert "people-db-id" in call_args[0][0]  # URL contains the DB id
+    assert call_args[1]["json"]["filter"]["timestamp"] == "created_time"
 
 
 @pytest.mark.asyncio

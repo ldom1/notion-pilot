@@ -1,7 +1,85 @@
 """Runtime configuration loaded from environment variables."""
 
-from pydantic import AliasChoices, Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+import logging
+import os
+from typing import Any
+
+from pydantic import AliasChoices, Field, SecretStr, model_validator
+from pydantic.fields import FieldInfo
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+
+_log = logging.getLogger(__name__)
+
+try:
+    from infisical_sdk import InfisicalSDKClient
+except ImportError:  # pragma: no cover — optional dependency
+    InfisicalSDKClient = None  # noqa: F841
+
+
+class InfisicalSettingsSource(PydanticBaseSettingsSource):
+    """Fetches secrets from Infisical via Universal Auth (SDK path).
+
+    No-op when INFISICAL_CLIENT_ID is absent — CLI-injected env vars take over.
+    Secrets from /notion-pilot override /global on key conflict (later path wins).
+    """
+
+    _PATHS: tuple[str, ...] = ("/global", "/notion-pilot")
+
+    def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
+        # Required by ABC; not called because __call__ is fully overridden.
+        return None, field_name, False
+
+    def field_is_complex(self, field: FieldInfo) -> bool:
+        # Required by ABC; not called because __call__ is fully overridden.
+        return False
+
+    def __call__(self) -> dict[str, Any]:
+        client_id = os.environ.get("INFISICAL_CLIENT_ID")
+        if not client_id:
+            return {}
+
+        client_secret = os.environ.get("INFISICAL_CLIENT_SECRET")
+        project_id = os.environ.get("INFISICAL_PROJECT_ID")
+        if not client_secret or not project_id:
+            missing = [
+                k
+                for k, v in {
+                    "INFISICAL_CLIENT_SECRET": client_secret,
+                    "INFISICAL_PROJECT_ID": project_id,
+                }.items()
+                if not v
+            ]
+            raise ValueError(
+                f"INFISICAL_CLIENT_ID is set but {', '.join(missing)} "
+                "are missing. Set all three or none."
+            )
+
+        host = os.environ.get("INFISICAL_HOST", "https://app.infisical.com")
+        client = InfisicalSDKClient(host=host)
+        client.auth.universal_auth.login(
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+        env_slug = os.environ.get("INFISICAL_ENV", "prod")
+        secrets: dict[str, Any] = {}
+        for path in self._PATHS:
+            try:
+                for s in client.secrets.list_secrets(
+                    project_id=project_id,
+                    environment_slug=env_slug,
+                    secret_path=path,
+                    view_secret_value=True,
+                ):
+                    secrets[s.secretKey.lower()] = s.secretValue
+            except Exception as exc:  # noqa: BLE001
+                _log.warning("Infisical: could not read path %s — %s", path, exc)
+        if not secrets:
+            _log.warning(
+                "Infisical: authenticated but no secrets loaded from any path. "
+                "Check that the machine identity has 'Read' + 'List' permission on the configured paths. "
+                "Falling back to environment variables."
+            )
+        return secrets
 
 
 class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
@@ -14,6 +92,22 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         extra="ignore",
         populate_by_name=True,
     )
+
+    @classmethod
+    def settings_customise_sources(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            InfisicalSettingsSource(settings_cls),
+            env_settings,
+            dotenv_settings,
+            init_settings,
+        )
 
     # ── Notion (optional when using OAuth) ──────────────────────────────────
     notion_token: SecretStr | None = Field(
@@ -127,6 +221,10 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         default=None,
         description="Notion database ID for the Deals database (standard databases API, not data_sources).",
     )
+    prosper_mcp_url: str = Field(
+        default="http://localhost:8090/sse",
+        description="SSE endpoint for prosper's MCP server (company resolution + enrichment).",
+    )
 
     # ── Knowledge Inbox DBs (optional) ──────────────────────────────────────
     notion_notions_database_id: str | None = Field(
@@ -169,7 +267,7 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
     )
     notion_oauth_redirect_uri: str = Field(
         default="http://localhost:8080/auth/notion/callback",
-        description="OAuth redirect URI. Must match what is registered in the Notion integration.",
+        description="OAuth redirect URI. Must match what is registered in the Notion integration. Always set explicitly in production via NOTION_OAUTH_REDIRECT_URI.",
     )
     web_session_secret: SecretStr | None = Field(
         default=None,
@@ -189,6 +287,16 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
     discord_channel_id: str | None = Field(
         default=None, description="Discord channel ID to read from and write to"
     )
+
+    @model_validator(mode="after")
+    def _check_oauth_redirect_uri(self) -> "Settings":
+        if self.notion_oauth_client_id and "localhost" in self.notion_oauth_redirect_uri:
+            raise ValueError(
+                f"NOTION_OAUTH_REDIRECT_URI is set to '{self.notion_oauth_redirect_uri}' "
+                "which contains 'localhost' — this will break OAuth in production. "
+                "Set NOTION_OAUTH_REDIRECT_URI to your public callback URL."
+            )
+        return self
 
 
 def load_settings() -> Settings:

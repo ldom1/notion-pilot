@@ -1,41 +1,51 @@
 import React, { useEffect, useState } from "react";
 import { fetchStatus } from "../api/client";
+import { SetupWizard } from "../features/setup/SetupWizard";
+import { Spinner } from "../components/Spinner";
 
-type CheckState = "idle" | "checking" | "authenticated" | "unauthenticated";
+type CheckState = "idle" | "checking" | "authenticated" | "unauthenticated" | "setup";
+
+// ── Landing page ──────────────────────────────────────────────────────────────
 
 export default function Landing() {
   const [checkState, setCheckState] = useState<CheckState>("idle");
+  const isSetup = new URLSearchParams(window.location.search).get("connected") === "1";
 
   useEffect(() => {
     setCheckState("checking");
     fetchStatus()
       .then(() => {
-        setCheckState("authenticated");
-        window.location.href = "/cockpit";
+        // Authenticated — show setup wizard if coming from OAuth, else go straight to cockpit
+        setCheckState(isSetup ? "setup" : "authenticated");
+        if (!isSetup) window.location.href = "/cockpit";
       })
       .catch(() => {
         setCheckState("unauthenticated");
       });
-  }, []);
+  }, [isSetup]);
 
-  if (checkState === "idle" || checkState === "checking") {
+  if (checkState === "idle" || checkState === "checking" || checkState === "authenticated") {
+    return <Spinner fullPage />;
+  }
+
+  if (checkState === "setup") {
     return (
-      <div style={styles.center}>
-        <div style={styles.spinner} />
+      <div style={styles.page}>
+        <nav style={styles.nav}>
+          <span className="hdr-logo">Notion Pilot</span>
+          <a href="/auth/logout" style={{ fontSize: "0.85rem", color: "#888" }}>Sign out</a>
+        </nav>
+        <main style={{ ...styles.hero, alignItems: "flex-start", paddingTop: "3rem" }}>
+          <div style={{ maxWidth: "480px", width: "100%", margin: "0 auto" }}>
+            <SetupWizard
+              onComplete={() => { window.location.href = "/cockpit"; }}
+              onSkip={() => { window.location.href = "/cockpit"; }}
+            />
+          </div>
+        </main>
       </div>
     );
   }
-
-  if (checkState === "authenticated") {
-    // Will redirect via window.location — show spinner while navigating
-    return (
-      <div style={styles.center}>
-        <div style={styles.spinner} />
-      </div>
-    );
-  }
-
-  const startDeploy = () => { window.location.href = "/auth/notion?next=/cockpit"; };
 
   // unauthenticated — show landing hero
   return (
@@ -43,10 +53,9 @@ export default function Landing() {
       <nav style={styles.nav}>
         <div style={styles.navLeft}>
           <span className="hdr-logo">Notion Pilot</span>
-          <span className="hdr-badge">BETA</span>
         </div>
         <div style={styles.navRight}>
-          <button className="nav-deploy" onClick={startDeploy}>
+          <button className="nav-deploy" onClick={() => { window.location.href = "/auth/notion"; }}>
             Deploy to Notion
           </button>
           <a className="nav-login" href="/auth/notion?next=/cockpit">
@@ -65,9 +74,7 @@ export default function Landing() {
           <button
             className="btn-primary"
             style={styles.cta}
-            onClick={() => {
-              window.location.href = "/auth/notion?next=/cockpit";
-            }}
+            onClick={() => { window.location.href = "/auth/notion"; }}
           >
             Deploy your workspace
           </button>
@@ -126,20 +133,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     gap: "0.75rem",
-  },
-  center: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  spinner: {
-    width: "32px",
-    height: "32px",
-    border: "3px solid #ece8ff",
-    borderTopColor: "#6e56cf",
-    borderRadius: "50%",
-    animation: "spin 0.7s linear infinite",
   },
   hero: {
     flex: 1,

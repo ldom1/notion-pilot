@@ -1,8 +1,10 @@
 # --- Secrets & local-only ---
 # Never commit credentials or machine-specific deploy scripts.
 .env
+.env.bootstrap
 .env.*
 !.env.example
+!.env.bootstrap.example
 deploy.sh
 PLAN.md
 
@@ -71,10 +73,11 @@ logs/
 data/
 
 # --- Claude ---
+.claude/worktrees/
 .superpowers
 # Per-workspace data (DB pointers, workflows — not committed)
 web/workspaces/
 
 # Frontend build
 web/dist/
-web/frontend/node_modules/data/crm_meetings_synced.json
+web/frontend/node_modules/

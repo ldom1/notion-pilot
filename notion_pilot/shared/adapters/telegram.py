@@ -3,13 +3,13 @@
 import asyncio
 import datetime as _dt
 import json
+import re as _re
 import tempfile
 from datetime import timezone
 from pathlib import Path
 from typing import Any
 
 import httpx
-
 from loguru import logger
 from telegram import Message, Update
 from telegram.ext import (
@@ -22,6 +22,7 @@ from telegram.ext import (
 )
 
 from notion_pilot.crm.commands import COMMANDS, extract_fields_from_text, get_next_prompt
+from notion_pilot.crm.contact_parse import parse_linkedin_deterministic, sanitize_extracted
 from notion_pilot.crm.conv_state import ConvState, ConvStateStore
 from notion_pilot.crm.queries import get_inbox_items, get_open_leads, get_recent_people
 from notion_pilot.crm.recap import format_inbox, format_leads, format_recap
@@ -31,7 +32,6 @@ from notion_pilot.shared.config import Settings
 from notion_pilot.shared.media import extract_photo, extract_voice
 from notion_pilot.shared.media.transcribe_voice import transcribe_file
 from notion_pilot.shared.models import IncomingMessage, MediaType
-
 
 _last_seen: _dt.datetime | None = None
 
@@ -43,9 +43,64 @@ def get_last_seen() -> _dt.datetime | None:
 
 READ_COMMANDS: frozenset[str] = frozenset({"recap", "leads", "inbox"})
 
+_READ_INTENT_PATTERNS: list[tuple[str, str]] = [
+    (r"\brecap\b", "recap"),
+    (r"\bleads\b", "leads"),
+    (r"inbox|relire", "inbox"),
+]
+
+
+def _detect_read_intent(text: str) -> str | None:
+    """Return a READ_COMMANDS name if text is a query intent, else None.
+
+    Matches whole-word keywords only to avoid false positives on data entries
+    like "j'ai un lead intéressant" (no trailing 's').
+    """
+    lowered = text.lower()
+    for pattern, cmd in _READ_INTENT_PATTERNS:
+        if _re.search(pattern, lowered):
+            return cmd
+    return None
+
+
+def _enrich_settings_from_cockpit(settings: Settings) -> Settings:
+    """Return settings patched with DB IDs from the first available cockpit_config.json."""
+    workspaces_dir = Path(__file__).parent.parent.parent.parent / "web" / "workspaces"
+    if not workspaces_dir.exists():
+        return settings
+    overrides: dict[str, str] = {}
+    for ws_dir in sorted(workspaces_dir.iterdir()):
+        cfg_path = ws_dir / "cockpit_config.json"
+        if not cfg_path.exists():
+            continue
+        try:
+            cfg = json.loads(cfg_path.read_text())
+            overrides = cfg.get("databases", {})
+            break
+        except Exception:
+            continue
+    if not overrides:
+        return settings
+    # Build a new settings instance with cockpit values filling in missing env values
+    data = settings.model_dump()
+    for field, env_key in (
+        ("notion_deals_database_id", "notion_deals_database_id"),
+        ("notion_people_data_source_id", "notion_people_data_source_id"),
+        ("notion_companies_data_source_id", "notion_companies_data_source_id"),
+        ("notion_telegram_msg_database_id", "notion_telegram_msg_database_id"),
+        ("notion_notions_database_id", "notion_notions_database_id"),
+        ("notion_ideas_database_id", "notion_ideas_database_id"),
+        ("notion_tools_database_id", "notion_tools_database_id"),
+        ("notion_data_tech_database_id", "notion_data_tech_database_id"),
+    ):
+        if not data.get(field) and overrides.get(env_key):
+            data[field] = overrides[env_key]
+    return Settings.model_validate(data)
+
 
 async def dispatch_read(cmd_name: str, settings: Settings) -> str:
     """Query Notion and return a formatted string for a read command."""
+    settings = _enrich_settings_from_cockpit(settings)
     try:
         if cmd_name == "leads":
             leads = await get_open_leads(settings)
@@ -125,7 +180,13 @@ _INFER_PROMPT = (
     "- knowledge: everything else (notes, articles, ideas, reflections)\n\n"
     "Return JSON with keys: type (one of the 4 categories), "
     "name, company, position, email, linkedin_url, title, stage, notes. "
-    "Use empty string for fields that don't apply.\n\nMessage: "
+    "Use empty string for fields that don't apply.\n"
+    "NEVER use placeholder text like [PERSON_NAME], [COMPANY], <name>, etc. "
+    "Always use literal values from the message.\n"
+    "For 'URL : Name, Company, Position' format: company is the second comma-separated "
+    "value; everything after the second comma is the position.\n"
+    "Set linkedin_url from any linkedin.com/in/ URL in the message.\n\n"
+    "Message: "
 )
 
 _TYPE_LABEL: dict[str, str] = {
@@ -135,10 +196,31 @@ _TYPE_LABEL: dict[str, str] = {
 }
 
 
+def _build_infer_confirmation(inferred_type: str, extracted: dict[str, str]) -> str:
+    label = _TYPE_LABEL[inferred_type]
+    name = extracted.get("name") or extracted.get("title") or "this entry"
+    company = extracted.get("company", "")
+    position = extracted.get("position", "")
+    details = name
+    if company:
+        details += f" @ {company}"
+    if position:
+        details += f" ({position})"
+    return (
+        f"Looks like a {label} — {details}.\n"
+        f"Save to {label.capitalize()}s? Reply yes, /knowledge to file as a note, or cancel to discard."
+    )
+
+
 async def infer_and_confirm(
     text: str, settings: Settings
 ) -> tuple[str, str, dict[str, str]] | None:
     """Classify text via LLM. Returns (inferred_type, confirmation_text, extracted) or None for knowledge."""
+    linkedin = parse_linkedin_deterministic(text)
+    if linkedin:
+        inferred_type, parsed = linkedin
+        return inferred_type, _build_infer_confirmation(inferred_type, parsed), parsed
+
     if not settings.openrouter_api_key:
         return None
     try:
@@ -160,20 +242,15 @@ async def infer_and_confirm(
         inferred_type = str(data.get("type", "knowledge")).lower()
         if inferred_type not in ("people", "company", "deal"):
             return None
-        extracted = {k: str(v) for k, v in data.items() if v and k != "type"}
-        label = _TYPE_LABEL[inferred_type]
-        name = extracted.get("name") or extracted.get("title") or "this entry"
-        company = extracted.get("company", "")
-        position = extracted.get("position", "")
-        details = name
-        if company:
-            details += f" @ {company}"
-        if position:
-            details += f" ({position})"
-        confirmation = (
-            f"Looks like a {label} — {details}.\n"
-            f"Save to {label.capitalize()}s? Reply yes or /knowledge to file as a note."
-        )
+        llm_fields = {k: str(v) for k, v in data.items() if v and k != "type"}
+        fallback = None
+        linkedin_fb = parse_linkedin_deterministic(text)
+        if linkedin_fb and linkedin_fb[0] == inferred_type:
+            fallback = linkedin_fb[1]
+        extracted = sanitize_extracted(llm_fields, fallback=fallback)
+        if inferred_type in ("people", "company") and not extracted.get("name"):
+            return None
+        confirmation = _build_infer_confirmation(inferred_type, extracted)
         return inferred_type, confirmation, extracted
     except Exception:  # noqa: BLE001
         logger.warning("telegram: LLM inference failed, falling back to knowledge pipeline")
@@ -181,13 +258,41 @@ async def infer_and_confirm(
 
 
 def _resolve_confirmation(text: str) -> str:
-    """Return 'yes', 'no', or 'unknown' based on user reply."""
+    """Return 'yes', 'no', 'cancel', or 'unknown' based on user reply."""
     t = text.strip().lower()
     if t in ("yes", "oui", "y", "o"):
         return "yes"
     if t in ("no", "non", "n") or t.startswith("/knowledge"):
         return "no"
+    if t in ("cancel", "skip", "abort", "rien", "nothing", "discard") or t.startswith(
+        ("/cancel", "/skip")
+    ):
+        return "cancel"
     return "unknown"
+
+
+_ERROR_MESSAGE_CAP = 120
+
+
+def _format_handler_error(exc: Exception) -> str:
+    """Sanitized, user-facing error text: always show the exception class name;
+    never surface a raw notion_client SDK message (may contain page/database IDs
+    or schema internals); cap any other exception's message length.
+
+    Checked against NotionClientErrorBase — the true root of every notion_client
+    exception (verified: RequestTimeoutError, InvalidPathParameterError,
+    HTTPResponseError, UnknownHTTPResponseError, and APIResponseError all inherit
+    from it) — not just APIResponseError, so a timeout or an internal-path error
+    from the SDK gets the same generic treatment instead of leaking its message."""
+    from notion_client.errors import NotionClientErrorBase
+
+    cls_name = type(exc).__name__
+    if isinstance(exc, NotionClientErrorBase):
+        return f"⚠ Failed to save to Notion: {cls_name} — Notion API error, see server logs."
+    detail = str(exc)
+    if len(detail) > _ERROR_MESSAGE_CAP:
+        detail = detail[:_ERROR_MESSAGE_CAP] + "..."
+    return f"⚠ Failed to save to Notion: {cls_name} — {detail}"
 
 
 class TelegramAdapter:
@@ -234,8 +339,12 @@ class TelegramAdapter:
             prompt = get_next_prompt(cmd, state)
             if prompt is None:
                 # All required fields extracted — run handler immediately
-                result = await cmd.handler(collected, settings)
-                await _send_reply(msg, result)
+                try:
+                    result = await cmd.handler(collected, _enrich_settings_from_cockpit(settings))
+                    await _send_reply(msg, result)
+                except Exception as exc:  # noqa: BLE001
+                    logger.exception("telegram: CRM handler failed for /{}", cmd_name)
+                    await _send_reply(msg, _format_handler_error(exc))
                 return
 
             state.pending_field = prompt
@@ -265,11 +374,13 @@ class TelegramAdapter:
                 # All required fields filled — run handler
                 state_store.clear(msg.chat_id)
                 try:
-                    result = await cmd.handler(state.collected, settings)
+                    result = await cmd.handler(
+                        state.collected, _enrich_settings_from_cockpit(settings)
+                    )
                     await _send_reply(msg, result)
-                except Exception:  # noqa: BLE001
+                except Exception as exc:  # noqa: BLE001
                     logger.exception("telegram: CRM handler failed for /{}", state.command)
-                    await _send_reply(msg, "Failed to save to Notion. See server logs.")
+                    await _send_reply(msg, _format_handler_error(exc))
             else:
                 state.pending_field = prompt
                 state_store.set(state)
@@ -302,13 +413,18 @@ class TelegramAdapter:
                         cmd = COMMANDS.get(inferred_type)
                         if cmd:
                             try:
-                                result = await cmd.handler(extracted, settings)
+                                result = await cmd.handler(
+                                    extracted, _enrich_settings_from_cockpit(settings)
+                                )
                                 await _send_reply(msg, result)
                             except Exception:  # noqa: BLE001
                                 logger.exception("telegram: inferred handler failed")
                                 await _send_reply(msg, "Failed to save. See server logs.")
                         else:
                             await _send_reply(msg, "Unknown type — saved nothing.")
+                    elif resolution == "cancel":
+                        state_store.clear(chat_id)
+                        await _send_reply(msg, "Discarded — nothing saved to Notion.")
                     elif resolution == "no":
                         state_store.clear(chat_id)
                         original_text = state.collected.get("original_text", text)
@@ -340,7 +456,10 @@ class TelegramAdapter:
                             state.collected["retry"] = str(retry + 1)
                             state_store.set(state)
                             await _send_reply(
-                                msg, state.collected.get("confirmation", "Reply yes or /knowledge.")
+                                msg,
+                                state.collected.get(
+                                    "confirmation", "Reply yes, /knowledge, or cancel."
+                                ),
                             )
                         else:
                             state_store.clear(chat_id)
@@ -401,8 +520,24 @@ class TelegramAdapter:
                             await _dispatch_crm(msg, cmd_name, text)
                             return
 
-                # Priority 3: plain text → try LLM inference, else knowledge pipeline
+                # Priority 3: plain text / voice → check for read command intent first
                 incoming = await _to_incoming(settings, msg)
+                read_cmd = _detect_read_intent(incoming.text or "")
+                if read_cmd is not None:
+                    reply = await dispatch_read(read_cmd, settings)
+                    await _send_reply(msg, reply)
+                    return
+                from notion_pilot.inbox.knowledge import _MULTI_LINK_THRESHOLD
+                from notion_pilot.shared.models import all_urls as _telegram_all_urls
+
+                # incoming.body (text-or-caption), matching what inbox/knowledge.py's
+                # process_message actually routes on — using incoming.text alone would
+                # miss photo messages, whose content lands in .caption, not .text.
+                if len(_telegram_all_urls(incoming.body)) >= _MULTI_LINK_THRESHOLD:
+                    await _send_reply(
+                        msg, "Processing… (multiple links found, this may take a moment)"
+                    )
+
                 infer_result = await infer_and_confirm(incoming.text or "", settings)
                 if infer_result is not None:
                     inferred_type, confirmation, extracted = infer_result
@@ -450,7 +585,9 @@ class TelegramAdapter:
             await app.start()
             if app.updater is None:
                 raise RuntimeError("Telegram Application updater is None — cannot start polling")
-            await app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+            await app.updater.start_polling(
+                allowed_updates=Update.ALL_TYPES, drop_pending_updates=True
+            )
             logger.info("telegram adapter: polling started")
             await asyncio.Event().wait()  # block until cancelled
             await app.updater.stop()

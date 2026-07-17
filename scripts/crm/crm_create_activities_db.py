@@ -17,8 +17,8 @@ NOTION_API = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"
 
 COMMERCIAL_ID = "4890e1d6-178d-4a42-af06-7bbe0cef09fe"
-COMPANIES_ID  = "cfc21198-9684-47ef-98ae-fc5657511998"
-PEOPLE_ID     = "11b5f43c-a19a-4bec-9489-7c6897ed30fb"
+COMPANIES_ID = "cfc21198-9684-47ef-98ae-fc5657511998"
+PEOPLE_ID = "11b5f43c-a19a-4bec-9489-7c6897ed30fb"
 CRM_PARENT_PAGE_ID = "36d6c451-9465-80b7-af00-d80250f0974c"
 
 
@@ -83,7 +83,9 @@ async def main() -> None:
             "Notes": {"rich_text": {}},
             "Next Step": {"rich_text": {}},
             "Next Step Date": {"date": {}},
-            "Owner": {"people": {}},  # person type — supports @mentions, no manual option list needed
+            "Owner": {
+                "people": {}
+            },  # person type — supports @mentions, no manual option list needed
         },
     }
 

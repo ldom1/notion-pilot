@@ -1,3 +1,8 @@
+---
+type: api
+updated:
+---
+
 # API
 
 ## External Services Consumed
@@ -19,3 +24,9 @@ All secrets in `.env` (see `.env.example`). Loaded via Pydantic settings in `con
 Required columns: `Name` (title), `Label` (multi-select), `Type` (select), `Link` (url), `Source` (select), `Description` (text), `Interest` (select), `Status` (status)
 
 `NOTION_TITLE_COLUMN` env var overrides the title column name (default: `Name`).
+
+## Endpoints
+<!-- added by ai-dotfiles upgrade -->
+
+## External Services
+<!-- added by ai-dotfiles upgrade -->

@@ -59,8 +59,8 @@ async def test_people_pipeline_upserts_through_central_syncer() -> None:
     assert result == "person-page"
     assert second == "person-page"
     client_cls.assert_called_once_with(auth="notion-token")
-    company_syncer.load_snapshot.assert_awaited_once()
-    people_syncer.load_snapshot.assert_awaited_once()
+    company_syncer.load_notion_snapshot.assert_awaited_once()
+    people_syncer.load_notion_snapshot.assert_awaited_once()
     assert people_syncer.upsert.await_count == 2
     person = people_syncer.upsert.await_args_list[0].args[0]
     assert person.name == "Alice Martin"

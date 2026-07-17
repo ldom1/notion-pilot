@@ -1,3 +1,8 @@
+---
+type: roadmap
+updated:
+---
+
 # Roadmap
 
 ## Phase 0 — Refactoring (current priority)
@@ -10,6 +15,31 @@ Rename and reorganize before adding features. No new behavior, just structural c
 - [x] Organize scripts: `scripts/crm/` + `scripts/inbox/`
 - [x] Unify People capture through `notion_people_data_source_id` and the central CRM syncer
 - [x] Update README, CHANGELOG, brain vault note path
+
+## Phase 0c — Infrastructure: Infisical OIDC Secrets Management
+
+Single source of truth for all secrets. `vault.yml` reduced to 3 Infisical bootstrap vars only. GitHub Actions uses OIDC — zero static GitHub secrets.
+
+**Infisical setup (manual — done by user):**
+- [x] Created `cicd-devbox` folder in `prod` env of Dom Universe project with: `GITHUB_DEPLOY_KEY`, `GITHUB_ACTIONS_SSH_PUBLIC_KEY`, `CERTBOT_EMAIL`, `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `DEVBOX_TAILSCALE_IP`, `DEVBOX_SSH_PORT`, `DEVBOX_SSH_USER`
+- [ ] Grant `notion-pilot-ansible` machine identity read access to `prod/cicd-devbox` folder
+- [ ] Create `notion-pilot-ci` machine identity — auth: JWT/OIDC, JWKS URL: `https://token.actions.githubusercontent.com/.well-known/jwks`, bound subject: `repo:ldom1/telegram-to-notion:ref:refs/heads/main`
+- [ ] Assign `notion-pilot-ci` read-only policy on `prod/cicd-devbox` folder
+- [ ] Copy `notion-pilot-ci` identity ID (needed in deploy.yml)
+
+**Code changes (notion-pilot-deployment):**
+- [ ] `vault.yml` — remove `vault_github_actions_ssh_public_key`, `vault_github_deploy_key`, `vault_certbot_email`
+- [ ] New task file `roles/notion_pilot/tasks/fetch_infisical_secrets.yml` — fetch `prod/cicd-devbox` secrets via `uri` module, `set_fact` with `no_log: true`
+- [ ] `roles/notion_pilot/tasks/main.yml` — include `fetch_infisical_secrets.yml` before devbox/vps tasks
+- [ ] `roles/notion_pilot/tasks/devbox.yml` — replace `vault_github_*` with Infisical facts
+- [ ] `roles/notion_pilot/tasks/vps.yml` — replace `vault_certbot_email` with Infisical fact
+
+**Code changes (telegram-to-notion):**
+- [ ] `.github/workflows/deploy.yml` — add `permissions: id-token: write`, add `Infisical/secrets-action` OIDC step, replace all `${{ secrets.* }}` with `${{ env.* }}`
+- [ ] Delete GitHub secrets: `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `DEVBOX_SSH_KEY`
+
+**Documentation:**
+- [ ] `resources/knowledge/infrastructure/secrets-management.md` in brain vault
 
 ## Phase 1 — Setup Wizard (CLI)
 
@@ -81,8 +111,6 @@ Target: 4 custom knowledge DBs — Notions, Ideas, Tools, Data & Technology.
 
 ## Phase 6 — Enrichment & Prospection Polish
 
-- [ ] Company enrichment: Apollo domain search + Brave fallback
-- [ ] People enrichment: Apollo person search by name + company
 - [ ] Prospection pipeline: batch enrich a list from CSV/LinkedIn export
 - [ ] Dedup: merge duplicate People/Companies via LLM similarity
 - [ ] Robustify enrichment for People and Companies: retry logic, partial-failure recovery, progress logging per record, idempotent runs (skip already-enriched records), dry-run mode that reports what would change
@@ -94,3 +122,22 @@ Target: 4 custom knowledge DBs — Notions, Ideas, Tools, Data & Technology.
 - RSS feeds
 - Multi-tenant SaaS billing (hard multi-tenancy, billing, subscription management)
 - Support for knowledge bases other than Notion
+
+## Now
+<!-- added by ai-dotfiles upgrade -->
+
+- **PR #19 open, not yet merged** (`mcp-crm-fixes` → `develop`): fixes the People DB schema bug, the "Rte France"/"RTE" duplicate-creation bug, the SIREN accuracy gap, and the `matched_name` overwrite bug all listed below (formerly the "blocking bug" / SIREN accuracy / matched_name entries in this section, now shipped). See [DECISIONS.md](DECISIONS.md) 2026-07-16 entry and `[[2026-07-16-mcp-crm-fixes]]`. Needs review/merge decision.
+- **New, found during PR #19's whole-branch review, not fixed in that PR:** `web/server.py`'s `/lead` and web-cockpit person-create path independently writes to the same wrong `"Nom"` property — same root cause, different code path. Needs its own fix.
+- **New, deferred until PR #19 merges:** archive the stale, empty "Rte France" duplicate Notion page (`39e6c451-9465-81d1-ad4e-f80e58fc3070`) — only after re-running the original live test to confirm it now resolves to `needs_review` against "RTE" instead of creating a duplicate.
+
+## Next
+<!-- added by ai-dotfiles upgrade -->
+
+- MCP server (`notion_pilot/mcp/`) merged to `develop` 2026-07-15 (PR #18, squash commit `8e705b7`) — exposes CRM upsert/dedup/enrich/rank/read as 11 MCP tools. Registered in this repo's own `.claude/settings.json` as `notion-crm` (needs a Claude Code restart to connect). Still needs: verify the *sibling* `artelys-crystal-hpc-lead-generation` project's `.claude/settings.json` registration (added earlier, points at this repo's main checkout — the worktree it may have referenced is gone now that the branch merged) actually resolves.
+- No MCP tool creates a Lead/Deal yet — only `upsert_people`/`upsert_companies` write, `get_open_leads` is read-only. Add if Deal creation via MCP is wanted.
+
+## Later
+<!-- added by ai-dotfiles upgrade -->
+
+## Won't Do
+<!-- added by ai-dotfiles upgrade -->

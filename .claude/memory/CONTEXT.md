@@ -1,3 +1,8 @@
+---
+type: context
+updated:
+---
+
 # Context
 
 ## What's Done
@@ -9,6 +14,13 @@
 - CRM module fully functional: `/lead`, `/people`, `/company`, `/deal`, `/enrich`, `/knowledge`
 - Deployed on devbox as systemd user service
 - Cockpit (Phase 4): chat panel, workspace panel, automation panel — UX polished
+
+## Current Branch
+
+`main` — merged `develop` via PR #15 (regular merge, not squash) on 2026-07-17, reconciling two features built in parallel since they diverged:
+
+- From `develop`: PR #16 (thin CRM sync layer: SIREN auto-population + enrichment migration to prosper, squash `0d22d45`), PR #18 (MCP server exposing CRM as tools, squash `8e705b7`), PR #19 (CRM dedup/SIREN/enrichment-cascade fixes, `af2d718`), Infisical secret manager integration (PR #14), migration of project memory from `.claude/brain/` to `.claude/memory/` + `AGENTS.md`. See [[2026-07-14-crm-rationalization-execution]], [[2026-07-15-mcp-server-test]], [[2026-07-16-mcp-crm-fixes]].
+- From `main`: full 5-database CRM schema redesign (Deals/People/Companies/Meetings/Activities, see below), Deal List Review + Prosper enrichment pass, Last Activity rollups/Deal Temperature formulas, Meetings→Activities polling agent (`scripts/crm/crm_sync_meetings_activities.py`) replacing the Notion UI automation.
 
 ## CRM Schema Redesign (2026-06-29/30)
 
@@ -49,16 +61,45 @@ Full pass over all 29 leads in the Deal Board: backfilled 18 Activities from the
 
 **Reusable prompt** for repeating this workflow (mapping tables, gotchas, cold-prospect default template) written to session scratchpad — not yet copied into the repo. Consider moving it into `scripts/crm/` if this becomes a recurring task.
 
-## Current Branch
+## MCP Server + CRM Sync Layer (from `develop`, 2026-07-14/16)
 
-`main` — CRM redesign complete (10 commits, 8370168→81dcb93).
+- Thin CRM sync layer (SIREN auto-population + enrichment migration to prosper) merged as PR #16.
+- MCP server (`notion_pilot/mcp/`) merged as PR #18 — exposes CRM upsert/dedup/enrich/rank/search/read as 11 MCP tools, registered in `.claude/settings.json` as `notion-crm` (needs a Claude Code restart to connect via stdio). No MCP tool creates a Lead/Deal yet — only `upsert_people`/`upsert_companies` write, `get_open_leads` is read-only.
+- PR #19 (`af2d718`) fixed: People DB schema mismatch, "Rte France"/"RTE" duplicate creation, wrong-SIREN attachment, no-fallback-enrichment. Top-3 SIREN candidates with a name-divergence gate now used instead of blind top-1.
+- Fixed during the PR #15 merge (2026-07-17): `web/server.py`'s `/lead`, create-lead, and create-deal inline-person-creation paths all wrote to the wrong `"Nom"` property — same root cause as the People DB schema bug PR #19 fixed, different code paths. All three now write `"Name"`.
+- Deferred: archive the stale, empty "Rte France" duplicate Notion page (`39e6c451-9465-81d1-ad4e-f80e58fc3070`) once the original live test is re-run to confirm no further duplicates.
+
+## What's New (2026-06-04, UX polish)
+
+### Cockpit layout
+- Panel order: Chat → Workspace → Automation
+- Workspace panel moved above Automation for discoverability
+
+### Ask your data (ChatPanel)
+- Chat input anchored to bottom of fixed-height (280px) card via `historyRef.scrollTop` (no page scroll hijack)
+- Example prompt buttons (light violet chips) shown when chat is empty; clicking auto-sends
+- "Deal" renamed to "Lead" throughout visible UI
+- Lead creation modal rewritten: single form showing all fields at once (no step-by-step wizard)
+- On lead creation: last assistant message written as purple 🤖 callout block on Notion page
+- On lead creation: company auto-linked via relation (exact title match in Companies DB + auto-detected relation property in Deals DB)
+- Success screen shows "Open in Notion ↗" link
+
+### Workspace panel
+- Linking a DB shows per-card loading state (dim + spinner + "loading" label) while single-key refresh runs
+- After re-link, only the changed DB is re-fetched (`/api/cockpit/status/{key}`) — not all 8
+- Error footer shows "⚠ check access" when Notion API returns error
+
+### Backend fixes
+- `filter_properties: []` removed from Notion query pagination (was causing 400 on all DBs)
+- `CreateDealRequest` gains `summary` and `company_name` fields
+- DB_DEFS: `"Deals"` label renamed to `"Leads"`
+- New endpoint: `GET /api/cockpit/status/{key}` — single-DB status refresh
 
 ## Open Decisions
 
 - Notion conversation history persistence (log chat to a Notion page) — not yet implemented
 - Notion OAuth: currently using public integration (client_id + secret from env)
 - Company linking uses exact title match — fuzzy match not implemented
-- Meetings→Activities automation: the built-in Notion agent ran out of credits (as of 2026-07-02) — treat as unavailable; Activities must be created manually/via Claude Code until re-funded
 
 ## Next Steps
 
@@ -70,6 +111,7 @@ Full pass over all 29 leads in the Deal Board: backfilled 18 Activities from the
 6. Phase 5: `data/{workspace_id}/` namespacing, LinkedIn upload endpoint, shared bot dispatcher
 7. Notion conversation history (log chat sessions to Notion — roadmap item)
 8. Phase 2: email "à relire" pipeline
+9. Verify the sibling `artelys-crystal-hpc-lead-generation` project's `.claude/settings.json` MCP registration still resolves now that this repo's branches are merged
 
 ## Web module layout
 

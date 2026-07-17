@@ -24,7 +24,7 @@ from notion_pilot.inbox import build_knowledge_pipeline
 from notion_pilot.shared.adapters.email import EmailAdapter, _sender_allowed
 from notion_pilot.shared.config import Settings, load_settings
 from notion_pilot.shared.models import _first_url
-from notion_pilot.shared.utils.enrichment import enrich_person
+from notion_pilot.shared.prosper_client import PersonEnrichment, enrich_person
 
 _SENDER_CONFIG = Path("config/email-senders.yaml")
 _REVIEW_CSV = Path("data/inbox/email-import-review.csv")
@@ -291,7 +291,13 @@ async def _apply_review() -> None:
         email = row.get("email", "").strip()
         display = row.get("display_name", "").strip() or email
         domain = row.get("domain", "").strip()
-        enrichment = await enrich_person(display, domain, settings)
+        try:
+            enrichment = await enrich_person(display, domain, settings)
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "Enrichment failed for {} @ {} — upserting without enrichment", display, domain
+            )
+            enrichment = PersonEnrichment()
         person = PersonRecord(
             name=display,
             email=email,
@@ -321,7 +327,7 @@ async def _build_people_syncer(settings: Settings, token: str) -> NotionPeopleSy
         return None
     client = AsyncClient(auth=token)
     syncer = NotionPeopleSyncer(client, ds_id, company_syncer=None)
-    await syncer.load_snapshot()
+    await syncer.load_notion_snapshot()
     return syncer
 
 
@@ -618,7 +624,13 @@ async def run(
         dedup_status = dedup_score = matched_name = ""
 
         if in_people_list and not dry_run and people_syncer:
-            enrichment = await enrich_person(display, domain, settings)
+            try:
+                enrichment = await enrich_person(display, domain, settings)
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "Enrichment failed for {} @ {} — upserting without enrichment", display, domain
+                )
+                enrichment = PersonEnrichment()
             if enrichment.source:
                 enriched_flag = enrichment.source
             linkedin = enrichment.linkedin_url

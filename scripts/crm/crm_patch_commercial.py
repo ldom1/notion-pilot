@@ -28,7 +28,7 @@ load_dotenv()
 NOTION_API = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"
 COMMERCIAL_ID = "4890e1d6-178d-4a42-af06-7bbe0cef09fe"
-MEETINGS_ID   = "e94cc98f-2f66-4c53-ac6d-62b9d8f7d5aa"
+MEETINGS_ID = "e94cc98f-2f66-4c53-ac6d-62b9d8f7d5aa"
 
 
 async def main() -> None:

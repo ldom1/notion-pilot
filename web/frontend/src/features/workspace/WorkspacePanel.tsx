@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
+import { deleteWorkspace } from "../../api/client";
 
 export interface DatabaseEntry {
   count: number | null;
+  has_more?: boolean;
   label: string;
   icon: string;
   category: string;
@@ -24,21 +26,25 @@ interface TelegramStatus {
 interface WorkspacePanelProps {
   databases: Record<string, DatabaseEntry>;
   onRefresh: () => void;
+  isRefreshing?: boolean;
   editingDbId: string | null;
   savingDbId: string | null;
   onEditDb: (key: string) => void;
   onSaveDb: (key: string, newId: string) => void;
   onCancelEdit: () => void;
+  onRedeploy: () => void;
 }
 
 export function WorkspacePanel({
   databases,
   onRefresh,
+  isRefreshing = false,
   editingDbId,
   savingDbId,
   onEditDb,
   onSaveDb,
   onCancelEdit,
+  onRedeploy,
 }: WorkspacePanelProps) {
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [availableDbs, setAvailableDbs] = useState<NotionDb[]>([]);
@@ -46,6 +52,8 @@ export function WorkspacePanel({
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null);
   const [telegramPinging, setTelegramPinging] = useState(false);
   const [telegramPingResult, setTelegramPingResult] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchTelegramStatus = useCallback(async () => {
     try {
@@ -99,6 +107,19 @@ export function WorkspacePanel({
     onSaveDb(key, selections[key] ?? "");
   }
 
+  async function handleDelete(): Promise<void> {
+    setDeleting(true);
+    try {
+      await deleteWorkspace();
+      onRefresh();
+      setConfirmDelete(false);
+    } catch {
+      // ignore — user can retry
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   function relativeTime(iso: string | null): string {
     if (!iso) return "never";
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -111,15 +132,24 @@ export function WorkspacePanel({
     <section className="panel">
       <div className="panel-header">
         <span className="panel-title">Workspace</span>
-        <button className="btn-ghost btn-sm" onClick={onRefresh}>↻ Refresh</button>
+        <button
+          className="btn-ghost btn-sm"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+        >
+          {isRefreshing ? "↻ …" : "↻ Refresh"}
+        </button>
       </div>
 
       <div className="db-grid">
         {Object.entries(databases).map(([key, db]) => {
           const isEditing = editingDbId === key;
-          const isSaving = savingDbId === key;
+          const isSaving = savingDbId === key || isRefreshing;
           const countIsNull = db.count === null;
           const catClass = (db.category ?? "").toLowerCase();
+          const countLabel = db.count !== null
+            ? `${db.count}${db.has_more ? "+" : ""}`
+            : null;
 
           return (
             <div className={`db-card${isSaving ? " db-card-saving" : ""}`} key={key}>
@@ -131,7 +161,7 @@ export function WorkspacePanel({
 
               <div className="db-name">{db.label}</div>
               <div className={`db-count${isSaving ? " na" : countIsNull ? " na" : db.error ? " error" : ""}`}>
-                {isSaving ? "…" : db.error ? "Error" : countIsNull ? "—" : db.count}
+                {isSaving ? "…" : db.error ? "Error" : countLabel ?? "—"}
               </div>
               <div className="db-count-label">
                 {isSaving ? "loading" : db.error ? db.error.slice(0, 40) : "records"}
@@ -206,6 +236,44 @@ export function WorkspacePanel({
           </button>
           {telegramPingResult && (
             <span className="tg-bot-ping-result">{telegramPingResult}</span>
+          )}
+        </div>
+      </div>
+
+      <div className="tg-bot-card" style={{ marginTop: "0.5rem" }}>
+        <div className="tg-bot-header">
+          <span className="db-icon">⚙️</span>
+          <span className="tg-bot-label">Workspace actions</span>
+        </div>
+        <div className="tg-bot-actions" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
+          <button className="btn-ghost btn-sm" onClick={onRedeploy}>
+            ↺ Redeploy workspace
+          </button>
+          {!confirmDelete ? (
+            <button
+              className="btn-ghost btn-sm"
+              style={{ color: "#c0392b", borderColor: "#f5c6cb" }}
+              onClick={() => setConfirmDelete(true)}
+            >
+              🗑 Delete workspace config
+            </button>
+          ) : (
+            <span style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "0.78rem", color: "#c0392b" }}>
+                This clears all DB links. Are you sure?
+              </span>
+              <button
+                className="btn-ghost btn-sm"
+                style={{ color: "#c0392b", borderColor: "#f5c6cb" }}
+                onClick={() => void handleDelete()}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting…" : "Confirm delete"}
+              </button>
+              <button className="btn-ghost btn-sm" onClick={() => setConfirmDelete(false)}>
+                Cancel
+              </button>
+            </span>
           )}
         </div>
       </div>

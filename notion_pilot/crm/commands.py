@@ -9,6 +9,11 @@ from typing import Awaitable, Callable
 import httpx
 from loguru import logger
 
+from notion_pilot.crm.contact_parse import (
+    parse_company_message,
+    parse_contact_message,
+    sanitize_extracted,
+)
 from notion_pilot.crm.conv_state import ConvState
 from notion_pilot.shared.config import Settings
 
@@ -48,8 +53,8 @@ async def _handle_people(collected: dict[str, str], settings: Settings) -> str:
     people_syncer = NotionPeopleSyncer(
         client, settings.notion_people_data_source_id or "", company_syncer
     )
-    await company_syncer.load_snapshot()
-    await people_syncer.load_snapshot()
+    await company_syncer.load_notion_snapshot()
+    await people_syncer.load_notion_snapshot()
 
     record = PersonRecord(
         name=collected["name"],
@@ -58,7 +63,7 @@ async def _handle_people(collected: dict[str, str], settings: Settings) -> str:
         email=collected.get("email", ""),
         linkedin_url=collected.get("linkedin_url", ""),
     )
-    result = await people_syncer.upsert(record)
+    result = await people_syncer.upsert(record, settings=settings)
     action = "Already in Notion" if result.status in ("skipped", "review") else "Added to Notion"
     return f"✓ {action}: {record.name} @ {record.company}"
 
@@ -70,8 +75,8 @@ async def _handle_company(collected: dict[str, str], settings: Settings) -> str:
 
     client = AsyncClient(auth=_notion_token(settings))
     syncer = NotionCompanySyncer(client, settings.notion_companies_data_source_id or "")
-    await syncer.load_snapshot()
-    page_id = await syncer.get_or_create(collected["name"])
+    await syncer.load_notion_snapshot()
+    page_id = await syncer.get_or_create(collected["name"], settings=settings)
     return f"✓ Company in Notion: {collected['name']} (id: {page_id[:8]}…)"
 
 
@@ -108,24 +113,6 @@ async def _handle_lead(collected: dict[str, str], settings: Settings) -> str:
     return person_msg
 
 
-async def _handle_enrich(collected: dict[str, str], settings: Settings) -> str:
-    from notion_pilot.shared.utils.enrichment import enrich_person
-
-    enrichment = await enrich_person(collected["name"], collected.get("company", ""), settings)
-    parts = []
-    if enrichment.email:
-        parts.append(f"email: {enrichment.email}")
-    if enrichment.phone:
-        parts.append(f"phone: {enrichment.phone}")
-    if enrichment.linkedin_url:
-        parts.append(f"linkedin: {enrichment.linkedin_url}")
-    if enrichment.seniority:
-        parts.append(f"seniority: {enrichment.seniority}")
-    if not parts:
-        return f"No enrichment data found for {collected['name']}."
-    return f"✓ Enriched {collected['name']}:\n" + "\n".join(f"  • {p}" for p in parts)
-
-
 async def _handle_knowledge(_collected: dict[str, str], _settings: Settings) -> str:
     return "__KNOWLEDGE__"  # sentinel: caller routes to knowledge pipeline
 
@@ -137,14 +124,22 @@ async def extract_fields_from_text(
     text: str, cmd: CommandDef, settings: Settings
 ) -> dict[str, str]:
     """Extract command fields from free-form text using OpenRouter LLM."""
+    field_names = [f.name for f in cmd.fields]
+    if cmd.name == "company":
+        parsed = parse_company_message(text)
+    else:
+        parsed = parse_contact_message(text)
+    if parsed:
+        return {key: value for key, value in parsed.items() if key in field_names}
+
     if not settings.openrouter_api_key:
         return {}
-    field_names = [f.name for f in cmd.fields]
     prompt = (
         f"{cmd.llm_prompt}\n\n"
         f"Text: {text}\n\n"
         f"Return JSON with keys: {', '.join(field_names)}. "
-        "Use empty string for any field not found in the text."
+        "Use empty string for any field not found in the text. "
+        "NEVER use placeholder text like [PERSON_NAME], [COMPANY], <name>, etc."
     )
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
@@ -162,7 +157,11 @@ async def extract_fields_from_text(
             )
         resp.raise_for_status()
         data = json.loads(resp.json()["choices"][0]["message"]["content"])
-        return {k: str(v) for k, v in data.items() if v}
+        extracted = {k: str(v) for k, v in data.items() if v}
+        fallback = (
+            parse_company_message(text) if cmd.name == "company" else parse_contact_message(text)
+        )
+        return sanitize_extracted(extracted, fallback=fallback)
     except Exception:  # noqa: BLE001
         logger.warning("commands: LLM field extraction failed")
         return {}
@@ -236,16 +235,6 @@ COMMANDS: dict[str, CommandDef] = {
         ],
         llm_prompt="Extract the deal title, stage, and notes from this message.",
         handler=_handle_deal,
-    ),
-    "enrich": CommandDef(
-        name="enrich",
-        description="Look up enrichment data for a person",
-        fields=[
-            FieldDef("name", "Person's full name?"),
-            FieldDef("company", "Which company?"),
-        ],
-        llm_prompt="Extract the person's name and company from this message.",
-        handler=_handle_enrich,
     ),
     "knowledge": CommandDef(
         name="knowledge",

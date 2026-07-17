@@ -1,3 +1,8 @@
+---
+type: architecture
+updated:
+---
+
 # Architecture
 
 ## Product Structure
@@ -90,3 +95,15 @@ Layer 3 (next):   Setup wizard            → virgin Notion bootstrap (CRM + Kno
 Layer 4 (later):  Email recap             → "à relire" tagging + Telegram summary
 Layer 5 (later):  Website                 → landing + Notion OAuth deploy wizard + chatbot
 ```
+
+## Key Modules
+<!-- added by ai-dotfiles upgrade -->
+
+- **`notion_pilot/mcp/`** (2026-07-13) — exposes the CRM vertical as MCP tools over stdio (`FastMCP`), for any MCP-aware client (not just Telegram). `session.py` caches a `SyncerSession` (People/Companies snapshot) per process with a background pre-warm at startup (via FastMCP's `lifespan` hook — pre-warm must NOT start at bare module-import time, since `asyncio.create_task` requires a running event loop). `tools.py` are thin wrappers calling straight into `crm/syncer.py`, `shared/utils/dedup.py`, `shared/prosper_client.py` (updated 2026-07-14 — was `shared/utils/enrichment.py` until that module was deleted in favor of prosper's MCP-based enrichment), `crm/prospection.py`, `crm/queries.py` — no duplicated business logic. `server.py` registers 11 tools: `upsert_people`, `upsert_companies`, `find_duplicates`, `enrich_people`, `enrich_companies`, `rank_contacts_for_pitch`, `search_people`, `search_companies`, `get_recent_people`, `get_open_leads`, `refresh_notion_snapshot`.
+
+## Non-Obvious Decisions
+<!-- added by ai-dotfiles upgrade -->
+
+- **MCP write tools default to `confirm=false` (dry-run preview)** — every tool that writes to Notion (`upsert_people`, `upsert_companies`, `enrich_people`, `enrich_companies`) computes and returns what *would* happen without calling any Notion write endpoint unless the caller passes `confirm=true`. Mirrors `crm_enrich.py`'s existing `--dry-run` flag, generalized to every write tool.
+- **Company dedup fuzzy matching does not catch legal-suffix variants** (e.g. "EDF" vs "EDF S.A." scores ~55, well under the 85 threshold) — the existing `token_sort_ratio`-based algorithm in `shared/utils/dedup.py` has no legal-suffix-stripping. Confirmed while implementing the MCP `find_duplicates`/`upsert_companies` tools (2026-07-13): don't assume near-miss company-name pairs will dedup — verify empirically before writing tests/fixtures around this matcher.
+- **People DB title property is `"Name"`, not `"Nom"`** (2026-07-16 fix, PR #19) — `NotionPeopleSyncer` and `shared/workspace.py`'s People DB template both use `"Name"`; there is no `"In my network"` property. Company dedup in `upsert_companies` is now a strict 4-signal chain (domain match → `token_sort_ratio>=85` → `token_set_ratio>=90` acronym/subset containment → create), enforced identically in preview and on write. SIREN lookup returns top-3 candidates gated by a `token_sort_ratio>=85` name-divergence check against the candidate's matched name; `force=True` bypasses only the Notion-dedup review, never this SIREN gate. See DECISIONS.md 2026-07-16 entries.

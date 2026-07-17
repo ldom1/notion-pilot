@@ -1,12 +1,12 @@
 """Unit tests for crm/recap.py."""
 
 from notion_pilot.crm.recap import (
-    format_leads,
-    format_inbox,
-    format_recap,
-    CAP_LEADS,
     CAP_INBOX,
+    CAP_LEADS,
     CAP_RECAP_SECTION,
+    format_inbox,
+    format_leads,
+    format_recap,
 )
 
 

@@ -7,7 +7,11 @@ services:
       dockerfile: docker/Dockerfile.web
     ports:
       - "${PORT:-8080}:8080"
-    env_file: .env
+    env_file:
+      - path: .env.bootstrap
+        required: true
+      - path: .env
+        required: false
     volumes:
       - ./data:/app/data      # scripts write here (LinkedIn CSV, SQLite state, review CSVs)
       - ./config:/app/config  # scripts.yaml, email-senders.yaml
@@ -20,7 +24,11 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.bot
-    env_file: .env
+    env_file:
+      - path: .env.bootstrap
+        required: true
+      - path: .env
+        required: false
     volumes:
       - ./data:/app/data
       - ./config:/app/config

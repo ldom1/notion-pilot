@@ -1,8 +1,9 @@
 #!/usr/bin/env python
-"""Dedup then enrich Companies — one-shot data-quality pass.
+"""Dedup Companies — one-shot data-quality pass.
 
-Runs crm_dedup.py --companies first (prints suspected duplicates for review),
-then crm_enrich.py --companies to fill in missing data via Apollo / Brave Search.
+Runs crm_dedup.py --companies (prints suspected duplicates for review).
+Enrichment is now handled by prosper's MCP `enrich_companies` tool, not a
+subprocess step — call it from an MCP-aware client (e.g. Claude Code).
 
 Usage:
     uv run python scripts/crm/crm_refresh_companies.py
@@ -16,7 +17,6 @@ _ROOT = Path(__file__).parent
 
 _STEPS = [
     ("Dedup Companies", [sys.executable, str(_ROOT / "crm_dedup.py"), "--companies"]),
-    ("Enrich Companies", [sys.executable, str(_ROOT / "crm_enrich.py"), "--companies"]),
 ]
 
 
