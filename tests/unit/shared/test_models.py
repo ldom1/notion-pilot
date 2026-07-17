@@ -22,3 +22,25 @@ def test_all_urls_empty_when_no_url():
 def test_first_url_still_returns_only_the_first():
     text = "https://a.example.com/one https://b.example.com/two"
     assert _first_url(text) == "https://a.example.com/one"
+
+
+def test_all_urls_dedupes_exact_duplicates():
+    # Regression guard: a link repeated to confirm it (the same style the /people
+    # markdown-link paste format uses) must count once, not as two distinct links.
+    text = (
+        "[Jordan Belrose](https://www.linkedin.com/in/jordan-belrose-12345678/), "
+        "Nordvale Energy :\nhttps://www.linkedin.com/in/jordan-belrose-12345678/"
+    )
+    assert all_urls(text) == ["https://www.linkedin.com/in/jordan-belrose-12345678/"]
+
+
+def test_all_urls_preserves_first_seen_order_with_duplicates():
+    text = (
+        "https://a.example.com/one https://b.example.com/two "
+        "https://a.example.com/one https://c.example.com/three"
+    )
+    assert all_urls(text) == [
+        "https://a.example.com/one",
+        "https://b.example.com/two",
+        "https://c.example.com/three",
+    ]

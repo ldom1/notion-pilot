@@ -13,8 +13,18 @@ _URL_RE = re.compile(r"https?://[^\s<>\[\]()]+", re.IGNORECASE)
 
 
 def all_urls(text: str) -> list[str]:
-    """Return every HTTP(S) URL in ``text``, in order, with trailing punctuation trimmed."""
-    return [m.group(0).rstrip(").,]\\\"'") for m in _URL_RE.finditer(text)]
+    """Return every distinct HTTP(S) URL in ``text``, in first-seen order, with trailing
+    punctuation trimmed. Exact-duplicate URLs (e.g. a link repeated to confirm it) count once —
+    callers that gate behavior on URL count (multi-link routing, "processing" notices) must not
+    mistake one link mentioned twice for two distinct links."""
+    seen: set[str] = set()
+    result: list[str] = []
+    for m in _URL_RE.finditer(text):
+        url = m.group(0).rstrip(").,]\\\"'")
+        if url not in seen:
+            seen.add(url)
+            result.append(url)
+    return result
 
 
 def _first_url(text: str) -> str | None:

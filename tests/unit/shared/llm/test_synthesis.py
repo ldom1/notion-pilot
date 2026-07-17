@@ -70,6 +70,25 @@ def test_build_link_body_blocks_never_fabricates_missing_metadata():
     assert "stars" not in all_text.lower()
 
 
+def test_build_link_body_blocks_truncates_at_notion_block_limit():
+    # Regression guard: 20 links * up to 6 blocks each would exceed Notion's
+    # 100-children-per-pages.create limit and fail the whole page write.
+    items = [
+        LinkMetadata(
+            url=f"https://github.com/example-org/repo-{i}",
+            title=f"repo-{i}",
+            description="A tool.",
+        )
+        for i in range(20)
+    ]
+    blocks = build_link_body_blocks(items)
+
+    assert len(blocks) < 100
+    heading_count = len([b for b in blocks if b["type"] == "heading_3"])
+    assert heading_count == 15
+    assert "5 more link" in str(blocks)
+
+
 @pytest.mark.asyncio
 async def test_synthesize_multi_link_description_calls_openrouter():
     items = [LinkMetadata(url="https://github.com/example-org/repo-a", description="A tool.")]

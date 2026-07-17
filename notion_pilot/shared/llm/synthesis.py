@@ -27,11 +27,20 @@ def _heading(text: str) -> dict[str, Any]:
     }
 
 
+_MAX_LINKS_IN_BODY = 15  # each link contributes up to 6 blocks; keeps the total safely
+# under Notion's 100-children-per-pages.create limit
+
+
 def build_link_body_blocks(items: list[LinkMetadata]) -> list[dict[str, Any]]:
     """One heading + up to 4 factual bullets per link. Never fabricates data —
-    a failed fetch just gets the bare URL, no invented stats or summary."""
+    a failed fetch just gets the bare URL, no invented stats or summary.
+
+    Truncates to _MAX_LINKS_IN_BODY links, appending a note naming the omitted
+    count, instead of letting a large link list exceed Notion's 100-children
+    limit and silently fail the entire page write."""
+    truncated = items[:_MAX_LINKS_IN_BODY]
     blocks: list[dict[str, Any]] = []
-    for item in items:
+    for item in truncated:
         blocks.append(_heading(item.title or item.url))
         if item.error:
             blocks.append(_bullet(f"{item.url} (could not fetch details: {item.error})"))
@@ -45,6 +54,19 @@ def build_link_body_blocks(items: list[LinkMetadata]) -> list[dict[str, Any]]:
         if item.extra.get("topics"):
             blocks.append(_bullet(f"Topics: {item.extra['topics']}"))
         blocks.append(_bullet(item.url))
+
+    omitted = len(items) - len(truncated)
+    if omitted:
+        logger.warning(
+            "synthesis: truncated {} of {} links from page body (Notion's block limit)",
+            omitted,
+            len(items),
+        )
+        blocks.append(
+            _bullet(
+                f"...and {omitted} more link(s) not shown (message exceeded Notion's block limit)"
+            )
+        )
     return blocks
 
 

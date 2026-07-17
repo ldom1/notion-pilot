@@ -112,6 +112,31 @@ async def test_fetch_generic_url_parses_og_tags():
 
 
 @pytest.mark.asyncio
+async def test_fetch_generic_rejects_non_200_status():
+    # Regression guard: a dead/moved link serving a 404 error page as text/html must not
+    # have that error page's <title>/description treated as real, successfully-fetched
+    # link metadata.
+    with patch("notion_pilot.shared.llm.link_metadata.httpx.AsyncClient") as mock_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        not_found = httpx.Response(
+            404,
+            content=b"<html><head><title>404 Not Found</title></head></html>",
+            headers={"content-type": "text/html"},
+            request=httpx.Request("GET", "https://example.com/gone"),
+        )
+        mock_client.stream = _stream_sequence([not_found])
+        mock_cls.return_value = mock_client
+
+        with patch("notion_pilot.shared.llm.link_metadata._resolve_is_safe", return_value=True):
+            results = await fetch_link_metadata(["https://example.com/gone"])
+
+    assert results[0].error == "fetch_failed"
+    assert results[0].title == ""
+
+
+@pytest.mark.asyncio
 async def test_fetch_github_rate_limit_logs_distinct_warning(caplog):
     with patch("notion_pilot.shared.llm.link_metadata.httpx.AsyncClient") as mock_cls:
         mock_client = AsyncMock()

@@ -129,6 +129,9 @@ async def _fetch_generic(url: str) -> LinkMetadata:
                         current_url = str(httpx.URL(current_url).join(location))
                         continue  # loop back — re-checks safety on the NEW host first
 
+                    if resp.status_code != 200:
+                        return LinkMetadata(url=url, error="fetch_failed")
+
                     content_type = resp.headers.get("content-type", "")
                     if not content_type.startswith("text/html"):
                         return LinkMetadata(url=url, error="unsupported_content_type")

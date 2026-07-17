@@ -499,9 +499,13 @@ class TelegramAdapter:
                     reply = await dispatch_read(read_cmd, settings)
                     await _send_reply(msg, reply)
                     return
+                from notion_pilot.inbox.knowledge import _MULTI_LINK_THRESHOLD
                 from notion_pilot.shared.models import all_urls as _telegram_all_urls
 
-                if len(_telegram_all_urls(incoming.text or "")) >= 2:
+                # incoming.body (text-or-caption), matching what inbox/knowledge.py's
+                # process_message actually routes on — using incoming.text alone would
+                # miss photo messages, whose content lands in .caption, not .text.
+                if len(_telegram_all_urls(incoming.body)) >= _MULTI_LINK_THRESHOLD:
                     await _send_reply(
                         msg, "Processing… (multiple links found, this may take a moment)"
                     )
