@@ -1,6 +1,6 @@
 """Unit tests for crm/syncer.py — mocked Notion client."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -33,14 +33,14 @@ class TestNotionCompanySyncer:
         client = _mock_ds_query(
             [
                 _make_company_page("id-edf", "EDF"),
-                _make_company_page("id-rte", "RTE"),
+                _make_company_page("id-vantree", "Vantree"),
             ]
         )
         syncer = NotionCompanySyncer(client, "fake-ds-id")
         await syncer.load_notion_snapshot()
 
         assert syncer.id_to_name("id-edf") == "EDF"
-        assert syncer.id_to_name("id-rte") == "RTE"
+        assert syncer.id_to_name("id-vantree") == "Vantree"
         assert syncer.id_to_name("unknown") == ""
 
     async def test_get_or_create_returns_existing_on_exact_match(self):
@@ -125,6 +125,367 @@ class TestNotionCompanySyncer:
         await syncer.load_notion_snapshot()
 
         assert syncer.details["pid1"]["siren"] == "428895676"
+
+    async def test_preview_would_create_no_siren_candidates(self):
+        client = _mock_ds_query([])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+
+        from unittest.mock import AsyncMock as _AsyncMock
+
+        from notion_pilot.crm.syncer import CompanyRecord
+
+        with patch("notion_pilot.crm.syncer.lookup_siren_candidates", _AsyncMock(return_value=[])):
+            preview = await syncer.preview(CompanyRecord(name="OVHcloud"))
+
+        assert preview.status == "would_create"
+        assert preview.siren == ""
+
+    async def test_preview_would_create_confident_siren_candidate(self):
+        client = _mock_ds_query([])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+
+        from notion_pilot.crm.syncer import CompanyRecord
+
+        with patch(
+            "notion_pilot.crm.syncer.lookup_siren_candidates",
+            AsyncMock(
+                return_value=[
+                    {
+                        "siren": "428895676",
+                        "matched_name": "ARTELYS",
+                        "section_activite_principale": "M",
+                        "activite_principale": "70.22Z",
+                        "tranche_effectif_salarie": "12",
+                    }
+                ]
+            ),
+        ):
+            preview = await syncer.preview(CompanyRecord(name="Artelys"))
+
+        assert preview.status == "would_create"
+        assert preview.siren == "428895676"
+        assert preview.siren_candidate_name == "ARTELYS"
+        assert preview.enrichment_preview == {
+            "siren": "428895676",
+            "sector": "Consulting",
+            "size": "11-50",
+            "country": "FR",
+        }
+
+    async def test_preview_flags_diverging_siren_as_needs_review(self):
+        client = _mock_ds_query([])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+
+        from notion_pilot.crm.syncer import CompanyRecord
+
+        with patch(
+            "notion_pilot.crm.syncer.lookup_siren_candidates",
+            AsyncMock(
+                return_value=[
+                    {
+                        "siren": "409526167",
+                        "matched_name": "VCSP ROUTE FRANCE",
+                        "section_activite_principale": "F",
+                        "activite_principale": "42.11Z",
+                        "tranche_effectif_salarie": "01",
+                    }
+                ]
+            ),
+        ):
+            preview = await syncer.preview(CompanyRecord(name="Vantree Energy"))
+
+        assert preview.status == "needs_review"
+        assert preview.siren == ""
+        assert preview.candidates == [
+            {
+                "type": "siren",
+                "siren": "409526167",
+                "matched_name": "VCSP ROUTE FRANCE",
+                "score": 32.25806451612904,
+            }
+        ]
+
+    async def test_preview_flags_acronym_as_needs_review(self):
+        client = _mock_ds_query([_make_company_page("id-vantree", "Vantree")])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+
+        from notion_pilot.crm.syncer import CompanyRecord
+
+        preview = await syncer.preview(CompanyRecord(name="Vantree Energy"))
+
+        assert preview.status == "needs_review"
+        assert preview.candidates == [
+            {"type": "notion", "page_id": "id-vantree", "name": "Vantree", "score": 100.0}
+        ]
+
+    async def test_preview_domain_match_wins_over_needs_review(self):
+        client = _mock_ds_query([_make_company_page("id-vantree", "Vantree")])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+        syncer.details["id-vantree"] = {"website": "https://www.vantree-energy.example"}
+
+        from notion_pilot.crm.syncer import CompanyRecord
+
+        preview = await syncer.preview(
+            CompanyRecord(
+                name="Vantree Energy", contact_email="alice.martin@vantree-energy.example"
+            )
+        )
+
+        assert preview.status == "matched"
+        assert preview.matched_name == "Vantree"
+
+    async def test_preview_matched_company_never_shows_website_guess(self):
+        # Regression guard: the matched company below has NO existing website
+        # in `details` — before the fix gating the website-derivation on
+        # status == "would_create", this would have populated
+        # enrichment_preview["website"] from contact_email even though
+        # status="matched" means no write (and therefore no property update)
+        # will ever happen for this record.
+        client = _mock_ds_query([_make_company_page("id-vantree", "Vantree")])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+        syncer.details["id-vantree"] = {"website": "https://www.vantree-energy.example"}
+
+        from notion_pilot.crm.syncer import CompanyRecord
+
+        preview = await syncer.preview(
+            CompanyRecord(name="Vantree", contact_email="alice.martin@vantree-energy.example")
+        )
+
+        assert preview.status == "matched"
+        assert preview.enrichment_preview == {}
+
+    async def test_upsert_creates_new_company_with_enrichment(self, monkeypatch):
+        from notion_pilot.crm.syncer import CompanyEnrichment, CompanyRecord
+
+        client = _mock_ds_query([])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+        monkeypatch.setattr(
+            "notion_pilot.crm.syncer.enrich_company",
+            AsyncMock(return_value=CompanyEnrichment()),
+        )
+        monkeypatch.setattr(
+            "notion_pilot.crm.syncer.lookup_siren_candidates", AsyncMock(return_value=[])
+        )
+
+        result = await syncer.upsert(CompanyRecord(name="OVHcloud"))
+
+        assert result.status == "created"
+        assert result.page_id == "new-company-id"
+        assert result.siren == ""
+
+    async def test_upsert_writes_siren_and_registry_fallback(self, monkeypatch):
+        from notion_pilot.crm.syncer import CompanyEnrichment, CompanyRecord
+
+        client = _mock_ds_query([])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+        monkeypatch.setattr(
+            "notion_pilot.crm.syncer.enrich_company",
+            AsyncMock(return_value=CompanyEnrichment()),
+        )
+        monkeypatch.setattr(
+            "notion_pilot.crm.syncer.lookup_siren_candidates",
+            AsyncMock(
+                return_value=[
+                    {
+                        "siren": "428895676",
+                        "matched_name": "ARTELYS",
+                        "section_activite_principale": "M",
+                        "activite_principale": "70.22Z",
+                        "tranche_effectif_salarie": "12",
+                    }
+                ]
+            ),
+        )
+        ensure_siren_mock = AsyncMock()
+        monkeypatch.setattr(syncer, "ensure_siren_property", ensure_siren_mock)
+        update_mock = AsyncMock()
+        monkeypatch.setattr(syncer._client.pages, "update", update_mock)
+
+        result = await syncer.upsert(CompanyRecord(name="Artelys"))
+
+        ensure_siren_mock.assert_awaited_once()
+        update_mock.assert_awaited_once_with(
+            "new-company-id",
+            properties={
+                "SIREN": {"rich_text": [{"text": {"content": "428895676"}}]},
+                "Sector": {"select": {"name": "Consulting"}},
+                "Size": {"select": {"name": "11-50"}},
+                "Country": {"select": {"name": "FR"}},
+            },
+        )
+        assert result.siren == "428895676"
+
+    async def test_upsert_domain_match_wins_without_calling_get_or_create(self, monkeypatch):
+        from notion_pilot.crm.syncer import CompanyRecord
+
+        client = _mock_ds_query([_make_company_page("id-vantree", "Vantree")])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+        syncer.details["id-vantree"] = {"website": "https://www.vantree-energy.example"}
+        get_or_create_mock = AsyncMock()
+        monkeypatch.setattr(syncer, "get_or_create", get_or_create_mock)
+
+        result = await syncer.upsert(
+            CompanyRecord(
+                name="Vantree Energy", contact_email="alice.martin@vantree-energy.example"
+            )
+        )
+
+        get_or_create_mock.assert_not_called()
+        assert result.status == "matched"
+        assert result.page_id == "id-vantree"
+
+    async def test_upsert_blocks_needs_review_without_force(self, monkeypatch):
+        from notion_pilot.crm.syncer import CompanyRecord
+
+        client = _mock_ds_query([_make_company_page("id-vantree", "Vantree")])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+        get_or_create_mock = AsyncMock()
+        monkeypatch.setattr(syncer, "get_or_create", get_or_create_mock)
+
+        result = await syncer.upsert(CompanyRecord(name="Vantree Energy"))
+
+        get_or_create_mock.assert_not_called()
+        assert result.status == "needs_review"
+        assert result.candidates == [
+            {"type": "notion", "page_id": "id-vantree", "name": "Vantree", "score": 100.0}
+        ]
+
+    async def test_upsert_force_bypasses_dedup_but_not_siren_gate(self, monkeypatch):
+        from notion_pilot.crm.syncer import CompanyEnrichment, CompanyRecord
+
+        client = _mock_ds_query([_make_company_page("id-vantree", "Vantree")])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+        monkeypatch.setattr(syncer, "get_or_create", AsyncMock(return_value="new-company-id"))
+        monkeypatch.setattr(
+            "notion_pilot.crm.syncer.enrich_company",
+            AsyncMock(return_value=CompanyEnrichment()),
+        )
+        monkeypatch.setattr(
+            "notion_pilot.crm.syncer.lookup_siren_candidates",
+            AsyncMock(
+                return_value=[
+                    {
+                        "siren": "409526167",
+                        "matched_name": "VCSP ROUTE FRANCE",
+                        "section_activite_principale": "F",
+                        "activite_principale": "42.11Z",
+                        "tranche_effectif_salarie": "01",
+                    }
+                ]
+            ),
+        )
+        ensure_siren_mock = AsyncMock()
+        monkeypatch.setattr(syncer, "ensure_siren_property", ensure_siren_mock)
+
+        result = await syncer.upsert(CompanyRecord(name="Vantree Energy", force=True))
+
+        ensure_siren_mock.assert_not_called()
+        assert result.status == "created_with_override"
+        assert result.siren == ""
+
+    async def test_get_or_create_force_create_bypasses_own_fuzzy_match(self):
+        # Regression guard: force_create=True must skip get_or_create's own
+        # independent name-similarity check entirely, not just raise its bar —
+        # otherwise force=True on upsert() could silently re-attach to the
+        # very company the caller is overriding.
+        client = _mock_ds_query([_make_company_page("id-edf", "EDF")])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+
+        page_id = await syncer.get_or_create("EDF", force_create=True)
+
+        assert page_id == "new-company-id"
+        client.pages.create.assert_called_once()
+
+    async def test_upsert_force_true_needs_review_always_creates_new_page(self, monkeypatch):
+        from notion_pilot.crm.syncer import CompanyEnrichment, CompanyRecord
+
+        client = _mock_ds_query([_make_company_page("id-vantree", "Vantree")])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+        monkeypatch.setattr(
+            "notion_pilot.crm.syncer.enrich_company",
+            AsyncMock(return_value=CompanyEnrichment()),
+        )
+        monkeypatch.setattr(
+            "notion_pilot.crm.syncer.lookup_siren_candidates", AsyncMock(return_value=[])
+        )
+        get_or_create_spy = AsyncMock(wraps=syncer.get_or_create)
+        monkeypatch.setattr(syncer, "get_or_create", get_or_create_spy)
+
+        result = await syncer.upsert(CompanyRecord(name="Vantree Energy", force=True))
+
+        get_or_create_spy.assert_awaited_once_with("Vantree Energy", force_create=True)
+        assert result.status == "created_with_override"
+        assert result.page_id == "new-company-id"
+
+    async def test_upsert_blocks_would_create_with_diverging_siren_without_force(self, monkeypatch):
+        # Regression guard for a real bug found via live testing: preview() already
+        # downgrades a would_create record to needs_review when its only SIREN
+        # registry match diverges from the input name — upsert() must match that
+        # contract instead of silently creating the company anyway just because no
+        # NAME-based concern was raised.
+        from notion_pilot.crm.syncer import CompanyRecord
+
+        client = _mock_ds_query([])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+        monkeypatch.setattr(
+            "notion_pilot.crm.syncer.lookup_siren_candidates",
+            AsyncMock(return_value=[{"siren": "409526167", "matched_name": "VCSP ROUTE FRANCE"}]),
+        )
+        get_or_create_mock = AsyncMock()
+        monkeypatch.setattr(syncer, "get_or_create", get_or_create_mock)
+
+        result = await syncer.upsert(CompanyRecord(name="OVHcloud"))
+
+        get_or_create_mock.assert_not_called()
+        assert result.status == "needs_review"
+        assert result.page_id == ""
+        assert "VCSP ROUTE FRANCE" in result.reason
+        assert result.candidates == [
+            {
+                "type": "siren",
+                "siren": "409526167",
+                "matched_name": "VCSP ROUTE FRANCE",
+                "score": 24.0,
+            }
+        ]
+
+    async def test_upsert_would_create_force_bypasses_siren_divergence_block(self, monkeypatch):
+        from notion_pilot.crm.syncer import CompanyEnrichment, CompanyRecord
+
+        client = _mock_ds_query([])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+        monkeypatch.setattr(
+            "notion_pilot.crm.syncer.lookup_siren_candidates",
+            AsyncMock(return_value=[{"siren": "409526167", "matched_name": "VCSP ROUTE FRANCE"}]),
+        )
+        monkeypatch.setattr(
+            "notion_pilot.crm.syncer.enrich_company", AsyncMock(return_value=CompanyEnrichment())
+        )
+        ensure_siren_mock = AsyncMock()
+        monkeypatch.setattr(syncer, "ensure_siren_property", ensure_siren_mock)
+
+        result = await syncer.upsert(CompanyRecord(name="OVHcloud", force=True))
+
+        ensure_siren_mock.assert_not_called()
+        assert result.status == "created_with_override"
+        assert result.page_id == "new-company-id"
+        assert result.siren == ""
+        assert "VCSP ROUTE FRANCE" in result.reason
 
 
 def _make_people_page(page_id: str, name: str, company_page_ids: list[str] | None = None) -> dict:

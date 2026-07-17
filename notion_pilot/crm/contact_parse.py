@@ -53,6 +53,41 @@ def parse_linkedin_person_paste(text: str) -> dict[str, str] | None:
     return {key: value for key, value in result.items() if value and not is_placeholder(value)}
 
 
+_MARKDOWN_LINK_PERSON_RE = re.compile(
+    r"\[([^\]]+)\]\((https?://(?:www\.)?linkedin\.com/in/\S+?)\)\s*,\s*([^:\n]+?)\s*:",
+    re.IGNORECASE,
+)
+_URL_ONLY_RE = re.compile(r"(https?://(?:www\.)?linkedin\.com/in/\S+)", re.IGNORECASE)
+
+
+def _normalize_linkedin_url(url: str) -> str:
+    return url.strip().rstrip("/").lower()
+
+
+def parse_markdown_link_person_paste(text: str) -> dict[str, str] | None:
+    """Parse ``[Name](linkedin_url), Company :`` with an optional repeated
+    LinkedIn URL line following. If a second URL is present and differs from
+    the markdown-link URL, treat the message as ambiguous and return None
+    instead of guessing — the caller falls through to the LLM, which can
+    ask the user rather than silently picking (possibly) the wrong URL."""
+    stripped = text.strip()
+    match = _MARKDOWN_LINK_PERSON_RE.search(stripped)
+    if not match:
+        return None
+    name, linkedin_url, company = match.group(1).strip(), match.group(2), match.group(3).strip()
+    if not name or is_placeholder(name) or not company or is_placeholder(company):
+        return None
+
+    remainder = stripped[match.end() :]
+    other_url_match = _URL_ONLY_RE.search(remainder)
+    if other_url_match:
+        other_url = other_url_match.group(1)
+        if _normalize_linkedin_url(other_url) != _normalize_linkedin_url(linkedin_url):
+            return None  # ambiguous — differing second URL, don't guess
+
+    return {"name": name, "company": company, "linkedin_url": linkedin_url}
+
+
 def parse_linkedin_company_paste(text: str) -> dict[str, str] | None:
     """Parse ``linkedin.com/company/…`` with optional ``: Name, sector, …`` tail."""
     match = _LINKEDIN_COMPANY_URL_RE.search(text.strip())
@@ -113,7 +148,11 @@ def parse_comma_contact(text: str) -> dict[str, str] | None:
 
 def parse_contact_message(text: str) -> dict[str, str] | None:
     """Try deterministic person paste formats (/people command)."""
-    return parse_linkedin_person_paste(text) or parse_comma_contact(text)
+    return (
+        parse_linkedin_person_paste(text)
+        or parse_markdown_link_person_paste(text)
+        or parse_comma_contact(text)
+    )
 
 
 def parse_company_message(text: str) -> dict[str, str] | None:

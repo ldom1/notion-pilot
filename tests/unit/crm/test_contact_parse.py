@@ -103,3 +103,42 @@ def test_sanitize_extracted_drops_placeholders_and_uses_fallback():
     assert clean["company"] == "Veolia"
     assert clean["position"] == "Chapter Lead Appel d'Offres et Développement"
     assert clean["linkedin_url"] == "https://www.linkedin.com/in/ocoussau/"
+
+
+_FICTIONAL_MD_MSG = (
+    "[Jordan Belrose](https://www.linkedin.com/in/jordan-belrose-12345678/), Nordvale Energy :\n"
+    "https://www.linkedin.com/in/jordan-belrose-12345678/"
+)
+
+_FICTIONAL_MD_MSG_DIFFERING_URL = (
+    "[Jordan Belrose](https://www.linkedin.com/in/jordan-belrose-12345678/), Nordvale Energy :\n"
+    "https://www.linkedin.com/in/jordan-belrose-stale-slug/"
+)
+
+
+def test_parse_markdown_link_person_paste_matches_markdown_first_format():
+    from notion_pilot.crm.contact_parse import parse_markdown_link_person_paste
+
+    result = parse_markdown_link_person_paste(_FICTIONAL_MD_MSG)
+    assert result is not None
+    assert result["name"] == "Jordan Belrose"
+    assert result["company"] == "Nordvale Energy"
+    assert result["linkedin_url"] == "https://www.linkedin.com/in/jordan-belrose-12345678/"
+
+
+def test_parse_markdown_link_person_paste_returns_none_on_differing_second_url():
+    from notion_pilot.crm.contact_parse import parse_markdown_link_person_paste
+
+    assert parse_markdown_link_person_paste(_FICTIONAL_MD_MSG_DIFFERING_URL) is None
+
+
+def test_parse_contact_message_routes_markdown_link_format():
+    result = parse_contact_message(_FICTIONAL_MD_MSG)
+    assert result is not None
+    assert result["name"] == "Jordan Belrose"
+    assert result["company"] == "Nordvale Energy"
+
+
+def test_parse_contact_message_falls_through_to_none_on_differing_second_url():
+    # Ambiguous — don't guess which URL is right; let the caller fall to the LLM.
+    assert parse_contact_message(_FICTIONAL_MD_MSG_DIFFERING_URL) is None

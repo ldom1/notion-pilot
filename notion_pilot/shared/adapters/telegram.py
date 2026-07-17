@@ -271,6 +271,30 @@ def _resolve_confirmation(text: str) -> str:
     return "unknown"
 
 
+_ERROR_MESSAGE_CAP = 120
+
+
+def _format_handler_error(exc: Exception) -> str:
+    """Sanitized, user-facing error text: always show the exception class name;
+    never surface a raw notion_client SDK message (may contain page/database IDs
+    or schema internals); cap any other exception's message length.
+
+    Checked against NotionClientErrorBase — the true root of every notion_client
+    exception (verified: RequestTimeoutError, InvalidPathParameterError,
+    HTTPResponseError, UnknownHTTPResponseError, and APIResponseError all inherit
+    from it) — not just APIResponseError, so a timeout or an internal-path error
+    from the SDK gets the same generic treatment instead of leaking its message."""
+    from notion_client.errors import NotionClientErrorBase
+
+    cls_name = type(exc).__name__
+    if isinstance(exc, NotionClientErrorBase):
+        return f"⚠ Failed to save to Notion: {cls_name} — Notion API error, see server logs."
+    detail = str(exc)
+    if len(detail) > _ERROR_MESSAGE_CAP:
+        detail = detail[:_ERROR_MESSAGE_CAP] + "..."
+    return f"⚠ Failed to save to Notion: {cls_name} — {detail}"
+
+
 class TelegramAdapter:
     """Telegram long-polling source adapter."""
 
@@ -315,8 +339,12 @@ class TelegramAdapter:
             prompt = get_next_prompt(cmd, state)
             if prompt is None:
                 # All required fields extracted — run handler immediately
-                result = await cmd.handler(collected, _enrich_settings_from_cockpit(settings))
-                await _send_reply(msg, result)
+                try:
+                    result = await cmd.handler(collected, _enrich_settings_from_cockpit(settings))
+                    await _send_reply(msg, result)
+                except Exception as exc:  # noqa: BLE001
+                    logger.exception("telegram: CRM handler failed for /{}", cmd_name)
+                    await _send_reply(msg, _format_handler_error(exc))
                 return
 
             state.pending_field = prompt
@@ -350,9 +378,9 @@ class TelegramAdapter:
                         state.collected, _enrich_settings_from_cockpit(settings)
                     )
                     await _send_reply(msg, result)
-                except Exception:  # noqa: BLE001
+                except Exception as exc:  # noqa: BLE001
                     logger.exception("telegram: CRM handler failed for /{}", state.command)
-                    await _send_reply(msg, "Failed to save to Notion. See server logs.")
+                    await _send_reply(msg, _format_handler_error(exc))
             else:
                 state.pending_field = prompt
                 state_store.set(state)

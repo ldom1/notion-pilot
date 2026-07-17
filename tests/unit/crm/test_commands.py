@@ -51,6 +51,22 @@ async def test_extract_fields_from_text_linkedin_paste_bypasses_llm():
     assert result["linkedin_url"] == "https://www.linkedin.com/in/ocoussau/"
 
 
+async def test_extract_fields_from_text_markdown_link_paste_bypasses_llm():
+    s = Settings(**_SETTINGS)
+    cmd = COMMANDS["people"]
+    text = (
+        "[Jordan Belrose](https://www.linkedin.com/in/jordan-belrose-12345678/), "
+        "Nordvale Energy :\nhttps://www.linkedin.com/in/jordan-belrose-12345678/"
+    )
+    with patch("notion_pilot.crm.commands.httpx.AsyncClient") as mock_client_cls:
+        result = await extract_fields_from_text(text, cmd, s)
+
+    mock_client_cls.assert_not_called()
+    assert result["name"] == "Jordan Belrose"
+    assert result["company"] == "Nordvale Energy"
+    assert result["linkedin_url"] == "https://www.linkedin.com/in/jordan-belrose-12345678/"
+
+
 async def test_extract_fields_from_text_parses_llm_response():
     s = Settings(**_SETTINGS)
     cmd = COMMANDS["people"]

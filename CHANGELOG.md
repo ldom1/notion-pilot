@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gets a heading + factual bullets (description, language, stars, topics where available) in the
   page body, plus a set-level Description summarizing the links as a whole — instead of a one-line
   Description with a blank body. A "Processing…" reply is sent first since this path is slower.
+- `/people`: pasting a markdown-formatted contact (`[Name](linkedin_url), Company :`, optionally
+  followed by a repeated LinkedIn URL line) is now parsed deterministically, bypassing the LLM;
+  falls through to the LLM (rather than guessing) if a second URL in the message disagrees with
+  the markdown link's URL.
+
+### Fixed
+- Telegram CRM errors (both the immediate-dispatch and step-by-step field-filling paths) now show
+  a consistent, sanitized message — always the exception class name, never a raw Notion SDK error
+  (which could leak page/database IDs or schema internals) — instead of a generic
+  "Failed to save to Notion" with no detail on one path and an unsanitized raw message on the other.
 
 ### Added
 - **Infisical secret manager** — all app secrets now live in Infisical (`Dom Universe` project, `prod` env, `/global` + `/notion-pilot` folders); `.env` replaced by `.env.bootstrap` (4 vars: client_id, client_secret, project_id, env)
@@ -52,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Rte France" now gets flagged against the existing "RTE" company instead of creating a duplicate.
 - `upsert_companies`: a SIREN candidate whose registry name diverges too far from the input name (e.g.
   "Rte France" → an unrelated "VCSP ROUTE FRANCE") is now rejected instead of silently attached.
+- `upsert_companies`: `preview()` already downgraded a `would_create` record to `needs_review` on
+  SIREN-name divergence, but `upsert()` only skipped the SIREN field and created the company anyway
+  — live-tested against production Notion this created 2 unreviewed company pages. `upsert()` now
+  blocks creation on the same divergence unless `force=True`.
 - Telegram CRM writes (`/people`, infer-confirm yes, multi-step commands): call `_enrich_settings_from_cockpit()` before handlers so People/Companies DB IDs from `cockpit_config.json` are used when env vars are unset (fixes `data_sources//query` 400 on save)
 - LinkedIn contact paste (`URL : Name, Company, Position`): deterministic parser in `contact_parse.py` bypasses LLM; rejects `[PERSON_NAME]` placeholders; fixes wrong name/company/position on infer-confirm save
 - Comma contact lines: deterministic parse only on explicit `/people`; smart routing uses LLM
