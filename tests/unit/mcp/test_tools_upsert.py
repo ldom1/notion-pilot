@@ -385,8 +385,10 @@ async def test_upsert_companies_confirm_true_force_bypasses_needs_review(monkeyp
 async def test_upsert_companies_confirm_true_force_does_not_bypass_siren_confidence_gate(
     monkeypatch,
 ):
-    # force=True only bypasses the needs_review *dedup* block. It must never cause a
-    # low-confidence SIREN candidate to be written — that gate stays enforced regardless.
+    # force=True bypasses a SIREN-divergence needs_review block (this is itself an
+    # override, hence created_with_override — no NAME-based dedup concern was ever
+    # raised here). It must never cause a low-confidence SIREN candidate to be
+    # written — that gate stays enforced regardless of force.
     session = await _loaded_session()
     monkeypatch.setattr(
         session.company_syncer, "get_or_create", AsyncMock(return_value="new-company-id")
@@ -406,8 +408,9 @@ async def test_upsert_companies_confirm_true_force_does_not_bypass_siren_confide
     )
 
     ensure_siren_mock.assert_not_called()
-    assert result.results[0].status == "created"  # no dedup needs_review was ever triggered here
+    assert result.results[0].status == "created_with_override"
     assert result.results[0].siren == ""
+    assert "VCSP ROUTE FRANCE" in result.results[0].reason
 
 
 async def test_upsert_companies_confirm_true_force_bypasses_dedup_but_not_siren_gate(monkeypatch):

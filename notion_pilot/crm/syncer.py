@@ -283,7 +283,8 @@ class NotionCompanySyncer:
     async def upsert(
         self, record: CompanyRecord, settings: "Settings | None" = None
     ) -> CompanyUpsertResult:
-        """Write path: dedup check → get-or-create → SIREN + enrichment write."""
+        """Write path: dedup check → SIREN pre-check (would_create path only) →
+        get-or-create → enrichment write."""
         signal = self._dedup_signal(record)
         dedup_status = signal.status
         dedup_score = signal.score
@@ -300,6 +301,51 @@ class NotionCompanySyncer:
                 reason=f"name similarity to existing company {dedup_best_name!r} "
                 f"(score {dedup_score:.0f})",
             )
+
+        siren_candidates: list[dict[str, str]] = []
+        siren_lookup_done = False
+        siren_override_reason = ""
+        if dedup_status == "would_create":
+            # No NAME-based concern was raised, but the SIREN registry lookup
+            # is itself an independent dedup signal — preview() already
+            # downgrades to needs_review when its only registry match
+            # diverges from the input name. upsert() must match that
+            # contract instead of silently creating the company just because
+            # the name signal alone looked clean.
+            try:
+                siren_candidates = await lookup_siren_candidates(record.name)
+            except Exception:  # noqa: BLE001
+                siren_candidates = []
+            siren_lookup_done = True
+            if siren_candidates:
+                top = siren_candidates[0]
+                divergence = float(
+                    token_sort_ratio(normalize(record.name), normalize(top["matched_name"]))
+                )
+                if divergence < _DEDUP_MATCH_THRESHOLD:
+                    if not record.force:
+                        return CompanyUpsertResult(
+                            status="needs_review",
+                            reason=f"SIREN candidate {top['matched_name']!r} doesn't resemble "
+                            f"{record.name!r} (score {divergence:.0f}); verify before writing",
+                            candidates=[
+                                {
+                                    "type": "siren",
+                                    "siren": c["siren"],
+                                    "matched_name": c["matched_name"],
+                                    "score": float(
+                                        token_sort_ratio(
+                                            normalize(record.name), normalize(c["matched_name"])
+                                        )
+                                    ),
+                                }
+                                for c in siren_candidates
+                            ],
+                        )
+                    siren_override_reason = (
+                        f"created despite SIREN candidate {top['matched_name']!r} not "
+                        f"resembling {record.name!r} (score {divergence:.0f})"
+                    )
 
         if dedup_status == "matched":
             # Our own dedup signal (domain match or confident name match) is
@@ -321,7 +367,10 @@ class NotionCompanySyncer:
         status: Literal["matched", "created", "created_with_override"]
         if not created_new:
             status = "matched"
-        elif dedup_status == "needs_review":  # only reachable here when record.force is True
+        elif dedup_status == "needs_review" or siren_override_reason:
+            # needs_review: only reachable here when record.force is True.
+            # siren_override_reason: force=True bypassed the SIREN-divergence
+            # pre-check above instead — an override either way.
             status = "created_with_override"
         else:
             status = "created"
@@ -329,7 +378,11 @@ class NotionCompanySyncer:
         siren = ""
         siren_candidate_name = ""
         reason = (
-            f"created despite name similarity to {dedup_best_name!r} (score {dedup_score:.0f})"
+            (
+                f"created despite name similarity to {dedup_best_name!r} (score {dedup_score:.0f})"
+                if dedup_status == "needs_review"
+                else siren_override_reason
+            )
             if status == "created_with_override"
             else ""
         )
@@ -349,10 +402,15 @@ class NotionCompanySyncer:
             if enrichment.linkedin_url:
                 props["Linkedin"] = {"url": enrichment.linkedin_url}
 
-            try:
-                siren_candidates = await lookup_siren_candidates(record.name)
-            except Exception:  # noqa: BLE001
-                siren_candidates = []
+            if not siren_lookup_done:
+                # would_create already looked this up above; only the
+                # needs_review+force path (which skips that pre-check by
+                # design — force explicitly authorizes proceeding) still
+                # needs its own lookup here.
+                try:
+                    siren_candidates = await lookup_siren_candidates(record.name)
+                except Exception:  # noqa: BLE001
+                    siren_candidates = []
             if siren_candidates:
                 top = siren_candidates[0]
                 divergence = float(
