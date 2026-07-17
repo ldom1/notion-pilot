@@ -33,7 +33,7 @@ async def test_get_open_leads_returns_list():
                     "properties": {
                         "Name": {"type": "title", "title": [{"plain_text": "Artelys HPC"}]},
                         "Stage": {"select": {"name": "Prospect"}},
-                        "Next action": {"rich_text": [{"plain_text": "Call CEO"}]},
+                        "Next Step": {"rich_text": [{"plain_text": "Call CEO"}]},
                     },
                 }
             ]
@@ -78,11 +78,6 @@ async def test_get_inbox_items_filters_not_analysed():
 
 @pytest.mark.asyncio
 async def test_get_recent_people_returns_list():
-    from unittest.mock import AsyncMock, MagicMock, patch
-
-    from notion_pilot.crm.queries import get_recent_people
-    from notion_pilot.shared.config import Settings
-
     settings = Settings(
         notion_token="secret_test",
         notion_telegram_msg_database_id="db-id",

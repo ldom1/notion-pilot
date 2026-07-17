@@ -508,7 +508,7 @@ def test_create_deal_with_extra_fields():
                 "notion_id": "person-id",
                 "extra_fields": {
                     "Product": ["HPC-as-a-service"],
-                    "Type": "Prospection chaude",
+                    "Lead Source": "Prospection chaude",
                     "Value (euros)": 45000,
                     "Notes": "Strategic account",
                 },
@@ -518,7 +518,7 @@ def test_create_deal_with_extra_fields():
     assert r.status_code == 200
     body = json.loads(respx.calls[0].request.content)
     assert body["properties"]["Product"]["multi_select"][0]["name"] == "HPC-as-a-service"
-    assert body["properties"]["Type"]["select"]["name"] == "Prospection chaude"
+    assert body["properties"]["Lead Source"]["select"]["name"] == "Prospection chaude"
     assert body["properties"]["Value (euros)"]["number"] == 45000
     assert body["properties"]["Notes"]["rich_text"][0]["text"]["content"] == "Strategic account"
 

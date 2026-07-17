@@ -205,6 +205,16 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         default=None,
         description="Notion data source ID for the Companies & departments database.",
     )
+    brave_api_key: SecretStr | None = Field(
+        default=None,
+        description="Brave Search API key for email enrichment during people import.",
+    )
+
+    # ── CRM Enrichment (optional) ────────────────────────────────────────────
+    apollo_api_key: SecretStr | None = Field(
+        default=None,
+        description="Apollo.io API key for person/company enrichment (Tier 1).",
+    )
 
     # ── Deals DB (optional) ──────────────────────────────────────────────────
     notion_deals_database_id: str | None = Field(

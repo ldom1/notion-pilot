@@ -422,23 +422,27 @@ def create_app(settings: Settings) -> FastAPI:
         if not db_id:
             return {**defn, "db_id": None, "count": None, "configured": False, "notion_name": None}
         try:
-            async with httpx.AsyncClient(headers=hdrs, timeout=15) as client:
+            async with httpx.AsyncClient(headers=hdrs, timeout=30) as client:
                 db_r = await client.get(f"{NOTION_API}/databases/{db_id}")
                 db_r.raise_for_status()
                 title_parts = db_r.json().get("title", [])
                 notion_name = "".join(t.get("plain_text", "") for t in title_parts) or None
-                q_r = await client.post(
-                    f"{NOTION_API}/databases/{db_id}/query", json={"page_size": 100}
-                )
-                q_r.raise_for_status()
-                data = q_r.json()
-                count = len(data.get("results", []))
-                has_more = bool(data.get("has_more"))
+                total, cursor = 0, None
+                while True:
+                    body: dict = {"page_size": 100}
+                    if cursor:
+                        body["start_cursor"] = cursor
+                    q_r = await client.post(f"{NOTION_API}/databases/{db_id}/query", json=body)
+                    q_r.raise_for_status()
+                    data = q_r.json()
+                    total += len(data.get("results", []))
+                    if not data.get("has_more"):
+                        break
+                    cursor = data.get("next_cursor")
             return {
                 **defn,
                 "db_id": db_id,
-                "count": count,
-                "has_more": has_more,
+                "count": total,
                 "configured": True,
                 "notion_name": notion_name,
             }
@@ -838,7 +842,7 @@ def create_app(settings: Settings) -> FastAPI:
                 if not people_db_id:
                     raise HTTPException(status_code=400, detail="People database not configured")
                 person_props: dict = {
-                    "Nom": {"title": [{"text": {"content": req.new_person.name}}]},
+                    "Name": {"title": [{"text": {"content": req.new_person.name}}]},
                 }
                 if req.new_person.position:
                     person_props["Position"] = {
@@ -898,7 +902,7 @@ def create_app(settings: Settings) -> FastAPI:
                     deal_props[key] = {"number": val}
                 elif val:
                     # select or text
-                    if key in {"Stage", "Type"}:
+                    if key in {"Stage", "Lead Source"}:
                         deal_props[key] = {"select": {"name": val}}
                     else:
                         deal_props[key] = {"rich_text": [{"text": {"content": str(val)}}]}
@@ -942,7 +946,7 @@ def create_app(settings: Settings) -> FastAPI:
         if not people_db_id:
             raise HTTPException(status_code=400, detail="People database not configured")
 
-        person_props: dict = {"Nom": {"title": [{"text": {"content": req.name}}]}}
+        person_props: dict = {"Name": {"title": [{"text": {"content": req.name}}]}}
         if req.position:
             person_props["Position"] = {"rich_text": [{"text": {"content": req.position}}]}
         async with httpx.AsyncClient(headers=notion_headers(token), timeout=20) as client:

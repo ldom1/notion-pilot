@@ -39,7 +39,8 @@ def _rich_text(prop: dict[str, Any]) -> str:
 
 
 async def get_open_leads(settings: Settings) -> list[dict[str, Any]]:
-    """Return open deals from the Deals DB with primary contact name resolved."""
+    """Return open deals from the Deals DB (stage not Closed Won/Lost/No Answer),
+    with primary contact name resolved."""
     if not settings.notion_deals_database_id:
         return []
     token = _token(settings)
@@ -47,6 +48,13 @@ async def get_open_leads(settings: Settings) -> list[dict[str, Any]]:
         resp = await client.post(
             f"{_NOTION_BASE}/databases/{settings.notion_deals_database_id}/query",
             json={
+                "filter": {
+                    "and": [
+                        {"property": "Stage", "select": {"does_not_equal": "Closed Won"}},
+                        {"property": "Stage", "select": {"does_not_equal": "Closed Lost"}},
+                        {"property": "Stage", "select": {"does_not_equal": "No Answer"}},
+                    ]
+                },
                 "sorts": [{"timestamp": "last_edited_time", "direction": "descending"}],
                 "page_size": 50,
             },
@@ -60,9 +68,7 @@ async def get_open_leads(settings: Settings) -> list[dict[str, Any]]:
             props = page.get("properties", {})
             stage_prop = props.get("Stage", {})
             stage = (stage_prop.get("select") or {}).get("name", "")
-            if stage in ("Closed - Won", "Closed - Lost"):
-                continue
-            next_action = _rich_text(props.get("Next action", {}))
+            next_action = _rich_text(props.get("Next Step", {}))
             page_id = page.get("id", "").replace("-", "")
             url = f"https://notion.so/{page_id}" if page_id else None
             contact_ids = [r["id"] for r in props.get("Contacts", {}).get("relation", [])]

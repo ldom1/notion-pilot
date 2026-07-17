@@ -74,6 +74,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: remove unused `pytest` import in `tests/unit/crm/test_recap.py`
 
 ### Added
+- **CRM schema redesign** — full 5-database rework (Deals/People/Companies/Meetings/Activities) via
+  Notion API migration scripts in `scripts/crm/`: Deals gets Lead Source, 9 stages, Expected Close
+  Date, Owner, Meetings relation; People renamed `Nom`→`Name` with Priority/Relationship/Lead Source;
+  Companies gets Revenue Potential, Sector, Size, and a durable `SIREN` property for Prosper lookups;
+  new Activities DB is the CRM's event log (Type, Outcome, Deal/Person/Company relations, Next Step).
+- Deal formulas (Notion Formula 1.0 API, binary `or`/`and`): Days Since Last Activity, Deal Age,
+  Deal Temperature (🔥/🌡/❄️), Stale Deal, Next Step Scheduled.
+- `scripts/crm/crm_sync_meetings_activities.py` — polls Meetings for `Advanced Deal?` = checked and
+  creates the corresponding Activity record; replaces the Notion UI automation (paid-plan only).
+
+### Added
 - Deploy workflow: `workflow_dispatch` trigger for manual re-deploys
 - `scripts/inbox/process_promotions.py` — batch Promotions folder → DomTelegramBot DB (dry-run, CSV review, dedup, `--from-csv`)
 - Config: `IMAP_PROMOTIONS_FOLDER`, `IMAP_SINCE_DAYS`; email bodies fall back to stripped HTML
