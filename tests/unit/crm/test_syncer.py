@@ -390,6 +390,42 @@ class TestNotionCompanySyncer:
         assert result.status == "created_with_override"
         assert result.siren == ""
 
+    async def test_get_or_create_force_create_bypasses_own_fuzzy_match(self):
+        # Regression guard: force_create=True must skip get_or_create's own
+        # independent name-similarity check entirely, not just raise its bar —
+        # otherwise force=True on upsert() could silently re-attach to the
+        # very company the caller is overriding.
+        client = _mock_ds_query([_make_company_page("id-edf", "EDF")])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+
+        page_id = await syncer.get_or_create("EDF", force_create=True)
+
+        assert page_id == "new-company-id"
+        client.pages.create.assert_called_once()
+
+    async def test_upsert_force_true_needs_review_always_creates_new_page(self, monkeypatch):
+        from notion_pilot.crm.syncer import CompanyEnrichment, CompanyRecord
+
+        client = _mock_ds_query([_make_company_page("id-rte", "RTE")])
+        syncer = NotionCompanySyncer(client, "fake-ds-id")
+        await syncer.load_notion_snapshot()
+        monkeypatch.setattr(
+            "notion_pilot.crm.syncer.enrich_company",
+            AsyncMock(return_value=CompanyEnrichment()),
+        )
+        monkeypatch.setattr(
+            "notion_pilot.crm.syncer.lookup_siren_candidates", AsyncMock(return_value=[])
+        )
+        get_or_create_spy = AsyncMock(wraps=syncer.get_or_create)
+        monkeypatch.setattr(syncer, "get_or_create", get_or_create_spy)
+
+        result = await syncer.upsert(CompanyRecord(name="Rte France", force=True))
+
+        get_or_create_spy.assert_awaited_once_with("Rte France", force_create=True)
+        assert result.status == "created_with_override"
+        assert result.page_id == "new-company-id"
+
 
 def _make_people_page(page_id: str, name: str, company_page_ids: list[str] | None = None) -> dict:
     return {

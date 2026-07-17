@@ -215,7 +215,7 @@ async def test_upsert_companies_confirm_true_writes(monkeypatch):
         session, _settings(), [CompanyRecord(name="OVHcloud")], confirm=True
     )
 
-    get_or_create_mock.assert_awaited_once_with("OVHcloud")
+    get_or_create_mock.assert_awaited_once_with("OVHcloud", force_create=False)
     assert result.results[0].status == "created"
     assert result.results[0].page_id == "new-company-id"
     assert result.results[0].siren == ""

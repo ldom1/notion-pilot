@@ -309,7 +309,13 @@ class NotionCompanySyncer:
             created_new = False
         else:
             known_before = set(self._id_to_name.keys())
-            page_id = await self.get_or_create(record.name)
+            # force_create=True when overriding a needs_review dedup block: force=True
+            # means "create a distinct new company", so get_or_create's own separate
+            # name-similarity check (a weaker, independent signal) must not be allowed
+            # to silently re-attach to the very company the caller is overriding.
+            page_id = await self.get_or_create(
+                record.name, force_create=(dedup_status == "needs_review")
+            )
             created_new = page_id not in known_before
 
         status: Literal["matched", "created", "created_with_override"]
@@ -435,17 +441,20 @@ class NotionCompanySyncer:
             cursor = result["next_cursor"]
         logger.info("Companies snapshot: {} entries", len(self._name_to_id))
 
-    async def get_or_create(self, name: str, settings: "Settings | None" = None) -> str:
+    async def get_or_create(
+        self, name: str, settings: "Settings | None" = None, *, force_create: bool = False
+    ) -> str:
         norm = normalize(name)
-        best_score = 0.0
-        best_id = ""
-        for cached_norm, pid in self._name_to_id.items():
-            score = float(token_sort_ratio(norm, cached_norm))
-            if score > best_score:
-                best_score = score
-                best_id = pid
-        if best_score >= 85 and best_id:
-            return best_id
+        if not force_create:
+            best_score = 0.0
+            best_id = ""
+            for cached_norm, pid in self._name_to_id.items():
+                score = float(token_sort_ratio(norm, cached_norm))
+                if score > best_score:
+                    best_score = score
+                    best_id = pid
+            if best_score >= 85 and best_id:
+                return best_id
         parent = (
             {"type": "database_id", "database_id": self._ds_id}
             if self._standard_api
