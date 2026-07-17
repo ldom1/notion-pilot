@@ -7,7 +7,13 @@ _EXCLUDED_FIELDS = {"status"}
 
 
 def _fields_spec() -> str:
-    """Build the JSON key spec from NotionDatabaseProperties — single source of truth."""
+    """Build the JSON key spec from NotionDatabaseProperties — single source of truth.
+
+    NOTE: for multi-link messages (>=2 URLs), this one-shot prompt is bypassed
+    entirely in favor of notion_pilot.shared.llm.synthesis — see inbox/knowledge.py.
+    Description here stays a short per-message summary; the richer per-link
+    breakdown for multi-link messages lives in the Notion page body, not this field.
+    """
     lines = []
     for py_name, field in NotionDatabaseProperties.model_fields.items():
         if py_name in _EXCLUDED_FIELDS:

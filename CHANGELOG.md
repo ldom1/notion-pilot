@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Multi-link Telegram messages (≥2 URLs) now produce a richer Notion knowledge page: each link
+  gets a heading + factual bullets (description, language, stars, topics where available) in the
+  page body, plus a set-level Description summarizing the links as a whole — instead of a one-line
+  Description with a blank body. A "Processing…" reply is sent first since this path is slower.
 - `/people`: pasting a markdown-formatted contact (`[Name](linkedin_url), Company :`, optionally
   followed by a repeated LinkedIn URL line) is now parsed deterministically, bypassing the LLM;
   falls through to the LLM (rather than guessing) if a second URL in the message disagrees with
