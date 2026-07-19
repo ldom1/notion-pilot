@@ -119,6 +119,7 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
             "notion_telegram_msg_database_id",
             "NOTION_TELEGRAM_MSG_DATABASE_ID",
             "NOTION_DATABASE_ID",
+            "notion_database_id",
         ),
     )
     notion_telegram_msg_database_title_property: str = Field(
