@@ -69,7 +69,7 @@ class InfisicalSettingsSource(PydanticBaseSettingsSource):
                     environment_slug=env_slug,
                     secret_path=path,
                     view_secret_value=True,
-                ):
+                ).secrets:
                     secrets[s.secretKey.lower()] = s.secretValue
             except Exception as exc:  # noqa: BLE001
                 _log.warning("Infisical: could not read path %s — %s", path, exc)
