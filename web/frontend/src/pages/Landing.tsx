@@ -83,13 +83,13 @@ export default function Landing() {
             <li style={styles.featureItem}>
               <span style={styles.featureDot} />
               <span>
-                <strong>CRM</strong> — people, companies, deals and enrichment synced to Notion
+                <strong>CRM</strong> — people, companies, and deals synced to Notion
               </span>
             </li>
             <li style={styles.featureItem}>
               <span style={styles.featureDot} />
               <span>
-                <strong>Inbox</strong> — capture from Telegram, email, and Discord with LLM enrichment
+                <strong>Inbox</strong> — capture from Telegram, email, and Discord
               </span>
             </li>
             <li style={styles.featureItem}>
