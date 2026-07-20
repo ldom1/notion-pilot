@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 
 import Header from "../components/Header";
 import { Spinner } from "../components/Spinner";
-import AutomationPanel from "../features/automation/AutomationPanel";
+import { McpPanel } from "../features/mcp/McpPanel";
 import { ChatPanel } from "../features/chat/ChatPanel";
 import { SetupWizard } from "../features/setup/SetupWizard";
 import { WorkspacePanel, DatabaseEntry } from "../features/workspace/WorkspacePanel";
@@ -145,7 +145,7 @@ const Cockpit: React.FC = () => {
           onCancelEdit={handleCancelEdit}
           onRedeploy={() => setShowRedeploy(true)}
         />
-        <AutomationPanel />
+        <McpPanel />
       </div>
 
       {showRedeploy && (

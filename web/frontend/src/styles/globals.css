@@ -78,6 +78,9 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f5f4ff; c
 .tg-bot-actions { display: flex; align-items: center; gap: 0.75rem; }
 .tg-bot-ping-result { font-size: 0.75rem; color: #9ca3af; }
 
+/* ── MCP panel ── */
+.mcp-tool-name { font-family: 'SF Mono', 'Fira Mono', monospace; }
+
 /* ── Automation view toggle ── */
 .auto-view-toggle { display: flex; gap: 0; border: 1px solid #e5e5e5; border-radius: 6px; overflow: hidden; }
 .view-btn { background: none; border: none; color: #888; font-size: 0.74rem; font-weight: 600; padding: 0.28rem 0.85rem; cursor: pointer; border-right: 1px solid #e5e5e5; white-space: nowrap; }
