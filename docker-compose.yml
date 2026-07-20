@@ -5,8 +5,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.web
-    ports:
-      - "${PORT:-8080}:8080"
+    expose:
+      - "8080"
     env_file:
       - path: .env.bootstrap
         required: true

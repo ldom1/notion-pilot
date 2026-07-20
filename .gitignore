@@ -7,6 +7,9 @@
 !.env.bootstrap.example
 deploy.sh
 PLAN.md
+# Local-dev-only host port mapping — Coolify routes by domain, not a hardcoded host port
+# (coolify-hp-elite-server-sop.md, "reserved host ports" rule)
+docker-compose.override.yml
 
 # --- Python bytecode & packaging ---
 __pycache__/

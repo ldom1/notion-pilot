@@ -69,7 +69,7 @@ class InfisicalSettingsSource(PydanticBaseSettingsSource):
                     environment_slug=env_slug,
                     secret_path=path,
                     view_secret_value=True,
-                ):
+                ).secrets:
                     secrets[s.secretKey.lower()] = s.secretValue
             except Exception as exc:  # noqa: BLE001
                 _log.warning("Infisical: could not read path %s — %s", path, exc)
@@ -119,6 +119,7 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
             "notion_telegram_msg_database_id",
             "NOTION_TELEGRAM_MSG_DATABASE_ID",
             "NOTION_DATABASE_ID",
+            "notion_database_id",
         ),
     )
     notion_telegram_msg_database_title_property: str = Field(
