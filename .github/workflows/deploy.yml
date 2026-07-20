@@ -1,8 +1,8 @@
 name: Deploy
 
+# Production deploys via Coolify webhook on hp-elite-server (push to main).
+# This workflow is kept for manual emergency deploys only.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
