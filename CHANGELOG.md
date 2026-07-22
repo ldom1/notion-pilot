@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Project skill `notion-crm-ops` (`skills/notion-crm-ops/`) for Artelys CRM ops via Notion MCP (Leads / Activities / People / Companies): always French validation table before write; symlinked into `.cursor/skills/` and `.claude/skills/`.
+- Cursor project MCP config (`.cursor/mcp.json`) registers `notion-crm` over stdio (`uv run python -m notion_pilot.mcp.server`), matching `.claude/settings.json`.
 - MCP server now optionally reachable over HTTP (`streamable-http` transport) at `/mcp` on the web service, gated by a static bearer token (`MCP_BEARER_TOKEN`) — in addition to the existing stdio transport. Mounted only when both `NOTION_TOKEN` and `MCP_BEARER_TOKEN` are set; acts on that single Notion workspace, not per-session OAuth workspaces.
 - Cockpit MCP panel: tools grouped into collapsible "Write · confirm required" / "Read-only" sections with a kind badge per tool, based on actual `confirm`-gated write behavior in `notion_pilot/mcp/tools.py`.
 - MCP: Deals ("Leads") and Activities databases now accessible — `upsert_deal` (matched by exact title, reuses the existing `NotionDealsSyncer`, now also covering `Lead Source`/`Primary contact`/`Expected Close Date`), `log_activity` (append-only, no dedup — new `notion_pilot/crm/activities.py`), and `get_activities` (recent activities, optionally scoped to one Deal). `get_open_leads` now includes `page_id` for linking Activities to a specific deal. Requires `NOTION_DEALS_DATABASE_ID`/`NOTION_ACTIVITIES_DATABASE_ID` (the latter setting was previously undocumented in `Settings` despite being in `.env.example`).

@@ -123,27 +123,6 @@ updated:
 **Rejected:** Requiring the user to manually select the company in the modal  
 **Rationale:** The company name is already on the lead card. Auto-detection of the relation property avoids hardcoding property names. Silent failure (skip, don't error) if name doesn't match exactly.
 
-### 2026-06-30 — CRM schema: Activities as operational core, Meetings as separate tool
-**Decision:** Activities DB is the CRM's event log (what happened, next step). Meetings stays as a separate personal tool; linking is optional via "Advanced Deal?" checkbox → Notion automation creates the Activity automatically.
-**Rejected:** Mandatory mirroring (every meeting must create an Activity), or merging Meetings into Activities
-**Rationale:** Mandatory mirroring causes double-entry friction. Self-enforcing incentive: checking "Advanced Deal?" auto-creates the Activity, so the dashboard stays accurate only if the checkbox is used. Meetings retains its personal use outside CRM flow.
-
-### 2026-06-30 — CRM formulas: Notion Formula 1.0 API constraints
-**Decision:** All formula expressions submitted via PATCH /databases use binary-only `or()`/`and()` nesting and inline dateBetween expressions (no cross-formula property references).
-**Rejected:** Using the Formula 2.0 syntax from the Notion UI editor (`or(A, B, C)`, `prop("Days Since Last Activity")`)
-**Rationale:** Notion Formula 1.0 API returns 400 on: `or()`/`and()` with 3+ args, and formula properties referencing other formula properties. The binary nesting and inlining produce semantically identical results.
-
-### 2026-06-30 — CRM "No Answer" as terminal stage
-**Decision:** "No Answer" is a terminal stage (Days Since = 0, Temperature = "—", excluded from Stale Deal). "Waiting for a Response" is active (ball in their court, still tracked).
-**Rejected:** Treating "No Answer" as just another waiting state
-**Rationale:** No Answer means "stopped trying — 3 unanswered attempts". It is an explicit decision to park the deal, not a passive state. Keeping it active corrupts the pipeline and temperature metrics.
-
-### 2026-07-02 — Company enrichment: SIREN property + Notion page icon for logo
-**Decision:** Added a `SIREN` (rich_text) property to the Companies DB, populated whenever a company is matched in Prosper. Company logos are stored as the Notion page `icon` (external URL, Clearbit favicon lookup on the company's website domain) rather than a dedicated Logo property.
-**Rejected:** Adding a dedicated `Logo` URL property; leaving SIREN unstored and re-searching Prosper on every enrichment pass.
-**Rationale:** SIREN is the durable key for re-enriching a company later without re-disambiguating between similarly-named entities (a real pain point — many searches returned 5-15 candidates for common names). Notion's native page icon renders in the UI immediately with zero schema change, and Prosper itself has no logo data (only French SIREN/NAF/financial registry data) — Clearbit lookup on Website is the practical fallback.
-**How to apply:** Any future company enrichment should check `SIREN` first before re-querying Prosper; only search when it's empty.
-
 ### 2026-07-13 — MCP server wraps existing CRM code as a thin translation layer
 **Decision:** New `notion_pilot/mcp/` package exposes the CRM vertical (upsert, dedup, enrichment, ranking, read queries) as MCP tools over stdio via `FastMCP`. `tools.py` calls straight into existing `crm/syncer.py`, `shared/utils/dedup.py`, `shared/utils/enrichment.py`, `crm/prospection.py`, `crm/queries.py` — zero duplicated business logic. Required one prerequisite refactor: `scripts/crm/crm_dedup.py`'s private pairwise duplicate-finder moved into `shared/utils/dedup.py` (as `find_company_duplicates`/`find_people_duplicates`/`notion_page_url`) so both the CLI script and the new `find_duplicates` tool share the same code.
 **Rejected:** Reimplementing dedup/enrichment/ranking logic inside the MCP layer; an HTTP/SSE transport (deferred — stdio matches the existing `code-index`/`qmd` local MCP server pattern already in use, no auth surface to design for a single-user local tool).
@@ -200,25 +179,27 @@ updated:
 **Rejected:** Using the real contact from `[[2026-07-15-mcp-server-test]]`'s incident report as literal fixture data (what actually happened this session — caught only by the harness's permission classifier after it was already committed and pushed to a public repo, not by self-review).
 **Rationale:** Real PII in fixtures ends up in git history, pushed to remotes, and referenced in PRs — a privacy exposure that requires a disruptive history rewrite + force-push to fix once discovered, versus zero cost to use a fictional name upfront. See `[[2026-07-16-mcp-crm-fixes]]` for the full incident and remediation.
 
-### 2026-07-20 — Deploy notion-pilot on hp-elite-server via Coolify, not devbox/systemd
+### 2026-07-17 — `upsert()` must enforce every `needs_review` gate `preview()` enforces, not just skip the write
 
-**Decision:** Production `notion-pilot` (web + bot containers) runs on hp-elite-server as a Coolify-managed service, reached publicly through the existing vps-ovh reverse proxy (`notion-pilot.dombot.tech` → Coolify/Traefik → web container `:8080`).
-**Rejected:** Continuing on devbox as a systemd user service (the original deployment target, still stated in this file's "What's Done" section until this entry).
-**Rationale:** The migration itself predates this session — found already done (devbox's `notion-pilot-web-1`/`bot-1` containers stopped, Coolify containers already running) but never reflected in vps-ovh's nginx vhost (still pointed at devbox's dead Tailscale IP) or in Coolify's Traefik config (no router registered for the real domain yet), which is what caused the 502 this session fixed. Full diagnosis: Local Brain `inbox/daily/specs/notion-pilot/2026-07-20-fix-web-view-design.md`.
-**Affects:** deploy path (Coolify GitHub webhook replaces the old `notion-pilot-gha`/`notion-pilot-deploy` SSH-to-devbox keys; `.github/workflows/deploy.yml` was removed entirely on `main` as part of this).
+**Decision:** After Task A7's live retest against production Notion found that `upsert()`'s SIREN-divergence check only skipped writing the SIREN property but still created the company outright — creating 2 real, unreviewed pages ("Ugent", "Sqli") — fixed `upsert()` to run the SIREN-divergence pre-check on the `would_create` path *before* `get_or_create()`, returning `needs_review` (blocking creation) unless `force=True`, exactly matching `preview()`'s contract. When `force=True` bypasses this specific gate, status is `created_with_override` (not plain `created`), consistent with how a `force`-bypassed dedup `needs_review` is reported.
+**Rejected:** Leaving `upsert()`'s narrower "skip only the SIREN field" behavior, on the theory that a wrong SIREN attachment was the only real risk.
+**Rationale:** `preview()` and `upsert()` are meant to have the same decision contract (dry-run vs. write) — a write path that's more permissive than its own preview defeats the purpose of previewing at all. This is a structurally identical class of bug to the 2026-07-16 "company dedup match discarded on the write path" entry above: a signal computed correctly gets silently weakened by the time it reaches the actual Notion write.
+**Affects:** [Non-Obvious Decisions](ARCHITECTURE.md#non-obvious-decisions)
 
-### 2026-07-20 — Remove cockpit Automation panel, add static MCP Server panel
+### 2026-07-17 — Leave an accidentally-exposed partial Notion token as-is, do not rotate
 
-**Decision:** Replace the cockpit's Automation panel (List/Graph views, Operations/Workflows tabs, script-runner + workflow-graph builder — `features/automation/`) with a static `features/mcp/McpPanel.tsx` listing the MCP server's registered tools and client connection snippet (sourced from `README.md`, no fabricated live status since the MCP server is stdio-only with no persistent process to poll).
-**Rejected:** Keeping the Automation panel as-is; also rejected removing the backend script/workflow engine (`web/server.py`'s `/api/cockpit/scripts` + `/api/cockpit/workflows` endpoints) and `config/scripts.yaml` — those still back legitimate CRM/Inbox ops (Refresh People/Companies, Import LinkedIn, Get/Retrieve Emails) and nothing else currently depends on the removed frontend panel, so backend removal was scoped out as a separate, larger decision.
-**Rationale:** User call: the generic script-runner/workflow-graph builder UI wasn't representative of what notion-pilot is for; the MCP server (`notion_pilot/mcp/`, 11 tools, already documented in README) is the actual "automation" surface going forward.
+**Decision:** When a Pydantic `ValidationError` on an unrelated sibling field (`NOTION_OAUTH_REDIRECT_URI` failing validation) dumped a partial real Notion OAuth token via its raw `input_value` into the session transcript, the user was asked whether to rotate the token and explicitly chose not to — "leave it, just continue."
+**Rejected:** Proactively rotating the token without being asked, or treating this as a forced-incident-response situation.
+**Rationale:** Explicit user call on their own credential; the agent's job here was to surface the exposure clearly (which it did) and stop printing raw `Settings` values afterward (worked around by overriding the env var and only printing booleans), not to unilaterally decide the token needed rotating.
+**Affects:** [Non-Obvious Decisions](ARCHITECTURE.md#non-obvious-decisions)
 
-### 2026-07-22 — MCP HTTP transport: static bearer token, not FastMCP's OAuth resource-server auth
 
-**Decision:** Gate the new `/mcp` streamable-HTTP mount (`web/server.py` + `notion_pilot/mcp/server.py::build_http_app()`) with a small `_BearerTokenMiddleware` comparing against a single `MCP_BEARER_TOKEN` secret, mounted only when both it and `NOTION_TOKEN` are set.
-**Rejected:** FastMCP's built-in `auth=AuthSettings(...)` + `token_verifier` mechanism — it requires a required `issuer_url` pointing at a real OAuth authorization server and would advertise `WWW-Authenticate`/resource-metadata endpoints for an authorization server that doesn't exist.
-**Rationale:** User explicitly asked for the simplest approach. A shared secret is honest about what's actually being verified (no OAuth server exists here) and needed no new infrastructure. Also fixed same-session: `PersonRecord.name`/`.company`/`CompanyRecord.name` (already Pydantic-"required") plus `linkedin_url`/`website`/`country`/`sector` now reject empty/whitespace-only strings via a `NonEmptyStr` type alias — root cause of a reported bug where an empty `name` created a blank-titled Notion page, since `Field(...)` only enforces presence, not content.
-**Affects:** [Key Modules](ARCHITECTURE.md#key-modules), [Non-Obvious Decisions](ARCHITECTURE.md#non-obvious-decisions)
+### 2026-07-22 — Agent CRM ops: one project skill + Notion MCP (not four skills)
+
+**Decision:** Ship a single project skill `notion-crm-ops` under `skills/notion-crm-ops/` (symlinked to `.cursor/skills/` and `.claude/skills/`) with progressive-disclosure references for People / Companies / Leads / Activities. Notion workspace MCP is mandatory for Artelys CRM; prefer `notion-crm` stdio for People/Companies dry-runs when connected. Always show a French validation table before any write.
+**Rejected:** Four separate skills (one per entity); writing CRM changes without a preview gate; inventing LinkedIn/SIREN when research fails.
+**Rationale:** Real sales threads are multi-entity (company + people + lead + activities). One orchestrating skill preserves a single validation table and shared completeness rules (Company: country/sector/SIREN/website/LinkedIn; People: name+company plus strongly expected email/linkedin/position/seniority/role_type/phone). Field shapes stay grounded in `notion_pilot/mcp/models.py`.
+**Affects:** Agent workflow; `skills/notion-crm-ops/`; `.cursor/mcp.json`
 
 ## Template
 <!-- added by ai-dotfiles upgrade -->

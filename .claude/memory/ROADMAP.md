@@ -126,9 +126,11 @@ Target: 4 custom knowledge DBs — Notions, Ideas, Tools, Data & Technology.
 ## Now
 <!-- added by ai-dotfiles upgrade -->
 
-- **PR #19 open, not yet merged** (`mcp-crm-fixes` → `develop`): fixes the People DB schema bug, the "Rte France"/"RTE" duplicate-creation bug, the SIREN accuracy gap, and the `matched_name` overwrite bug all listed below (formerly the "blocking bug" / SIREN accuracy / matched_name entries in this section, now shipped). See [DECISIONS.md](DECISIONS.md) 2026-07-16 entry and `[[2026-07-16-mcp-crm-fixes]]`. Needs review/merge decision.
+- **2026-07-22:** Project skill `notion-crm-ops` + Cursor `.cursor/mcp.json` for `notion-crm` stdio. Agent can create/update Leads & Activities via Notion MCP (preview-gated). Still open: wire `NOTION_DEALS_DATABASE_ID`/`NOTION_ACTIVITIES_DATABASE_ID` for stdio path; run skill evals.
+- **PR #19 merged** (`mcp-crm-fixes` → `develop`, squash `af2d718`, 2026-07-16): fixed the People DB schema bug, the "Rte France"/"RTE" duplicate-creation bug, the SIREN accuracy gap, and the `matched_name` overwrite bug. See [DECISIONS.md](DECISIONS.md) 2026-07-16 entry and `[[2026-07-16-mcp-crm-fixes]]`.
+- **3 PRs open, not yet merged** (from `[[2026-07-16-mcp-people-knowledge-fixes-plan]]`): #20 (`upsert_companies` MCP thin-wrapper refactor + a second SIREN-gate fix on `upsert()`, see DECISIONS.md 2026-07-17 entry), #21 (`/people` markdown-link paste parsing), #22 (richer multi-link knowledge pages). See `[[2026-07-17-mcp-people-knowledge-fixes]]`.
 - **New, found during PR #19's whole-branch review, not fixed in that PR:** `web/server.py`'s `/lead` and web-cockpit person-create path independently writes to the same wrong `"Nom"` property — same root cause, different code path. Needs its own fix.
-- **New, deferred until PR #19 merges:** archive the stale, empty "Rte France" duplicate Notion page (`39e6c451-9465-81d1-ad4e-f80e58fc3070`) — only after re-running the original live test to confirm it now resolves to `needs_review` against "RTE" instead of creating a duplicate.
+- **Still open:** archive the stale, empty "Rte France" duplicate Notion page (`39e6c451-9465-81d1-ad4e-f80e58fc3070`) — PR #19 is merged now, so this just needs the live-test re-run + archive step (not yet done). Not the same pages as the "Ugent"/"Sqli" pages archived 2026-07-17.
 
 ## Next
 <!-- added by ai-dotfiles upgrade -->

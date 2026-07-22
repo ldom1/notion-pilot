@@ -175,11 +175,15 @@ notion_pilot/
 └── media/             # Photo + voice download, on-device transcription
 ```
 
+## Agent skill: Artelys CRM ops
+
+Canonical skill: `skills/notion-crm-ops/` (symlinked to `.cursor/skills/notion-crm-ops` and `.claude/skills/notion-crm-ops`). Use it when adding/updating Leads, Activities, People, or Companies in the Artelys Notion CRM via Notion MCP — always with a French preview table before writes. See the skill’s `references/` for DB IDs and field enums.
+
 ## MCP server
 
 `notion_pilot/mcp/` exposes the CRM vertical's existing capabilities (fuzzy-dedup'd upsert, enrichment, duplicate scan, pitch-based ranking, read queries) as MCP tools over stdio, so any MCP-aware client (e.g. Claude Code, from this project or another) can ingest, dedup, enrich, and query Notion CRM data directly — without reinventing any of the matching/enrichment logic already proven in `crm/` and `shared/utils/`. It's a thin wrapper: `session.py` caches a `NotionCompanySyncer`/`NotionPeopleSyncer` snapshot for the process lifetime (background pre-warm at startup), and `tools.py` calls straight into the existing syncer/dedup/enrichment/prospection/queries functions.
 
-Register it as an MCP server (e.g. in a project's `.claude/settings.json`):
+Register it as an MCP server (e.g. in a project's `.claude/settings.json`, or Cursor's `.cursor/mcp.json` — this repo ships the latter):
 
 ```json
 {
