@@ -27,6 +27,9 @@ async def test_all_expected_tools_are_registered(monkeypatch):
         "get_recent_people",
         "get_open_leads",
         "refresh_notion_snapshot",
+        "upsert_deal",
+        "log_activity",
+        "get_activities",
     }
 
 

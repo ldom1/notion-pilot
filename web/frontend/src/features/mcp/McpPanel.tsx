@@ -11,7 +11,10 @@ const TOOLS: { name: string; desc: string; kind: ToolKind }[] = [
   { name: "search_companies", desc: "Fuzzy-search existing Companies by name.", kind: "read" },
   { name: "get_recent_people", desc: "People added to Notion in the last 7 days.", kind: "read" },
   { name: "get_open_leads", desc: "Open (non-closed) deals from the Deals database.", kind: "read" },
+  { name: "get_activities", desc: "Recent Activities (calls, meetings, emails...), newest first; optionally scoped to one Deal.", kind: "read" },
   { name: "refresh_notion_snapshot", desc: "Force-reload the cached People/Companies snapshot from Notion.", kind: "read" },
+  { name: "upsert_deal", desc: "Upsert a Deal (\"Leads\" in this cockpit) into the Deals database, matched by exact title. Dry-run by default.", kind: "write" },
+  { name: "log_activity", desc: "Log an Activity (call, meeting, email...) — an append-only event, not dedup-checked. Dry-run by default.", kind: "write" },
 ];
 
 const WRITE_TOOLS = TOOLS.filter((t) => t.kind === "write");

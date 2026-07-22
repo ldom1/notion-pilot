@@ -73,7 +73,13 @@ async def get_open_leads(settings: Settings) -> list[dict[str, Any]]:
             url = f"https://notion.so/{page_id}" if page_id else None
             contact_ids = [r["id"] for r in props.get("Contacts", {}).get("relation", [])]
             results.append(
-                {"title": _title(page), "stage": stage, "next_action": next_action, "url": url}
+                {
+                    "page_id": page.get("id", ""),
+                    "title": _title(page),
+                    "stage": stage,
+                    "next_action": next_action,
+                    "url": url,
+                }
             )
             contact_ids_per_result.append(contact_ids)
 

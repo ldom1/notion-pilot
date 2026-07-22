@@ -4,8 +4,10 @@ import pytest
 from pydantic import ValidationError
 
 from notion_pilot.mcp.models import (
+    ActivityInput,
     BatchResult,
     CompanyRecord,
+    DealInput,
     PersonRecord,
     RecordResult,
     summarize,
@@ -60,6 +62,58 @@ def test_company_record_size_and_contact_email_still_accept_empty_string():
     record = CompanyRecord(name="EDF", size="", contact_email="")
     assert record.size == ""
     assert record.contact_email == ""
+
+
+def test_deal_input_requires_name_defaults_confirm_false():
+    deal = DealInput(name="New Deal")
+    assert deal.stage is None
+    assert deal.confirm is False
+    with pytest.raises(ValidationError):
+        DealInput(name="")
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "stage",
+        "lead_source",
+        "company_name",
+        "contact_page_id",
+        "primary_contact_page_id",
+        "expected_close_date",
+        "next_step_date",
+    ],
+)
+def test_deal_input_optional_but_non_empty_if_given(field):
+    assert getattr(DealInput(name="New Deal"), field) is None
+    with pytest.raises(ValidationError):
+        DealInput(name="New Deal", **{field: ""})
+
+
+def test_activity_input_requires_type_defaults_confirm_false():
+    activity = ActivityInput(type="📞 Call")
+    assert activity.title is None
+    assert activity.confirm is False
+    with pytest.raises(ValidationError):
+        ActivityInput(type="")
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "title",
+        "outcome",
+        "deal_page_id",
+        "person_page_id",
+        "company_page_id",
+        "date",
+        "next_step_date",
+    ],
+)
+def test_activity_input_optional_but_non_empty_if_given(field):
+    assert getattr(ActivityInput(type="📞 Call"), field) is None
+    with pytest.raises(ValidationError):
+        ActivityInput(type="📞 Call", **{field: ""})
 
 
 def test_summarize_counts_by_status():

@@ -1,16 +1,21 @@
 """MCP tool implementations — thin wrappers around existing crm/shared logic."""
 
 import asyncio
+from datetime import date
 
 from rapidfuzz.fuzz import token_sort_ratio
 
+from notion_pilot.crm.activities import ActivityRecord as SyncerActivityRecord
+from notion_pilot.crm.deals import DealRecord as SyncerDealRecord
 from notion_pilot.crm.prospection import rank_contacts
 from notion_pilot.crm.queries import get_open_leads, get_recent_people
 from notion_pilot.crm.syncer import CompanyRecord as SyncerCompanyRecord
 from notion_pilot.crm.syncer import PersonRecord as SyncerPersonRecord
 from notion_pilot.mcp.models import (
+    ActivityInput,
     BatchResult,
     CompanyRecord,
+    DealInput,
     PersonRecord,
     RecordResult,
     summarize,
@@ -376,3 +381,105 @@ async def get_open_leads_tool(settings: Settings) -> list[dict[str, object]]:
 async def refresh_notion_snapshot(session: SyncerSession) -> dict[str, int]:
     people_count, companies_count = await session.refresh()
     return {"people_count": people_count, "companies_count": companies_count}
+
+
+async def upsert_deal(
+    session: SyncerSession, settings: Settings, deal: DealInput
+) -> dict[str, object]:
+    if not settings.notion_deals_database_id:
+        raise ValueError("NOTION_DEALS_DATABASE_ID is required to access the Deals database")
+    await session.ensure_loaded()
+
+    stage = deal.stage or "Prospect"
+    company_id = ""
+    company_preview: str | None = None
+    if deal.company_name:
+        if deal.confirm:
+            company_id = await session.company_syncer.get_or_create(
+                deal.company_name, settings=settings
+            )
+        else:
+            norm = normalize(deal.company_name)
+            best_score = max(
+                (
+                    float(token_sort_ratio(norm, cached))
+                    for cached in session.company_syncer._name_to_id
+                ),
+                default=0.0,
+            )
+            company_preview = (
+                "would_match_existing_company" if best_score >= 85 else "would_create_new_company"
+            )
+
+    if not deal.confirm:
+        return {
+            "status": "would_update"
+            if deal.name in session.deals_syncer._snapshot
+            else "would_create",
+            "title": deal.name,
+            "stage": stage,
+            "company_resolution": company_preview,
+        }
+
+    record = SyncerDealRecord(
+        title=deal.name,
+        stage=stage,
+        lead_source=deal.lead_source or "",
+        product=deal.product or [],
+        value_euros=deal.value_eur,
+        probability_pct=deal.probability_pct,
+        expected_close_date=deal.expected_close_date or "",
+        next_action=deal.next_step or "",
+        next_action_date=deal.next_step_date or "",
+        notes=deal.notes or "",
+        people_ids=[deal.contact_page_id] if deal.contact_page_id else [],
+        primary_contact_id=deal.primary_contact_page_id or "",
+        company_ids=[company_id] if company_id else [],
+    )
+    page_id, created = await session.deals_syncer.upsert(record)
+    return {
+        "status": "created" if created else "updated",
+        "page_id": page_id,
+        "url": notion_page_url(page_id),
+    }
+
+
+async def log_activity(
+    session: SyncerSession, settings: Settings, activity: ActivityInput
+) -> dict[str, object]:
+    if not settings.notion_activities_database_id:
+        raise ValueError("NOTION_ACTIVITIES_DATABASE_ID is required to log activities")
+
+    if not activity.confirm:
+        return {
+            "status": "would_create",
+            "type": activity.type,
+            "title": activity.title or activity.type,
+        }
+
+    record = SyncerActivityRecord(
+        title=activity.title or activity.type,
+        type=activity.type,
+        outcome=activity.outcome or "",
+        deal_id=activity.deal_page_id or "",
+        person_id=activity.person_page_id or "",
+        company_id=activity.company_page_id or "",
+        date=activity.date or date.today().isoformat(),
+        duration_min=activity.duration_min,
+        next_action=activity.next_step or "",
+        next_action_date=activity.next_step_date or "",
+        notes=activity.notes or "",
+    )
+    page_id = await session.activities.create(record)
+    return {"status": "created", "page_id": page_id, "url": notion_page_url(page_id)}
+
+
+async def get_activities_tool(
+    session: SyncerSession,
+    settings: Settings,
+    deal_page_id: str | None = None,
+    limit: int = 20,
+) -> list[dict[str, object]]:
+    if not settings.notion_activities_database_id:
+        return []
+    return await session.activities.list_recent(deal_id=deal_page_id, limit=limit)

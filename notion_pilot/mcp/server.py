@@ -18,7 +18,13 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from notion_pilot.mcp import tools as t
-from notion_pilot.mcp.models import BatchResult, CompanyRecord, PersonRecord
+from notion_pilot.mcp.models import (
+    ActivityInput,
+    BatchResult,
+    CompanyRecord,
+    DealInput,
+    PersonRecord,
+)
 from notion_pilot.mcp.session import SyncerSession
 from notion_pilot.shared.config import load_settings
 
@@ -138,6 +144,34 @@ async def refresh_notion_snapshot() -> dict[str, int]:
     """Force-reload the cached People/Companies snapshot from Notion (use if
     the Telegram bot or web cockpit may have written since this session started)."""
     return await t.refresh_notion_snapshot(_session)
+
+
+@mcp.tool()
+async def upsert_deal(deal: DealInput) -> dict[str, object]:
+    """Upsert a Deal ("Leads" in the cockpit UI) into the Deals database,
+    matched against existing deals by exact title. Defaults to a dry-run
+    preview (confirm=False) — pass confirm=True to actually write.
+    company_name is resolved the same way as upsert_companies (fuzzy match,
+    else create); contact_page_id/primary_contact_page_id must be existing
+    People page ids (find one via search_people or upsert_people first)."""
+    return await t.upsert_deal(_session, _settings, deal)
+
+
+@mcp.tool()
+async def log_activity(activity: ActivityInput) -> dict[str, object]:
+    """Log an Activity (call, meeting, email, ...) — an append-only event, not
+    dedup-checked like People/Companies/Deals. Defaults to a dry-run preview
+    (confirm=False) — pass confirm=True to actually write. deal_page_id/
+    person_page_id/company_page_id must be existing page ids."""
+    return await t.log_activity(_session, _settings, activity)
+
+
+@mcp.tool(name="get_activities")
+async def get_activities_endpoint(
+    deal_page_id: str | None = None, limit: int = 20
+) -> list[dict[str, object]]:
+    """Recent Activities, newest first. Pass deal_page_id to scope to one Deal."""
+    return await t.get_activities_tool(_session, _settings, deal_page_id, limit)
 
 
 class _BearerTokenMiddleware(BaseHTTPMiddleware):

@@ -48,6 +48,54 @@ class CompanyRecord(BaseModel):
     )
 
 
+class DealInput(BaseModel):
+    """Input shape for upsert_deal — matched against existing Deals by exact title."""
+
+    name: NonEmptyStr = Field(..., description="Deal title")
+    stage: NonEmptyStr | None = Field(default=None, description="Defaults to 'Prospect' if omitted")
+    lead_source: NonEmptyStr | None = None
+    company_name: NonEmptyStr | None = Field(
+        default=None, description="Resolved to the Client relation via company dedup"
+    )
+    contact_page_id: NonEmptyStr | None = Field(
+        default=None, description="Existing People page id — linked as Contacts"
+    )
+    primary_contact_page_id: NonEmptyStr | None = Field(
+        default=None, description="Existing People page id — linked as Primary contact"
+    )
+    value_eur: float | None = None
+    probability_pct: float | None = None
+    expected_close_date: NonEmptyStr | None = Field(default=None, description="ISO date")
+    next_step: str | None = None
+    next_step_date: NonEmptyStr | None = Field(default=None, description="ISO date")
+    notes: str | None = None
+    product: list[str] | None = None
+    confirm: bool = Field(
+        default=False,
+        description="Dry-run preview by default; pass confirm=true to actually write",
+    )
+
+
+class ActivityInput(BaseModel):
+    """Input shape for log_activity — Activities are an append-only event log, no dedup."""
+
+    type: NonEmptyStr = Field(..., description="e.g. '📞 Call', '🤝 Meeting', '📧 Email'")
+    title: NonEmptyStr | None = Field(default=None, description="Defaults to `type` if omitted")
+    outcome: NonEmptyStr | None = None
+    deal_page_id: NonEmptyStr | None = None
+    person_page_id: NonEmptyStr | None = None
+    company_page_id: NonEmptyStr | None = None
+    date: NonEmptyStr | None = Field(default=None, description="ISO date; defaults to today")
+    duration_min: float | None = None
+    next_step: str | None = None
+    next_step_date: NonEmptyStr | None = Field(default=None, description="ISO date")
+    notes: str | None = None
+    confirm: bool = Field(
+        default=False,
+        description="Dry-run preview by default; pass confirm=true to actually write",
+    )
+
+
 class RecordResult(BaseModel):
     """Outcome of processing a single record within a batch tool call."""
 
