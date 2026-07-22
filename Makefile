@@ -1,4 +1,4 @@
-.PHONY: up down dev dev-stop build-frontend install-frontend deploy
+.PHONY: up down dev dev-stop build-frontend check-frontend install-frontend deploy
 
 BRANCH         ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFISICAL_ENV  ?= dev
@@ -20,6 +20,10 @@ install-frontend:
 
 build-frontend:
 	cd web/frontend && npm run build
+
+# Type-checks vite.config.ts too, which `tsc --noEmit` on the solution config does not.
+check-frontend:
+	cd web/frontend && npx tsc -b --force
 
 dev:
 	@echo "Starting FastAPI (:8080) + Vite (:5173) [Infisical env: $(INFISICAL_ENV)]..."
@@ -44,6 +48,7 @@ dev-frontend:
 help:
 	@echo "make install-frontend  - Install frontend npm dependencies"
 	@echo "make build-frontend    - Build frontend for production (outputs to web/static/)"
+	@echo "make check-frontend    - Type-check the frontend (incl. vite.config.ts)"
 	@echo "make dev               - Start FastAPI on :8080 + Vite HMR on :5173 (Infisical env: dev)"
 	@echo "make dev-stop          - Kill orphaned uvicorn/vite dev processes"
 	@echo "make dev-backend       - FastAPI only (port 8080, Infisical env: dev)"
