@@ -1,9 +1,21 @@
-"""MCP server entrypoint — stdio transport, registers the notion-pilot CRM tools."""
+"""MCP server entrypoint — registers the notion-pilot CRM tools.
 
+Runs over stdio by default (`python -m notion_pilot.mcp.server`, for MCP-aware
+desktop clients). `build_http_app()` additionally exposes the same tools over
+the streamable-HTTP transport, gated by a static bearer token, so it can be
+mounted into the web cockpit's FastAPI app for remote MCP clients.
+"""
+
+import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
+from starlette.applications import Starlette
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 
 from notion_pilot.mcp import tools as t
 from notion_pilot.mcp.models import BatchResult, CompanyRecord, PersonRecord
@@ -23,7 +35,17 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
     yield
 
 
-mcp = FastMCP("notion-crm", lifespan=_lifespan)
+mcp = FastMCP(
+    "notion-crm",
+    lifespan=_lifespan,
+    # Mounted under /mcp in the host app (web/server.py) — route at "/" there,
+    # not the default "/mcp", so the combined path isn't /mcp/mcp.
+    streamable_http_path="/",
+    # DNS-rebinding protection only allowlists 127.0.0.1/localhost Host headers
+    # by default; this is reached over the internet at the real domain and is
+    # already gated by the bearer token in build_http_app(), not by Host.
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+)
 
 
 @mcp.tool()
@@ -116,6 +138,33 @@ async def refresh_notion_snapshot() -> dict[str, int]:
     """Force-reload the cached People/Companies snapshot from Notion (use if
     the Telegram bot or web cockpit may have written since this session started)."""
     return await t.refresh_notion_snapshot(_session)
+
+
+class _BearerTokenMiddleware(BaseHTTPMiddleware):
+    """Rejects any request whose `Authorization` header doesn't match the
+    configured bearer token. Runs in front of the MCP streamable-HTTP app —
+    there is no OAuth authorization server behind this, just a shared secret."""
+
+    def __init__(self, app: Starlette, token: str) -> None:
+        super().__init__(app)
+        self._expected = f"Bearer {token}"
+
+    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[no-untyped-def]
+        if not secrets.compare_digest(request.headers.get("authorization", ""), self._expected):
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        return await call_next(request)
+
+
+def build_http_app(bearer_token: str) -> Starlette:
+    """Streamable-HTTP ASGI app for `mcp`, gated by `bearer_token`.
+
+    Meant to be mounted into another ASGI app (the web cockpit) at a sub-path.
+    The host app must also enter `mcp.session_manager.run()` in its own
+    lifespan — Starlette does not run a mounted sub-app's lifespan on its own.
+    """
+    http_app = mcp.streamable_http_app()
+    http_app.add_middleware(_BearerTokenMiddleware, token=bearer_token)
+    return http_app
 
 
 if __name__ == "__main__":

@@ -1,15 +1,22 @@
 """Pydantic models for MCP tool inputs and outputs."""
 
-from pydantic import BaseModel, Field
+from typing import Annotated
+
+from pydantic import BaseModel, Field, StringConstraints
+
+# Rejects missing, empty, and whitespace-only values — not just "field present".
+# A plain `str = Field(...)` only requires the key to exist; a client (LLM or
+# otherwise) can still pass "" and create a blank Notion page.
+NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class PersonRecord(BaseModel):
     """Input shape for a person to upsert into the Notion People database."""
 
-    name: str = Field(..., description="Full name of the contact")
-    company: str = Field(..., description="Company name")
+    name: NonEmptyStr = Field(..., description="Full name of the contact")
+    company: NonEmptyStr = Field(..., description="Company name")
     position: str | None = None
-    linkedin_url: str | None = None
+    linkedin_url: NonEmptyStr | None = None
     email: str | None = None
     phone: str | None = None
     seniority: str | None = None
@@ -23,12 +30,12 @@ class PersonRecord(BaseModel):
 class CompanyRecord(BaseModel):
     """Input shape for a company to upsert into the Notion Companies database."""
 
-    name: str = Field(..., description="Company name")
-    website: str | None = None
-    linkedin_url: str | None = None
+    name: NonEmptyStr = Field(..., description="Company name")
+    website: NonEmptyStr | None = None
+    linkedin_url: NonEmptyStr | None = None
     size: str | None = None
-    country: str | None = None
-    sector: str | None = None
+    country: NonEmptyStr | None = None
+    sector: NonEmptyStr | None = None
     contact_email: str | None = Field(
         default=None,
         description="Email of a known contact at this company — used as a dedup domain signal and, "

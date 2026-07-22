@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- MCP server now optionally reachable over HTTP (`streamable-http` transport) at `/mcp` on the web service, gated by a static bearer token (`MCP_BEARER_TOKEN`) — in addition to the existing stdio transport. Mounted only when both `NOTION_TOKEN` and `MCP_BEARER_TOKEN` are set; acts on that single Notion workspace, not per-session OAuth workspaces.
+- Cockpit MCP panel: tools grouped into collapsible "Write · confirm required" / "Read-only" sections with a kind badge per tool, based on actual `confirm`-gated write behavior in `notion_pilot/mcp/tools.py`.
+
+### Fixed
+- `upsert_people`/`upsert_companies` MCP tools: `PersonRecord.name`/`.company` and `CompanyRecord.name` now reject empty/whitespace-only strings (previously only required the key to be *present*, so an empty `name` could create a blank-titled Notion page). Same non-empty-if-provided constraint added to `PersonRecord.linkedin_url` and `CompanyRecord.website`/`.linkedin_url`/`.country`/`.sector`.
+
+### Fixed
+- Cockpit chat: resolve People → Company relation names when building CRM context; rehydrate lead names from `notion_id` when the LLM returns placeholders like `[PERSON_NAME]`; drop unresolvable placeholder leads.
+- Local dev: `.infisical.json` project ID updated to dedicated `notion-pilot` project (`71e743d9-…`); `make dev` uses `--env dev --path /`.
+- Cockpit: Notion status/chat queries fall back to `data_sources` API when `databases` returns 404; clearer access-denied message in UI.
+- Local dev: `WEB_SECRET_KEY` accepted as alias for `WEB_SESSION_SECRET` (OAuth 500 when only the legacy name was set).
+
+### Changed
+- Local dev: removed `.env` / `NOTION_PILOT_DEV` fallbacks — secrets come from Infisical per environment (`dev`, `staging`, `prod`). Override with `INFISICAL_ENV=staging make dev`.
+- Infisical: all envs use secret path `/` (was `/notion-pilot` for prod); SDK source reads `/global` then `/`.
+- Infisical: renamed `NOTION_DATABASE_ID` → `NOTION_TELEGRAM_MSG_DATABASE_ID`, `NOTION_TITLE_PROPERTY` → `NOTION_TELEGRAM_MSG_DATABASE_TITLE_PROPERTY`; removed unused `NOTION_OAUTH_AUTHORIZATION_URL` and `NOTION_COMMERCIAL_DATA_SOURCE_ID`.
+
+### Added
 - Multi-link Telegram messages (≥2 URLs) now produce a richer Notion knowledge page: each link
   gets a heading + factual bullets (description, language, stars, topics where available) in the
   page body, plus a set-level Description summarizing the links as a whole — instead of a one-line

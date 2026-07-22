@@ -179,7 +179,10 @@ def test_cockpit_status_with_configured_db():
     ]:
         setattr(settings, attr, None)
 
-    with patch("web.config.load_cockpit_cfg", return_value={"databases": {}}):
+    with patch(
+        "web.config.load_cockpit_cfg",
+        return_value={"databases": {"notion_people_data_source_id": "db-people-id"}},
+    ):
         client = _authed_client(settings=settings)
         r = client.get("/api/cockpit/status")
 
@@ -820,6 +823,51 @@ def test_chat_passes_history_to_llm():
 
 
 # ── crm_chat module ───────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_chat_crm_rehydrates_placeholder_names():
+    from notion_pilot.shared.llm.crm_chat import chat_crm
+
+    settings = MagicMock()
+    settings.openrouter_api_key = MagicMock()
+    settings.openrouter_api_key.get_secret_value.return_value = "key-x"
+    settings.openrouter_model = "model-x"
+    settings.openrouter_url = "https://openrouter.ai/api/v1"
+    settings.openrouter_http_referer = None
+    settings.openrouter_app_title = "Test"
+
+    response_body = {
+        "action": "suggest",
+        "message": "3 leads",
+        "leads": [
+            {
+                "type": "existing",
+                "name": "[PERSON_NAME]",
+                "notion_id": "p1",
+                "position": "Head of AI [ADDRESS]",
+                "company": "Veolia",
+            }
+        ],
+    }
+    respx.post("https://openrouter.ai/api/v1/chat/completions").mock(
+        return_value=Response(
+            200, json={"choices": [{"message": {"content": json.dumps(response_body)}}]}
+        )
+    )
+
+    people = [
+        {
+            "id": "p1",
+            "name": "Paul Saffers",
+            "position": "Head of AI | Veolia",
+            "company": "Veolia Eau",
+        }
+    ]
+    result = await chat_crm(settings, "find leads", [], people)
+    assert result["leads"][0]["name"] == "Paul Saffers"
+    assert "[ADDRESS]" not in result["leads"][0]["position"]
 
 
 @pytest.mark.asyncio

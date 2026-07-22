@@ -210,4 +210,19 @@ Tools:
 
 All write tools default to `confirm=false` (dry-run preview, no Notion write) and require an explicit `confirm=true` to actually write.
 
+### Remote access (HTTP)
+
+The same tools are also reachable over HTTP — mounted at `/mcp` on the deployed web service, gated by a static bearer token — for MCP clients that can't spawn a local subprocess. Set `NOTION_TOKEN` and `MCP_BEARER_TOKEN` (see `.env.example`); the mount is skipped entirely if either is unset. Note this endpoint always acts on that single `NOTION_TOKEN` workspace, not any per-session OAuth workspace connected through the cockpit UI.
+
+```json
+{
+  "mcpServers": {
+    "notion-crm": {
+      "url": "https://notion-pilot.dombot.tech/mcp",
+      "headers": { "Authorization": "Bearer <MCP_BEARER_TOKEN>" }
+    }
+  }
+}
+```
+
 Contributions welcome. Short & sharp.

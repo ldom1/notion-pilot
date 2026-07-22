@@ -75,8 +75,13 @@ def save_cockpit_cfg(workspace_id: str, cfg: dict) -> None:
     path.write_text(json.dumps(cfg, indent=2))
 
 
-def resolve_db_ids(settings: Settings, workspace_id: str) -> dict:
-    """Cockpit config overrides .env values; cockpit config takes precedence."""
+def resolve_db_ids(
+    settings: Settings,
+    workspace_id: str,
+    *,
+    cockpit_only: bool = False,
+) -> dict:
+    """Cockpit overrides Infisical/env. Web UI passes cockpit_only=True (linked DBs only)."""
     base: dict[str, str | None] = {
         "notion_people_data_source_id": settings.notion_people_data_source_id,
         "notion_companies_data_source_id": settings.notion_companies_data_source_id,
@@ -88,6 +93,8 @@ def resolve_db_ids(settings: Settings, workspace_id: str) -> dict:
         "notion_data_tech_database_id": settings.notion_data_tech_database_id,
     }
     overrides = load_cockpit_cfg(workspace_id).get("databases", {})
+    if cockpit_only:
+        return {k: overrides.get(k) for k in base}
     return {k: overrides.get(k) or v for k, v in base.items()}
 
 

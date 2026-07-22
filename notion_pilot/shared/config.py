@@ -20,10 +20,10 @@ class InfisicalSettingsSource(PydanticBaseSettingsSource):
     """Fetches secrets from Infisical via Universal Auth (SDK path).
 
     No-op when INFISICAL_CLIENT_ID is absent — CLI-injected env vars take over.
-    Secrets from /notion-pilot override /global on key conflict (later path wins).
+    Secrets from / override /global on key conflict (later path wins).
     """
 
-    _PATHS: tuple[str, ...] = ("/global", "/notion-pilot")
+    _PATHS: tuple[str, ...] = ("/global", "/")
 
     def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
         # Required by ABC; not called because __call__ is fully overridden.
@@ -125,6 +125,14 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
     notion_telegram_msg_database_title_property: str = Field(
         default="Name",
         description="Notion title column name (use Name if your DB uses the default title)",
+    )
+
+    # ── MCP server (optional) ────────────────────────────────────────────────
+    mcp_bearer_token: SecretStr | None = Field(
+        default=None,
+        description="Shared bearer token required to call the MCP server's HTTP transport "
+        "(mounted at /mcp). The web server only mounts /mcp when both this and "
+        "notion_token are set — leave unset to keep MCP stdio-only.",
     )
 
     # ── Telegram (optional) ──────────────────────────────────────────────────
@@ -272,6 +280,11 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
     )
     web_session_secret: SecretStr | None = Field(
         default=None,
+        validation_alias=AliasChoices(
+            "web_session_secret",
+            "WEB_SESSION_SECRET",
+            "WEB_SECRET_KEY",
+        ),
         description="Secret key for signing session cookies (deploy wizard). Required when NOTION_OAUTH_CLIENT_ID is set.",
     )
 
@@ -291,7 +304,12 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
 
     @model_validator(mode="after")
     def _check_oauth_redirect_uri(self) -> "Settings":
-        if self.notion_oauth_client_id and "localhost" in self.notion_oauth_redirect_uri:
+        env = os.environ.get("INFISICAL_ENV", "prod").lower()
+        if (
+            self.notion_oauth_client_id
+            and "localhost" in self.notion_oauth_redirect_uri
+            and env == "prod"
+        ):
             raise ValueError(
                 f"NOTION_OAUTH_REDIRECT_URI is set to '{self.notion_oauth_redirect_uri}' "
                 "which contains 'localhost' — this will break OAuth in production. "

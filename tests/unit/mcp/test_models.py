@@ -1,5 +1,8 @@
 """Unit tests for mcp/models.py — pure data, no I/O."""
 
+import pytest
+from pydantic import ValidationError
+
 from notion_pilot.mcp.models import (
     BatchResult,
     CompanyRecord,
@@ -13,6 +16,50 @@ def test_person_record_requires_name_and_company():
     record = PersonRecord(name="Jean Dupont", company="EDF")
     assert record.position is None
     assert record.role_type is None
+
+
+@pytest.mark.parametrize("bad_name", ["", "   "])
+def test_person_record_rejects_blank_name(bad_name):
+    with pytest.raises(ValidationError):
+        PersonRecord(name=bad_name, company="EDF")
+
+
+@pytest.mark.parametrize("bad_company", ["", "   "])
+def test_person_record_rejects_blank_company(bad_company):
+    with pytest.raises(ValidationError):
+        PersonRecord(name="Jean Dupont", company=bad_company)
+
+
+def test_person_record_strips_surrounding_whitespace():
+    record = PersonRecord(name="  Jean Dupont  ", company=" EDF ")
+    assert record.name == "Jean Dupont"
+    assert record.company == "EDF"
+
+
+def test_company_record_rejects_blank_name():
+    with pytest.raises(ValidationError):
+        CompanyRecord(name="")
+
+
+def test_person_record_linkedin_url_optional_but_non_empty_if_given():
+    assert PersonRecord(name="Jean Dupont", company="EDF").linkedin_url is None
+    with pytest.raises(ValidationError):
+        PersonRecord(name="Jean Dupont", company="EDF", linkedin_url="")
+
+
+@pytest.mark.parametrize("field", ["website", "linkedin_url", "country", "sector"])
+def test_company_record_optional_but_non_empty_if_given(field):
+    assert getattr(CompanyRecord(name="EDF"), field) is None
+    with pytest.raises(ValidationError):
+        CompanyRecord(name="EDF", **{field: ""})
+
+
+def test_company_record_size_and_contact_email_still_accept_empty_string():
+    """Unlike the fields above, these weren't flagged for the non-empty
+    constraint — behavior must stay unchanged (empty string still valid)."""
+    record = CompanyRecord(name="EDF", size="", contact_email="")
+    assert record.size == ""
+    assert record.contact_email == ""
 
 
 def test_summarize_counts_by_status():

@@ -12,8 +12,8 @@ updated:
 - LLM enrichment via OpenRouter (heuristics fallback if no key)
 - Multi-adapter architecture: Telegram, Email (IMAP), Discord
 - CRM module fully functional: `/lead`, `/people`, `/company`, `/deal`, `/enrich`, `/knowledge`
-- Deployed on devbox as systemd user service
-- Cockpit (Phase 4): chat panel, workspace panel, automation panel — UX polished
+- Deployed on hp-elite-server via Coolify (containers, not systemd) — migrated off devbox 2026-07-20; see Local Brain `inbox/daily/specs/notion-pilot/2026-07-20-fix-web-view-design.md`
+- Cockpit (Phase 4): chat panel, workspace panel, MCP Server info panel — UX polished (automation panel removed 2026-07-20, see Decisions)
 
 ## Current Branch
 
@@ -68,11 +68,12 @@ Full pass over all 29 leads in the Deal Board: backfilled 18 Activities from the
 - PR #19 (`af2d718`) fixed: People DB schema mismatch, "Rte France"/"RTE" duplicate creation, wrong-SIREN attachment, no-fallback-enrichment. Top-3 SIREN candidates with a name-divergence gate now used instead of blind top-1.
 - Fixed during the PR #15 merge (2026-07-17): `web/server.py`'s `/lead`, create-lead, and create-deal inline-person-creation paths all wrote to the wrong `"Nom"` property — same root cause as the People DB schema bug PR #19 fixed, different code paths. All three now write `"Name"`.
 - Deferred: archive the stale, empty "Rte France" duplicate Notion page (`39e6c451-9465-81d1-ad4e-f80e58fc3070`) once the original live test is re-run to confirm no further duplicates.
+- 2026-07-22: MCP server now also reachable over `streamable-http` at `/mcp` on the web service (mounted only when `NOTION_TOKEN` + `MCP_BEARER_TOKEN` are both set), in addition to stdio — gated by a static bearer token, not FastMCP's OAuth resource-server auth. Same-session fix: `PersonRecord.name`/`.company`/`CompanyRecord.name` plus a few optional fields (`linkedin_url`, `website`, `country`, `sector`) now reject empty/whitespace-only strings — previously an empty `name` could create a blank-titled Notion page since `Field(...)` only requires presence, not content. See ARCHITECTURE.md "Non-Obvious Decisions" and `[[2026-07-22-mcp-http-transport-and-field-validation]]`.
 
 ## What's New (2026-06-04, UX polish)
 
 ### Cockpit layout
-- Panel order: Chat → Workspace → Automation
+- Panel order: Chat → Workspace → MCP Server (was Automation until 2026-07-20)
 - Workspace panel moved above Automation for discoverability
 
 ### Ask your data (ChatPanel)
@@ -132,6 +133,6 @@ web/
       pages/Cockpit.tsx          ← panel layout, savingDbId state
       features/chat/ChatPanel.tsx ← Ask your data, example prompts, lead modal
       features/workspace/WorkspacePanel.tsx ← per-card save loading state
-      features/automation/AutomationPanel.tsx ← scripts + graph view
+      features/mcp/McpPanel.tsx ← MCP tool list (collapsible write/read-only groups, kind badges) + stdio/http connection info (replaced features/automation/ 2026-07-20)
       styles/globals.css         ← all UI styles
 ```

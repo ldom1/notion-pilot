@@ -33,3 +33,18 @@ def extract_text_prop(props: dict, key: str) -> str:
     if p.get("type") == "select" and p.get("select"):
         return str(p["select"]["name"])
     return ""
+
+
+def extract_relation_ids(props: dict, key: str) -> list[str]:
+    p = props.get(key, {})
+    if p.get("type") != "relation":
+        return []
+    return [rel["id"] for rel in p.get("relation", []) if rel.get("id")]
+
+
+def resolve_company_name(props: dict, company_names: dict[str, str], key: str = "Company") -> str:
+    """Resolve a People → Company relation to a display name."""
+    for rel_id in extract_relation_ids(props, key):
+        if rel_id in company_names:
+            return company_names[rel_id]
+    return extract_text_prop(props, key)

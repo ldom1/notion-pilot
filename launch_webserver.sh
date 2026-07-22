@@ -10,37 +10,35 @@
 # Override any env var by exporting it before running this script.
 #
 # Usage:
-#   make dev-backend               # preferred (wraps with infisical run --)
-#   infisical run -- ./launch_webserver.sh
-#   PORT=9000 infisical run -- ./launch_webserver.sh
+#   make dev-backend               # preferred (wraps with infisical run --env dev)
+#   infisical run --env dev --path / -- ./launch_webserver.sh
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Defaults
 WEB_ADMIN_USERNAME="${WEB_ADMIN_USERNAME:-admin}"
 WEB_ADMIN_PASSWORD="${WEB_ADMIN_PASSWORD:-}"
-WEB_SECRET_KEY="${WEB_SECRET_KEY:-}"
+WEB_SECRET_KEY="${WEB_SECRET_KEY:-${WEB_SESSION_SECRET:-}}"
+WEB_SESSION_SECRET="${WEB_SESSION_SECRET:-$WEB_SECRET_KEY}"
 PORT="${PORT:-8080}"
 
 if [[ -z "$WEB_ADMIN_PASSWORD" ]]; then
   echo "ERROR: WEB_ADMIN_PASSWORD is not set."
-  echo "  Run via: infisical run -- ./launch_webserver.sh"
-  echo "  Or:      make dev-backend"
+  echo "  Run: infisical login && make dev-backend"
   exit 1
 fi
 
 if [[ -z "$WEB_SECRET_KEY" ]]; then
-  echo "ERROR: WEB_SECRET_KEY is not set."
-  echo "  Run via: infisical run -- ./launch_webserver.sh"
-  echo "  Or:      make dev-backend"
+  echo "ERROR: WEB_SESSION_SECRET (or WEB_SECRET_KEY) is not set."
+  echo "  Run: infisical login && make dev-backend"
   exit 1
 fi
 
 export WEB_ADMIN_USERNAME
 export WEB_ADMIN_PASSWORD
 export WEB_SECRET_KEY
+export WEB_SESSION_SECRET
 
 echo "Starting Notion Pilot web UI on http://0.0.0.0:${PORT}"
 echo "  Admin user : $WEB_ADMIN_USERNAME"
