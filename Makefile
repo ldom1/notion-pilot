@@ -1,6 +1,10 @@
-.PHONY: up down dev build-frontend install-frontend deploy
+.PHONY: up down dev dev-stop build-frontend install-frontend deploy
 
-BRANCH       ?= $(shell git rev-parse --abbrev-ref HEAD)
+BRANCH         ?= $(shell git rev-parse --abbrev-ref HEAD)
+INFISICAL_ENV  ?= dev
+# All envs (dev, staging, prod): secrets at project root /
+INFISICAL_PATH ?= /
+INFISICAL      ?= infisical run --env $(INFISICAL_ENV) --path $(INFISICAL_PATH) --
 
 deploy:
 	BRANCH=$(BRANCH) ./deploy.sh
@@ -18,16 +22,21 @@ build-frontend:
 	cd web/frontend && npm run build
 
 dev:
-	@echo "Starting FastAPI (:8080) + Vite (:5174)..."
-	@echo "  1. Authenticate once at http://localhost:8080"
-	@echo "  2. Then use http://localhost:5174 for hot-reload development"
+	@echo "Starting FastAPI (:8080) + Vite (:5173) [Infisical env: $(INFISICAL_ENV)]..."
+	@echo "  1. Open http://localhost:5173 and sign in with Notion"
+	@echo "  2. If Infisical session expired: infisical login"
 	@trap 'kill %1 %2 2>/dev/null; exit 0' INT; \
-	infisical run -- ./launch_webserver.sh & \
+	(PORT=8080 INFISICAL_ENV=$(INFISICAL_ENV) $(INFISICAL) ./launch_webserver.sh) & \
 	cd web/frontend && npm run dev & \
 	wait
 
+dev-stop:
+	@pkill -f 'uvicorn web.server:app_factory.*--port 8080' 2>/dev/null || true
+	@pkill -f 'web/frontend/node_modules/.bin/vite' 2>/dev/null || true
+	@echo "Stopped dev servers on :8080 / :5173 (if any were running)"
+
 dev-backend:
-	infisical run -- ./launch_webserver.sh
+	PORT=8080 INFISICAL_ENV=$(INFISICAL_ENV) $(INFISICAL) ./launch_webserver.sh
 
 dev-frontend:
 	cd web/frontend && npm run dev
@@ -35,9 +44,11 @@ dev-frontend:
 help:
 	@echo "make install-frontend  - Install frontend npm dependencies"
 	@echo "make build-frontend    - Build frontend for production (outputs to web/static/)"
-	@echo "make dev               - Start FastAPI on :8080 + Vite HMR on :5173"
-	@echo "make dev-backend       - FastAPI only (port 8080)"
+	@echo "make dev               - Start FastAPI on :8080 + Vite HMR on :5173 (Infisical env: dev)"
+	@echo "make dev-stop          - Kill orphaned uvicorn/vite dev processes"
+	@echo "make dev-backend       - FastAPI only (port 8080, Infisical env: dev)"
 	@echo "make dev-frontend      - Vite dev server only (port 5173, proxies to :8080)"
+	@echo "  INFISICAL_ENV=staging make dev   - other env (path / by default)"
 	@echo "make up                - Start with Docker Compose"
 	@echo "make down              - Stop Docker Compose"
 	@echo "make deploy            - Push + deploy current branch to devbox via deploy.sh (BRANCH=name)"

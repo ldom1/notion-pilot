@@ -200,5 +200,25 @@ updated:
 **Rejected:** Using the real contact from `[[2026-07-15-mcp-server-test]]`'s incident report as literal fixture data (what actually happened this session — caught only by the harness's permission classifier after it was already committed and pushed to a public repo, not by self-review).
 **Rationale:** Real PII in fixtures ends up in git history, pushed to remotes, and referenced in PRs — a privacy exposure that requires a disruptive history rewrite + force-push to fix once discovered, versus zero cost to use a fictional name upfront. See `[[2026-07-16-mcp-crm-fixes]]` for the full incident and remediation.
 
+### 2026-07-20 — Deploy notion-pilot on hp-elite-server via Coolify, not devbox/systemd
+
+**Decision:** Production `notion-pilot` (web + bot containers) runs on hp-elite-server as a Coolify-managed service, reached publicly through the existing vps-ovh reverse proxy (`notion-pilot.dombot.tech` → Coolify/Traefik → web container `:8080`).
+**Rejected:** Continuing on devbox as a systemd user service (the original deployment target, still stated in this file's "What's Done" section until this entry).
+**Rationale:** The migration itself predates this session — found already done (devbox's `notion-pilot-web-1`/`bot-1` containers stopped, Coolify containers already running) but never reflected in vps-ovh's nginx vhost (still pointed at devbox's dead Tailscale IP) or in Coolify's Traefik config (no router registered for the real domain yet), which is what caused the 502 this session fixed. Full diagnosis: Local Brain `inbox/daily/specs/notion-pilot/2026-07-20-fix-web-view-design.md`.
+**Affects:** deploy path (Coolify GitHub webhook replaces the old `notion-pilot-gha`/`notion-pilot-deploy` SSH-to-devbox keys; `.github/workflows/deploy.yml` was removed entirely on `main` as part of this).
+
+### 2026-07-20 — Remove cockpit Automation panel, add static MCP Server panel
+
+**Decision:** Replace the cockpit's Automation panel (List/Graph views, Operations/Workflows tabs, script-runner + workflow-graph builder — `features/automation/`) with a static `features/mcp/McpPanel.tsx` listing the MCP server's registered tools and client connection snippet (sourced from `README.md`, no fabricated live status since the MCP server is stdio-only with no persistent process to poll).
+**Rejected:** Keeping the Automation panel as-is; also rejected removing the backend script/workflow engine (`web/server.py`'s `/api/cockpit/scripts` + `/api/cockpit/workflows` endpoints) and `config/scripts.yaml` — those still back legitimate CRM/Inbox ops (Refresh People/Companies, Import LinkedIn, Get/Retrieve Emails) and nothing else currently depends on the removed frontend panel, so backend removal was scoped out as a separate, larger decision.
+**Rationale:** User call: the generic script-runner/workflow-graph builder UI wasn't representative of what notion-pilot is for; the MCP server (`notion_pilot/mcp/`, 11 tools, already documented in README) is the actual "automation" surface going forward.
+
+### 2026-07-22 — MCP HTTP transport: static bearer token, not FastMCP's OAuth resource-server auth
+
+**Decision:** Gate the new `/mcp` streamable-HTTP mount (`web/server.py` + `notion_pilot/mcp/server.py::build_http_app()`) with a small `_BearerTokenMiddleware` comparing against a single `MCP_BEARER_TOKEN` secret, mounted only when both it and `NOTION_TOKEN` are set.
+**Rejected:** FastMCP's built-in `auth=AuthSettings(...)` + `token_verifier` mechanism — it requires a required `issuer_url` pointing at a real OAuth authorization server and would advertise `WWW-Authenticate`/resource-metadata endpoints for an authorization server that doesn't exist.
+**Rationale:** User explicitly asked for the simplest approach. A shared secret is honest about what's actually being verified (no OAuth server exists here) and needed no new infrastructure. Also fixed same-session: `PersonRecord.name`/`.company`/`CompanyRecord.name` (already Pydantic-"required") plus `linkedin_url`/`website`/`country`/`sector` now reject empty/whitespace-only strings via a `NonEmptyStr` type alias — root cause of a reported bug where an empty `name` created a blank-titled Notion page, since `Field(...)` only enforces presence, not content.
+**Affects:** [Key Modules](ARCHITECTURE.md#key-modules), [Non-Obvious Decisions](ARCHITECTURE.md#non-obvious-decisions)
+
 ## Template
 <!-- added by ai-dotfiles upgrade -->

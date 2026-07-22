@@ -1,15 +1,22 @@
 """Pydantic models for MCP tool inputs and outputs."""
 
-from pydantic import BaseModel, Field
+from typing import Annotated
+
+from pydantic import BaseModel, Field, StringConstraints
+
+# Rejects missing, empty, and whitespace-only values — not just "field present".
+# A plain `str = Field(...)` only requires the key to exist; a client (LLM or
+# otherwise) can still pass "" and create a blank Notion page.
+NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class PersonRecord(BaseModel):
     """Input shape for a person to upsert into the Notion People database."""
 
-    name: str = Field(..., description="Full name of the contact")
-    company: str = Field(..., description="Company name")
+    name: NonEmptyStr = Field(..., description="Full name of the contact")
+    company: NonEmptyStr = Field(..., description="Company name")
     position: str | None = None
-    linkedin_url: str | None = None
+    linkedin_url: NonEmptyStr | None = None
     email: str | None = None
     phone: str | None = None
     seniority: str | None = None
@@ -23,12 +30,12 @@ class PersonRecord(BaseModel):
 class CompanyRecord(BaseModel):
     """Input shape for a company to upsert into the Notion Companies database."""
 
-    name: str = Field(..., description="Company name")
-    website: str | None = None
-    linkedin_url: str | None = None
+    name: NonEmptyStr = Field(..., description="Company name")
+    website: NonEmptyStr | None = None
+    linkedin_url: NonEmptyStr | None = None
     size: str | None = None
-    country: str | None = None
-    sector: str | None = None
+    country: NonEmptyStr | None = None
+    sector: NonEmptyStr | None = None
     contact_email: str | None = Field(
         default=None,
         description="Email of a known contact at this company — used as a dedup domain signal and, "
@@ -38,6 +45,54 @@ class CompanyRecord(BaseModel):
         default=False,
         description="Bypass a needs_review dedup block on confirm=true (never bypasses the SIREN "
         "confidence gate)",
+    )
+
+
+class DealInput(BaseModel):
+    """Input shape for upsert_deal — matched against existing Deals by exact title."""
+
+    name: NonEmptyStr = Field(..., description="Deal title")
+    stage: NonEmptyStr | None = Field(default=None, description="Defaults to 'Prospect' if omitted")
+    lead_source: NonEmptyStr | None = None
+    company_name: NonEmptyStr | None = Field(
+        default=None, description="Resolved to the Client relation via company dedup"
+    )
+    contact_page_id: NonEmptyStr | None = Field(
+        default=None, description="Existing People page id — linked as Contacts"
+    )
+    primary_contact_page_id: NonEmptyStr | None = Field(
+        default=None, description="Existing People page id — linked as Primary contact"
+    )
+    value_eur: float | None = None
+    probability_pct: float | None = None
+    expected_close_date: NonEmptyStr | None = Field(default=None, description="ISO date")
+    next_step: str | None = None
+    next_step_date: NonEmptyStr | None = Field(default=None, description="ISO date")
+    notes: str | None = None
+    product: list[str] | None = None
+    confirm: bool = Field(
+        default=False,
+        description="Dry-run preview by default; pass confirm=true to actually write",
+    )
+
+
+class ActivityInput(BaseModel):
+    """Input shape for log_activity — Activities are an append-only event log, no dedup."""
+
+    type: NonEmptyStr = Field(..., description="e.g. '📞 Call', '🤝 Meeting', '📧 Email'")
+    title: NonEmptyStr | None = Field(default=None, description="Defaults to `type` if omitted")
+    outcome: NonEmptyStr | None = None
+    deal_page_id: NonEmptyStr | None = None
+    person_page_id: NonEmptyStr | None = None
+    company_page_id: NonEmptyStr | None = None
+    date: NonEmptyStr | None = Field(default=None, description="ISO date; defaults to today")
+    duration_min: float | None = None
+    next_step: str | None = None
+    next_step_date: NonEmptyStr | None = Field(default=None, description="ISO date")
+    notes: str | None = None
+    confirm: bool = Field(
+        default=False,
+        description="Dry-run preview by default; pass confirm=true to actually write",
     )
 
 

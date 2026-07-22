@@ -8,7 +8,13 @@ from typing import Any
 
 import httpx
 
+from notion_pilot.crm.contact_parse import is_placeholder
 from notion_pilot.shared.config import Settings
+
+_PLACEHOLDER_FRAGMENT = re.compile(
+    r"\[(?:PERSON_NAME|COMPANY|NAME|ADDRESS)\]|<[^>]+>",
+    re.IGNORECASE,
+)
 
 _SCHEMA = (
     '{"action":"suggest"|"create"|"info",'
@@ -94,6 +100,49 @@ def _rank(
     return sorted(items, key=score, reverse=True)[:limit]
 
 
+def _norm_id(page_id: str) -> str:
+    return page_id.replace("-", "").lower()
+
+
+def _is_bad_name(name: str) -> bool:
+    stripped = name.strip()
+    return not stripped or is_placeholder(stripped) or bool(_PLACEHOLDER_FRAGMENT.search(stripped))
+
+
+def _clean_field(value: str | None) -> str:
+    if not value:
+        return ""
+    return _PLACEHOLDER_FRAGMENT.sub("", value).strip(" @-|")
+
+
+def sanitize_leads(
+    leads: list[dict[str, Any]],
+    people: list[dict[str, Any]],
+    companies: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Rehydrate CRM fields from notion_id and drop placeholder names."""
+    by_id = {_norm_id(p["id"]): p for p in people if p.get("id")}
+    clean: list[dict[str, Any]] = []
+    for raw in leads:
+        lead = dict(raw)
+        person = by_id.get(_norm_id(str(lead.get("notion_id") or "")))
+        if person:
+            lead["type"] = "existing"
+            if _is_bad_name(str(lead.get("name", ""))):
+                lead["name"] = person.get("name", "")
+            if not _clean_field(str(lead.get("position") or "")):
+                lead["position"] = person.get("position") or ""
+            if not _clean_field(str(lead.get("company") or "")):
+                lead["company"] = person.get("company") or ""
+        lead["name"] = _clean_field(str(lead.get("name") or ""))
+        lead["position"] = _clean_field(str(lead.get("position") or ""))
+        lead["company"] = _clean_field(str(lead.get("company") or ""))
+        if _is_bad_name(str(lead.get("name", ""))):
+            continue
+        clean.append(lead)
+    return clean
+
+
 def _safe_parse_json(raw: str) -> dict[str, Any]:
     """Extract the first complete JSON object from raw LLM output."""
     text = raw.strip()
@@ -142,6 +191,7 @@ async def chat_crm(
     ctx_parts: list[str] = []
 
     if people:
+        people = [p for p in people if p.get("name") and not is_placeholder(str(p["name"]))]
         ranked_people = _rank(people, query, ["name", "position", "company"], 80)
         people_lines = "\n".join(
             f"- {p['name']} | {p.get('position', '')} @ {p.get('company', '')} | id:{p['id']}"
@@ -208,4 +258,5 @@ async def chat_crm(
     result = _safe_parse_json(raw)
     result.setdefault("action", "suggest")
     result.setdefault("leads", [])
+    result["leads"] = sanitize_leads(result["leads"], people, companies)
     return result

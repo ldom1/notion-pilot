@@ -205,9 +205,27 @@ Tools:
 | `search_people` | Fuzzy-search existing People by name/company — read-only, no write. |
 | `search_companies` | Fuzzy-search existing Companies by name — read-only, no write. |
 | `get_recent_people` | People added to Notion in the last 7 days. |
-| `get_open_leads` | Open (non-closed) deals from the Deals database. |
+| `get_open_leads` | Open (non-closed) deals from the Deals database ("Leads" in the cockpit UI), including `page_id` for linking Activities. |
+| `get_activities` | Recent Activities (calls, meetings, emails, ...), newest first. Pass `deal_page_id` to scope to one Deal. |
 | `refresh_notion_snapshot` | Force-reload the cached People/Companies snapshot from Notion (use if the Telegram bot or web cockpit may have written since this session started). |
+| `upsert_deal` | Upsert a Deal into the Deals database, matched against existing deals by exact title. `company_name` resolved the same way as `upsert_companies`; `contact_page_id`/`primary_contact_page_id` must be existing People page ids. Defaults to a dry-run preview. Requires `NOTION_DEALS_DATABASE_ID`. |
+| `log_activity` | Log an Activity (call, meeting, email, ...) — an append-only event, not dedup-checked like People/Companies/Deals. `deal_page_id`/`person_page_id`/`company_page_id` must be existing page ids. Defaults to a dry-run preview. Requires `NOTION_ACTIVITIES_DATABASE_ID`. |
 
 All write tools default to `confirm=false` (dry-run preview, no Notion write) and require an explicit `confirm=true` to actually write.
+
+### Remote access (HTTP)
+
+The same tools are also reachable over HTTP — mounted at `/mcp` on the deployed web service, gated by a static bearer token — for MCP clients that can't spawn a local subprocess. Set `NOTION_TOKEN` and `MCP_BEARER_TOKEN` (see `.env.example`); the mount is skipped entirely if either is unset. Note this endpoint always acts on that single `NOTION_TOKEN` workspace, not any per-session OAuth workspace connected through the cockpit UI.
+
+```json
+{
+  "mcpServers": {
+    "notion-crm": {
+      "url": "https://notion-pilot.dombot.tech/mcp",
+      "headers": { "Authorization": "Bearer <MCP_BEARER_TOKEN>" }
+    }
+  }
+}
+```
 
 Contributions welcome. Short & sharp.

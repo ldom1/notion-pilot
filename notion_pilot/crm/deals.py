@@ -15,13 +15,16 @@ _NOTION_BASE = "https://api.notion.com/v1"
 class DealRecord:
     title: str
     stage: str = "Prospect"
+    lead_source: str = ""
     product: list[str] = field(default_factory=list)
     value_euros: float | None = None
-    probability_pct: int | None = None
+    probability_pct: float | None = None
+    expected_close_date: str = ""
     next_action: str = ""
     next_action_date: str = ""
     notes: str = ""
     people_ids: list[str] = field(default_factory=list)
+    primary_contact_id: str = ""
     company_ids: list[str] = field(default_factory=list)
 
 
@@ -50,12 +53,16 @@ class NotionDealsSyncer:
         }
         if deal.stage:
             props["Stage"] = {"select": {"name": deal.stage}}
+        if deal.lead_source:
+            props["Lead Source"] = {"select": {"name": deal.lead_source}}
         if deal.product:
             props["Product"] = {"multi_select": [{"name": p} for p in deal.product]}
         if deal.value_euros is not None:
             props["Value (euros)"] = {"number": deal.value_euros}
         if deal.probability_pct is not None:
             props["Probability (%)"] = {"number": deal.probability_pct}
+        if deal.expected_close_date:
+            props["Expected Close Date"] = {"date": {"start": deal.expected_close_date}}
         if deal.next_action:
             props["Next Step"] = {"rich_text": [{"text": {"content": deal.next_action}}]}
         if deal.next_action_date:
@@ -64,6 +71,8 @@ class NotionDealsSyncer:
             props["Notes"] = {"rich_text": [{"text": {"content": deal.notes}}]}
         if deal.people_ids:
             props["Contacts"] = {"relation": [{"id": pid} for pid in deal.people_ids]}
+        if deal.primary_contact_id:
+            props["Primary contact"] = {"relation": [{"id": deal.primary_contact_id}]}
         if deal.company_ids:
             props["Client"] = {"relation": [{"id": cid} for cid in deal.company_ids]}
         return props

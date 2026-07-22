@@ -2,9 +2,12 @@
 
 import asyncio
 
+import httpx
 from loguru import logger
 from notion_client import AsyncClient
 
+from notion_pilot.crm.activities import NotionActivitiesLog
+from notion_pilot.crm.deals import NotionDealsSyncer
 from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer
 from notion_pilot.shared.config import Settings
 
@@ -24,11 +27,20 @@ class SyncerSession:
             raise ValueError("NOTION_TOKEN is required for the MCP server")
         self._settings = settings
         client = AsyncClient(auth=settings.notion_token.get_secret_value())
+        self.client = client
         self.company_syncer = NotionCompanySyncer(
             client, settings.notion_companies_data_source_id or ""
         )
         self.people_syncer = NotionPeopleSyncer(
             client, settings.notion_people_data_source_id or "", self.company_syncer
+        )
+        token = settings.notion_token.get_secret_value()
+        http_client = httpx.AsyncClient()
+        self.deals_syncer = NotionDealsSyncer(
+            http_client, token, settings.notion_deals_database_id or ""
+        )
+        self.activities = NotionActivitiesLog(
+            http_client, token, settings.notion_activities_database_id or ""
         )
         self._load_task: asyncio.Task[None] | None = None
 
@@ -55,6 +67,8 @@ class SyncerSession:
     async def _load(self) -> None:
         await self.company_syncer.load_notion_snapshot()
         await self.people_syncer.load_notion_snapshot()
+        if self._settings.notion_deals_database_id:
+            await self.deals_syncer.load_notion_snapshot()
 
     async def ensure_loaded(self) -> None:
         """Await the in-flight/prior load, starting one first if necessary."""
