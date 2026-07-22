@@ -152,7 +152,7 @@ class _BearerTokenMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[no-untyped-def]
         if not secrets.compare_digest(request.headers.get("authorization", ""), self._expected):
             return JSONResponse({"error": "unauthorized"}, status_code=401)
-        return await call_next(request)
+        return await call_next(request)  # type: ignore[no-any-return]
 
 
 def build_http_app(bearer_token: str) -> Starlette:
@@ -163,7 +163,7 @@ def build_http_app(bearer_token: str) -> Starlette:
     lifespan — Starlette does not run a mounted sub-app's lifespan on its own.
     """
     http_app = mcp.streamable_http_app()
-    http_app.add_middleware(_BearerTokenMiddleware, token=bearer_token)
+    http_app.add_middleware(_BearerTokenMiddleware, token=bearer_token)  # type: ignore[arg-type]
     return http_app
 
 
