@@ -37,3 +37,25 @@ jobs:
       - name: Tests integration (for develop & main branches only)
         if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
         run: uv run pytest tests/integration -v
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web/frontend
+        run: npm ci
+
+      # Same command as docker/Dockerfile.web — `tsc -b` walks into the
+      # tsconfig project references, which `tsc --noEmit` on the solution
+      # config silently skips.
+      - name: Build (tsc -b && vite build)
+        working-directory: web/frontend
+        run: npm run build

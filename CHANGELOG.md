@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MCP: Deals ("Leads") and Activities databases now accessible — `upsert_deal` (matched by exact title, reuses the existing `NotionDealsSyncer`, now also covering `Lead Source`/`Primary contact`/`Expected Close Date`), `log_activity` (append-only, no dedup — new `notion_pilot/crm/activities.py`), and `get_activities` (recent activities, optionally scoped to one Deal). `get_open_leads` now includes `page_id` for linking Activities to a specific deal. Requires `NOTION_DEALS_DATABASE_ID`/`NOTION_ACTIVITIES_DATABASE_ID` (the latter setting was previously undocumented in `Settings` despite being in `.env.example`).
 
 ### Fixed
+- Frontend production build (and therefore the Coolify deploy) failed with `TS2580: Cannot find name 'process'` in `vite.config.ts` — `@types/node` is only an optional peer dependency of vite and was never installed. `loadEnv` now takes `'.'` as its env directory instead of `process.cwd()` (identical resolution, no node globals).
+- CI now builds the frontend (`npm ci && npm run build`, the same command `docker/Dockerfile.web` runs), so a broken production build fails the PR instead of the deploy. The previous local check, `tsc --noEmit`, silently type-checked nothing: the root `tsconfig.json` is a solution-style config (`"files": []` + `references`), and only `tsc -b` walks into the referenced projects. Also available locally as `make check-frontend`.
+
+### Fixed
 - `upsert_people`/`upsert_companies` MCP tools: `PersonRecord.name`/`.company` and `CompanyRecord.name` now reject empty/whitespace-only strings (previously only required the key to be *present*, so an empty `name` could create a blank-titled Notion page). Same non-empty-if-provided constraint added to `PersonRecord.linkedin_url` and `CompanyRecord.website`/`.linkedin_url`/`.country`/`.sector`.
 
 ### Fixed
