@@ -170,7 +170,6 @@ Sourced from RNE step 3's `finances` dict (Direct API fallback, above), gated on
 SIREN: …
 NAF: … (label)
 BODACC: …
-RNE: …
 Dirigeants: …
 Sources: prosper|registry|… · refreshed YYYY-MM-DD
 [/open-data]
@@ -183,11 +182,12 @@ On re-run: if `[open-data]…[/open-data]` exists, **replace** that block only. 
 1. Search existing Notion Companies row with high/`needs_review` gates.
 2. Resolve SIREN identity (domain corroboration only if domain already known).
 3. Gather Prosper then registry; record each source as ok / empty / unreachable.
-4. Build proposal + `[open-data]` REPLACE plan.
-5. French validation table (below).
-6. Wait for explicit `go` (`ok`, `go`, `parfait`, …).
-7. Write via `notion-crm-ops` discipline.
-8. Report written fields, Notes REPLACE (human-edit warning), unresolved / unavailable sources.
+4. If SIREN is high-confidence: fetch RNE finances, pick `year = max(int(y) for y in finances.keys())`, compute margin (blank if `ca` is 0/missing); ensure the 4 Finance properties exist (create if missing, ERROR row if type conflict); check `fetched_year` against the existing `Année financière` (SKIP row if stale). No confident SIREN → Finance section is a SKIP row, nothing fetched.
+5. Build proposal + `[open-data]` REPLACE plan (Finance values excluded from Notes — properties only).
+6. French validation table (below).
+7. Wait for explicit `go` (`ok`, `go`, `parfait`, …).
+8. Write via `notion-crm-ops` discipline for existing fields; Finance properties via direct Notion MCP page-update.
+9. Report written fields, Notes REPLACE (human-edit warning), unresolved / unavailable sources, any Finance ERROR/stale-source rows.
 
 ## Validation table (required before write)
 
@@ -205,8 +205,16 @@ On re-run: if `[open-data]…[/open-data]` exists, **replace** that block only. 
 | Notes `[open-data]` | present/absent | replace block … | bodacc/rne/… | high | REPLACE |
 | RNE | — | not available (Prosper unreachable) | prosper | n/a | SKIP |
 | BODACC | — | not in Prosper catalog | prosper | n/a | SKIP |
+| CA | … | 27 376 000 000 € (2024) | rne | high | UPDATE |
+| Résultat net | … | 0 € (2024) | rne | high | UPDATE |
+| Marge nette % | … | 0.0% (2024) — ca nonzero, resultat_net exactly 0: a real computed ratio | rne | high | UPDATE |
+| Année financière | … | 2024 | rne | high | UPDATE |
+| Marge nette % (illustrative, different company) | … | blank — ca missing/0, ratio not computable (distinct from the 0.0% row above) | rne | n/a | SKIP |
+| Finance (all 4) | — | not available (no high-confidence SIREN) | rne | n/a | SKIP |
+| Finance (all 4) | 2024 (current) | 2023 (rne, stale) — RNE returned an older year than already on file | rne | n/a | SKIP — stale source |
+| CA | — | type conflict: existing "CA" property is Text, expected Number | rne | n/a | ERROR — fix property type manually |
 
 Réponds **go** pour écrire, ou corrige les lignes.
 ```
 
-Every run must include: property/CREATE rows, identity/`needs_review` (Notion match, SIREN, prosper↔registry disagreement when relevant), Notes REPLACE plan, and **explicit missing/unreachable source rows** (must appear, must not disappear).
+Every run must include: property/CREATE rows, identity/`needs_review` (Notion match, SIREN, prosper↔registry disagreement when relevant), Notes REPLACE plan, **explicit missing/unreachable source rows** (must appear, must not disappear), and Finance property rows (UPDATE/SKIP/ERROR) whenever a SIREN was in play.
