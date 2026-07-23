@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Project skill `company-open-data-enrichment` (`skills/company-open-data-enrichment/`) to enrich/create Artelys CRM Companies from French open data (SIREN, NAF/APE, BODACC, RNE, dirigeants): Prosper MCP preferred (early-stage, not always live) with a direct-API fallback documented step-by-step — SIREN via `recherche-entreprises.api.gouv.fr/search?q=`, BODACC via `bodacc-datadila.opendatasoft.com` `/records` filtered by `registre`, RNE dirigeants/finances via the same `recherche-entreprises` endpoint queried by SIREN — French validation table + `go` before write, `[open-data]` Notes replace-not-append; symlinked into `.cursor/skills/` and `.claude/skills/`.
 - Project skill `notion-crm-ops` (`skills/notion-crm-ops/`) for Artelys CRM ops via Notion MCP (Leads / Activities / People / Companies): always French validation table before write; symlinked into `.cursor/skills/` and `.claude/skills/`.
 - Cursor project MCP config (`.cursor/mcp.json`) registers `notion-crm` over stdio (`uv run python -m notion_pilot.mcp.server`), matching `.claude/settings.json`.
 - MCP server now optionally reachable over HTTP (`streamable-http` transport) at `/mcp` on the web service, gated by a static bearer token (`MCP_BEARER_TOKEN`) — in addition to the existing stdio transport. Mounted only when both `NOTION_TOKEN` and `MCP_BEARER_TOKEN` are set; acts on that single Notion workspace, not per-session OAuth workspaces.
