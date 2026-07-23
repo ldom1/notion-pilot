@@ -91,7 +91,7 @@ curl -s "https://recherche-entreprises.api.gouv.fr/search?q=Danone&page=1&per_pa
 `GET https://bodacc-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/annonces-commerciales/records?where=registre like "{siren}"&limit=10&order_by=dateparution desc&select=registre,dateparution,typeavis,familleavis_lib,tribunal,commercant`
 
 - **Expected data:** `total_count` + `results[]` of announcements (most recent first). `total_count == 0` → no BODACC history for this SIREN; that is a valid outcome, not a failure — tag the row SKIP with "no BODACC record", never omit it.
-- Read `familleavis_lib` to classify: contains "liquidation" → `LIQUIDATION`; "redressement" → `REDRESSEMENT`; "sauvegarde" → `SAUVEGARDE` — same keyword rules as `prosper/sync/bodacc.py::_extract_famille_procedure`. Surface the most recent matching procedure + its `dateparution` in the Notes `RNE`/`BODACC` line.
+- Read `familleavis_lib` to classify: contains "liquidation" → `LIQUIDATION`; "redressement" → `REDRESSEMENT`; "sauvegarde" → `SAUVEGARDE` — same keyword rules as `prosper/sync/bodacc.py::_extract_famille_procedure`. Surface the most recent matching procedure + its `dateparution` in the Notes `BODACC:` line.
 - **Do not** use the `/exports/json` variant of this dataset — that is prosper's bulk nightly-sync endpoint (whole date ranges, no per-SIREN filter, can return 10k+ rows). `/records` with a `where=registre like "…"` filter is the correct per-company lookup and is what must be queried here.
 
 ```bash
@@ -147,7 +147,7 @@ Sourced from RNE step 3's `finances` dict (Direct API fallback, above), gated on
 | `Marge nette %` | Number | Percent | `resultat_net / ca`; **blank** (not `0`) when `ca` is `0`/missing — never fabricate a ratio; can be negative |
 | `Année financière` | Number | plain | the year key itself, e.g. `2024` |
 
-`year` = `max(int(y) for y in finances.keys())` — a numeric max over year keys, never dict iteration order.
+`year` = `max(int(y) for y in finances.keys())` — a numeric max over year keys, never dict iteration order. If `finances` is empty or absent (no accounts filed yet — a valid registry state, not an error), skip the whole Finance section without calling `max()` on an empty dict, and add a SKIP row instead: `Finance (all 4) | — | not available (no accounts filed for this SIREN) | rne | n/a | SKIP — no accounts filed`.
 
 **Write path:** Notion MCP directly (not `notion-crm`'s `upsert_companies`/`enrich_companies` — those only write at CREATE time or fill-empty, neither fits data that must refresh annually). Values are **always overwritten** with the freshest year found — same REPLACE philosophy as the Notes block — subject to the two guards below.
 
@@ -156,6 +156,8 @@ Sourced from RNE step 3's `finances` dict (Direct API fallback, above), gated on
 1. Read the Companies DB schema via Notion MCP.
 2. For each of the 4 properties: if missing, create it with the type/format in the table above (same idempotent check-then-create idea as `ensure_siren_property` in `notion_pilot/crm/syncer.py:156-167`, issued as a Notion MCP call instead of new Python).
 3. If a property with that name **already exists with the wrong type** (e.g. `CA` hand-created as `Text`): do **not** write into it. Surface an ERROR row instead — `CA | — | type conflict: existing "CA" property is Text, expected Number | rne | n/a | ERROR — fix property type manually before retrying`.
+
+**Grouping:** creating these 4 properties does not group them — Notion's API has no way to create a named property section ("Finance"). That grouping is a manual, one-time step in Notion's page-layout builder, done once by the user after first creation; nothing in this workflow can automate it.
 
 **Stale-source guard (before writing values):**
 
@@ -182,7 +184,7 @@ On re-run: if `[open-data]…[/open-data]` exists, **replace** that block only. 
 1. Search existing Notion Companies row with high/`needs_review` gates.
 2. Resolve SIREN identity (domain corroboration only if domain already known).
 3. Gather Prosper then registry; record each source as ok / empty / unreachable.
-4. If SIREN is high-confidence: fetch RNE finances, pick `year = max(int(y) for y in finances.keys())`, compute margin (blank if `ca` is 0/missing); ensure the 4 Finance properties exist (create if missing, ERROR row if type conflict); check `fetched_year` against the existing `Année financière` (SKIP row if stale). No confident SIREN → Finance section is a SKIP row, nothing fetched.
+4. If SIREN is high-confidence: fetch RNE finances. If `finances` is empty/absent (no accounts filed), Finance section is a SKIP row, nothing else attempted. Otherwise pick `year = max(int(y) for y in finances.keys())`, compute margin (blank if `ca` is 0/missing); ensure the 4 Finance properties exist (create if missing, ERROR row if type conflict); check `fetched_year` against the existing `Année financière` (SKIP row if stale). No confident SIREN → Finance section is a SKIP row, nothing fetched.
 5. Build proposal + `[open-data]` REPLACE plan (Finance values excluded from Notes — properties only).
 6. French validation table (below).
 7. Wait for explicit `go` (`ok`, `go`, `parfait`, …).
@@ -211,6 +213,7 @@ On re-run: if `[open-data]…[/open-data]` exists, **replace** that block only. 
 | Année financière | … | 2024 | rne | high | UPDATE |
 | Marge nette % (illustrative, different company) | … | blank — ca missing/0, ratio not computable (distinct from the 0.0% row above) | rne | n/a | SKIP |
 | Finance (all 4) | — | not available (no high-confidence SIREN) | rne | n/a | SKIP |
+| Finance (all 4) | — | not available (no accounts filed for this SIREN) | rne | n/a | SKIP — no accounts filed |
 | Finance (all 4) | 2024 (current) | 2023 (rne, stale) — RNE returned an older year than already on file | rne | n/a | SKIP — stale source |
 | CA | — | type conflict: existing "CA" property is Text, expected Number | rne | n/a | ERROR — fix property type manually |
 
