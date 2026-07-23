@@ -82,6 +82,10 @@ Three ordered steps. Run 1 first — its SIREN feeds 2 and 3. Do not re-resolve 
 - Map to Notion: `section_activite_principale`/`activite_principale` → `Sector` via `naf_section_to_sector`; `tranche_effectif_salarie` → `Size` via `tranche_to_size` (both in `notion_pilot/shared/siren_lookup.py`).
 - This mirrors `notion_pilot/shared/siren_lookup.py::lookup_siren_candidates` exactly — same URL, same params.
 
+```bash
+curl -s "https://recherche-entreprises.api.gouv.fr/search?q=Danone&page=1&per_page=3"
+```
+
 ### 2. BODACC — insolvency signals for the resolved SIREN
 
 `GET https://bodacc-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/annonces-commerciales/records?where=registre like "{siren}"&limit=10&order_by=dateparution desc&select=registre,dateparution,typeavis,familleavis_lib,tribunal,commercant`
@@ -89,6 +93,12 @@ Three ordered steps. Run 1 first — its SIREN feeds 2 and 3. Do not re-resolve 
 - **Expected data:** `total_count` + `results[]` of announcements (most recent first). `total_count == 0` → no BODACC history for this SIREN; that is a valid outcome, not a failure — tag the row SKIP with "no BODACC record", never omit it.
 - Read `familleavis_lib` to classify: contains "liquidation" → `LIQUIDATION`; "redressement" → `REDRESSEMENT`; "sauvegarde" → `SAUVEGARDE` — same keyword rules as `prosper/sync/bodacc.py::_extract_famille_procedure`. Surface the most recent matching procedure + its `dateparution` in the Notes `RNE`/`BODACC` line.
 - **Do not** use the `/exports/json` variant of this dataset — that is prosper's bulk nightly-sync endpoint (whole date ranges, no per-SIREN filter, can return 10k+ rows). `/records` with a `where=registre like "…"` filter is the correct per-company lookup and is what must be queried here.
+
+```bash
+curl -s "https://bodacc-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/annonces-commerciales/records?where=registre%20like%20%22552032534%22&limit=10&order_by=dateparution%20desc&select=registre,dateparution,typeavis,familleavis_lib,tribunal,commercant"
+```
+
+Verified live against SIREN `552032534` (Danone) — returns `total_count: 106` and a `results[]` array of announcements.
 
 ### 3. RNE — dirigeants + finances for the resolved SIREN
 
@@ -98,6 +108,27 @@ Three ordered steps. Run 1 first — its SIREN feeds 2 and 3. Do not re-resolve 
 - **Expected data:** `results[0].dirigeants[]` — each entry `nom`, `prenoms`, `qualite` (e.g. "Directeur Général", "Administrateur"), `date_de_naissance`, `type_dirigeant` (`personne physique`/`personne morale`), `nationalite`; personne morale entries carry `siren`/`denomination` instead of `nom`/`prenoms`. And `results[0].finances` — dict keyed by year, e.g. `{"2024": {"ca": 27376000000, "resultat_net": 0}}`; absent/empty when no accounts have been filed.
 - `results` empty, or `results[0].siren != siren` → SIREN not found in this registry; tag SKIP, do not fabricate dirigeants/finances.
 - Mirrors prosper's own RNE fetch: `prosper/intelligence/rne_cache.py::fetch_rne` (same URL, `q=siren&per_page=1`) and `prosper/models/rne.py::RneEntreprise` (same `dirigeants`/`finances` shape) — Prosper does not have a separate INPI/RNE endpoint, it caches this exact call.
+
+```bash
+curl -s "https://recherche-entreprises.api.gouv.fr/search?q=552032534&page=1&per_page=1"
+```
+
+Verified live against the same SIREN — `results[0].finances` returns `{"2024": {"ca": 27376000000, "resultat_net": 0}}`.
+
+Margin computation (guards `ca == 0`/missing — never fabricates a ratio):
+
+```python
+def compute_margin(finances: dict) -> tuple[int, float | None]:
+    """Returns (year, margin) from an RNE `finances` dict. margin is None
+    when ca is 0 or missing — never fabricate a ratio."""
+    year = max(int(y) for y in finances.keys())
+    entry = finances[str(year)]
+    ca = entry.get("ca") or 0
+    resultat_net = entry.get("resultat_net")
+    if not ca or resultat_net is None:
+        return year, None
+    return year, resultat_net / ca
+```
 
 ## Fields
 
