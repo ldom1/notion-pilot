@@ -10,7 +10,7 @@ description: >-
 
 # company-open-data-enrichment
 
-Project-only skill for **Artelys CRM Companies** in this repo. Owns resolve → gather → propose. Does not invent values and does not change the Companies schema.
+Project-only skill for **Artelys CRM Companies** in this repo. Owns resolve → gather → propose. Does not invent values and does not change the Companies schema beyond the 4 fixed Finance properties (`CA`, `Résultat net`, `Marge nette %`, `Année financière` — see Fields below).
 
 ## Prerequisites (hard)
 
@@ -21,8 +21,8 @@ Project-only skill for **Artelys CRM Companies** in this repo. Owns resolve → 
 
 ## Scope
 
-- **In:** create or update one Companies row from name / domain / SIREN; SIREN, NAF/APE→Sector, Size, Country, Website, Linkedin; BODACC / RNE / dirigeants into Notes.
-- **Out:** schema migrations; person enrichment; Prosper pipeline ingest; inventing URLs or financials; ad hoc web search solely to manufacture identity corroboration.
+- **In:** create or update one Companies row from name / domain / SIREN; SIREN, NAF/APE→Sector, Size, Country, Website, Linkedin; BODACC / dirigeants into Notes; RNE financials (`CA`, `Résultat net`, `Marge nette %`, `Année financière`) as real Notion properties — see Finance section below.
+- **Out:** open-ended schema migrations beyond the 4 named Finance properties; person enrichment; Prosper pipeline ingest; inventing URLs or financials; ad hoc web search solely to manufacture identity corroboration.
 
 ## Identity confidence
 
@@ -101,9 +101,36 @@ Three ordered steps. Run 1 first — its SIREN feeds 2 and 3. Do not re-resolve 
 
 ## Fields
 
-**Writable properties:** `SIREN`, `Sector`, `Size`, `Country`, `Website`, `Linkedin`, `Notes`.
+**Writable properties:** `SIREN`, `Sector`, `Size`, `Country`, `Website`, `Linkedin`, `Notes`, `CA`, `Résultat net`, `Marge nette %`, `Année financière`.
 
-**Extras** (NAF label, BODACC, RNE summary, dirigeants, freshness) → single Notes block only. Do not add Notion properties.
+**Extras** (NAF label, BODACC, dirigeants, freshness) → single Notes block only. Do not add Notion properties beyond the fixed set above — no open-ended schema evolution.
+
+### Finance properties (`CA` / `Résultat net` / `Marge nette %` / `Année financière`)
+
+Sourced from RNE step 3's `finances` dict (Direct API fallback, above), gated on a **high-confidence SIREN** (Identity confidence, above) — no confident SIREN means the whole Finance section is skipped and shown as an explicit SKIP row, never fetched off a name-only match.
+
+| Property | Type | Format | Source |
+|---|---|---|---|
+| `CA` | Number | Euro | `finances[year].ca`, raw euros, no scaling |
+| `Résultat net` | Number | Euro | `finances[year].resultat_net` — can be negative (a loss), write as-is |
+| `Marge nette %` | Number | Percent | `resultat_net / ca`; **blank** (not `0`) when `ca` is `0`/missing — never fabricate a ratio; can be negative |
+| `Année financière` | Number | plain | the year key itself, e.g. `2024` |
+
+`year` = `max(int(y) for y in finances.keys())` — a numeric max over year keys, never dict iteration order.
+
+**Write path:** Notion MCP directly (not `notion-crm`'s `upsert_companies`/`enrich_companies` — those only write at CREATE time or fill-empty, neither fits data that must refresh annually). Values are **always overwritten** with the freshest year found — same REPLACE philosophy as the Notes block — subject to the two guards below.
+
+**Ensure Finance properties exist (idempotent, once per workspace):**
+
+1. Read the Companies DB schema via Notion MCP.
+2. For each of the 4 properties: if missing, create it with the type/format in the table above (same idempotent check-then-create idea as `ensure_siren_property` in `notion_pilot/crm/syncer.py:156-167`, issued as a Notion MCP call instead of new Python).
+3. If a property with that name **already exists with the wrong type** (e.g. `CA` hand-created as `Text`): do **not** write into it. Surface an ERROR row instead — `CA | — | type conflict: existing "CA" property is Text, expected Number | rne | n/a | ERROR — fix property type manually before retrying`.
+
+**Stale-source guard (before writing values):**
+
+1. Read the existing `Année financière` value on the Notion page, if any.
+2. If `fetched_year < existing_year`: skip the write entirely (RNE lags/caches — an older year is a stale fetch, not a real regression) and add a stale-source row: `Finance (all 4) | 2024 (current) | 2023 (rne, stale) — RNE returned an older year than already on file | rne | n/a | SKIP — stale source`.
+3. Otherwise (`fetched_year >= existing_year`, including equal) proceed with the write.
 
 ### Notes `[open-data]` (replace, never append)
 
