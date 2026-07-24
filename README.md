@@ -175,9 +175,12 @@ notion_pilot/
 └── media/             # Photo + voice download, on-device transcription
 ```
 
-## Agent skill: Artelys CRM ops
+## Agent skills: Artelys CRM
 
-Canonical skill: `skills/notion-crm-ops/` (symlinked to `.cursor/skills/notion-crm-ops` and `.claude/skills/notion-crm-ops`). Use it when adding/updating Leads, Activities, People, or Companies in the Artelys Notion CRM via Notion MCP — always with a French preview table before writes. See the skill’s `references/` for DB IDs and field enums.
+Canonical skills under `skills/` (symlinked into `.cursor/skills/` and `.claude/skills/`):
+
+- **`notion-crm-ops`** — add/update Leads, Activities, People, or Companies via Notion MCP; always French preview table before writes. See `references/` for DB IDs and field enums.
+- **`company-open-data-enrichment`** — enrich or create a Companies row from French open data (SIREN, NAF/APE, BODACC, RNE financials, dirigeants); Prosper MCP preferred, registry fallback; same preview + `go` write discipline as `notion-crm-ops`.
 
 ## MCP server
 
