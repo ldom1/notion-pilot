@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "notion-crm": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/home/lgiron/lab_perso/notion-pilot",
+        "run",
+        "python",
+        "-m",
+        "notion_pilot.mcp.server"
+      ],
+      "env": {
+        "INFISICAL_ENV": "dev"
+      }
+    }
+  }
+}

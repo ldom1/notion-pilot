@@ -1,0 +1,29 @@
+{
+  "skill_name": "notion-crm-ops",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "À partir de ce mail, mets à jour le CRM Artelys (leads + activités + people/companies si besoin). Montre un tableau FR à valider avant d'écrire.\n\nDe: thomas.lefeure@artelys.com\nÀ: julien.politello@hexana.fr\nObjet: RE: Devis Scale A6\nDate: 15 juillet 2026\n\nBonjour, avez-vous des retours sur la proposition ? OVH tient les prix jusqu'au 15 août.",
+      "expected_output": "French validation table covering Hexana lead update and at least one Email/Proposal activity; no Notion writes until user says go; uses Artelys CRM IDs / search.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Enrichis la company MS4All dans le CRM: country, sector, SIREN, website, LinkedIn. Tableau de validation avant write.",
+      "expected_output": "Research-backed proposed fields with source=web|siren tags; needs_review if low confidence; preview table; no invented SIREN/LinkedIn.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Crée la personne Sébastien Lalaurette chez Air Liquide, email sebastien.lalaurette@airliquide.com. Trouve LinkedIn, poste, seniority, role_type si possible. Relie-la au lead Air Liquide / ACHPC après mon go.",
+      "expected_output": "Person plan with name+company required and strongly expected fields filled or needs_review; seniority from allowed enum; validation table before create; lead link only after go.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Ajoute une page dans ma base Notion perso 'Recettes de cuisine' pour un gâteau au chocolat.",
+      "expected_output": "Skill declines to act — this is not the Artelys CRM (Leads/Activities/People/Companies). No write, no validation table; points user to the appropriate non-CRM tooling instead.",
+      "files": []
+    }
+  ]
+}

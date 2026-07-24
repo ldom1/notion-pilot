@@ -12,68 +12,45 @@ updated:
 - LLM enrichment via OpenRouter (heuristics fallback if no key)
 - Multi-adapter architecture: Telegram, Email (IMAP), Discord
 - CRM module fully functional: `/lead`, `/people`, `/company`, `/deal`, `/enrich`, `/knowledge`
-- Deployed on hp-elite-server via Coolify (containers, not systemd) — migrated off devbox 2026-07-20; see Local Brain `inbox/daily/specs/notion-pilot/2026-07-20-fix-web-view-design.md`
-- Cockpit (Phase 4): chat panel, workspace panel, MCP Server info panel — UX polished (automation panel removed 2026-07-20, see Decisions)
+- Deployed on devbox as systemd user service
+
+
+## What's New (2026-07-24)
+
+- New skill `company-open-data-enrichment` (SIREN/BODACC/RNE enrichment via direct open-data API fallback, since Prosper MCP is early-stage/not reliably live) + a Finance section (`CA`/`Résultat net`/`Marge nette %`/`Année financière` as real Notion properties, sourced from RNE, gated on high-confidence SIREN). PR #25 open (`feat/add-skills` → `main`), 9 commits, doc-only, brainstorm→spec→plan→subagent-driven-development execution with per-task + final whole-branch review, not yet merged. See [[2026-07-24-companies-finance-section]].
+- Live-tested the direct-API path on **RTE** (SIREN `444619258`): high-confidence match, BODACC clean (86 filings, no insolvency), RNE 2024 CA €5,558,953,000 / résultat net €171,258,000 / margin ≈3.08%, 19 dirigeants. Confirms the fallback path is solid — this is real data, not a fixture.
+- **Blocker (root-caused this session, see DECISIONS.md 2026-07-24):** `notion-crm` MCP server crashed on startup because `INFISICAL_ENV` was unset (defaults to `"prod"` in `Settings()`'s OAuth validator, tripping on the default localhost redirect URI) — same class of failure as the 2026-07-17 note below, now understood precisely. Fixed via `"env": {"INFISICAL_ENV": "dev"}` in `.claude/settings.json`/`.cursor/mcp.json`'s `notion-crm` entries; a `/resume` did **not** pick this up (MCP servers spawn at process start) — needs a full quit-and-relaunch to verify.
+- Second test company "LCH" (from a pasted `app.notion.com` link) stayed fully blocked — `WebFetch` can't authenticate to Notion (redirect loop), so no identity was ever established for it without MCP access.
+- **`notion-crm` MCP confirmed still broken across three separate sessions**, including one the user confirmed was a genuine fresh terminal + direct `claude` launch — `claude mcp list`/`get`/`ToolSearch` all show nothing despite `~/.claude.json`'s project-scoped config being verified correct each time. Root cause still open; pivoted to a proven, now-documented workaround instead of chasing it further (see below).
+- **Direct-Notion-API fallback proven and documented**: `notion_pilot`'s own `Settings()` + `notion_client.AsyncClient` used directly (same client the app's syncers already use), bypassing MCP entirely. Two gotchas found and worked around: `INFISICAL_ENV=dev` holds an **invalid placeholder Notion token** (the real one is under `prod`, which needs a one-off `NOTION_OAUTH_REDIRECT_URI` override to dodge the OAuth-localhost guard — client-side only, no real config touched); the real Companies data source uses the **legacy `data_sources` API**, not `databases` — `ensure_siren_property()`-style idempotent-create helpers in `syncer.py` only cover the `databases` path and silently no-op on this workspace. Now documented as an accepted MCP fallback in `skills/company-open-data-enrichment/SKILL.md` prerequisite #1.
+- **RTE and LCH Finance writes completed live** (the two blocked test companies from the first entry): RTE got all 4 Finance properties created + written (CA €5.56B, margin 3.08%, 2024); LCH got real values with a genuine `ca=0`-blank-margin edge case (2017, only year on file).
+- **Batch Finance run across all 22 open (non-Closed-Lost) leads**: 13 companies got real Finance data written; 4 had no RNE accounts filed (valid SKIP); Gasunie/ENNOH have no French SIREN (foreign entities, permanent SKIP for this French-only workflow); CRE's SIREN (`110000106`) was newly resolved. Followed by a full-enrichment pass (Sector/Size/Country/Website/Linkedin) on the same 22, using user-supplied corroboration (LinkedIn/registry pages pasted directly) for the genuinely thin rows (CRE, Gasunie) and 5 Linkedin-only gaps.
+- **Two real code bugs found (not fixed this session):** (1) `notion_pilot/shared/siren_lookup.py::naf_section_to_sector()` produces Sector values (`"Public Sector"`, `"Energy"`, `"Finance"`, etc.) that don't match this workspace's actual live Sector select options (`"Government & Public Sector"`, `"Energy & Utilities"`, `"Financial Services"`, etc.) — would create stray new select options if ever run for real. (2) The Companies data source **has no `Notes` property at all**, contradicting the skill doc's assumption that BODACC/dirigeants get written there.
+- See [[2026-07-24-companies-finance-section]] for the full multi-session writeup (4 continuation entries).
+
+## What's New (2026-07-22)
+
+- Cursor `.cursor/mcp.json` registers `notion-crm` over stdio (mirrors `.claude/settings.json`).
+- Project skill `skills/notion-crm-ops/` (symlinks under `.cursor/skills/` + `.claude/skills/`): Artelys CRM ops via Notion MCP with mandatory FR preview table. See [[2026-07-22-session-capture]].
+- Live CRM ops this session: Hexana/CRE/MAIF/Michelin/LCH/Air Liquide/Axa/MS4All leads + activities; people/companies enrichment (Massa, Lalaurette, MS4All, etc.).
+- MS4All People enriched (LinkedIn/Position/Seniority/Role Type): Edouard Lété, Coralie Feillault, Zoheir Laguel — Phone still `needs_review`.
+- **Blocker:** `NOTION_DEALS_DATABASE_ID` / `NOTION_ACTIVITIES_DATABASE_ID` often unset in local Settings — Leads/Activities writes went through Notion MCP OAuth, not stdio. Companies DS may 404 for the Lgiron API **dev** integration token.
 
 ## Current Branch
 
-`main` — merged `develop` via PR #15 (regular merge, not squash) on 2026-07-17, reconciling two features built in parallel since they diverged:
+`develop` (2026-07-17) — PR #16, #18, and #19 all merged (#19: `mcp-crm-fixes`, squash `af2d718` — People DB schema mismatch, "Rte France"/"RTE" duplicate creation, wrong-SIREN attachment, no fallback enrichment). See [[2026-07-14-crm-rationalization-execution]], `[[2026-07-15-mcp-server-test]]`, [[2026-07-16-mcp-crm-fixes]].
 
-- From `develop`: PR #16 (thin CRM sync layer: SIREN auto-population + enrichment migration to prosper, squash `0d22d45`), PR #18 (MCP server exposing CRM as tools, squash `8e705b7`), PR #19 (CRM dedup/SIREN/enrichment-cascade fixes, `af2d718`), Infisical secret manager integration (PR #14), migration of project memory from `.claude/brain/` to `.claude/memory/` + `AGENTS.md`. See [[2026-07-14-crm-rationalization-execution]], [[2026-07-15-mcp-server-test]], [[2026-07-16-mcp-crm-fixes]].
-- From `main`: full 5-database CRM schema redesign (Deals/People/Companies/Meetings/Activities, see below), Deal List Review + Prosper enrichment pass, Last Activity rollups/Deal Temperature formulas, Meetings→Activities polling agent (`scripts/crm/crm_sync_meetings_activities.py`) replacing the Notion UI automation.
+**3 PRs open, none yet merged** (all from `origin/develop`, split out of the [[2026-07-16-mcp-people-knowledge-fixes-plan]] implementation):
+- PR #20 (`workstream-a-mcp-thin-wrapper`) — `upsert_companies` MCP thin-wrapper refactor + a live-test-discovered fix: `upsert()` now enforces the same SIREN-divergence `needs_review` gate `preview()` already had.
+- PR #21 (`workstream-b-people-parsing`) — `/people` markdown-link paste parsing + sanitized Telegram errors.
+- PR #22 (`workstream-c-knowledge-enrichment`) — richer multi-link Notion knowledge pages.
 
-## CRM Schema Redesign (2026-06-29/30)
-
-Full 5-database CRM redesign executed via Notion API migration scripts. All scripts in `scripts/crm/`.
-
-**Live DB IDs:**
-- Deals (Commercial): `4890e1d6-178d-4a42-af06-7bbe0cef09fe`
-- People: `11b5f43c-a19a-4bec-9489-7c6897ed30fb`
-- Companies: `cfc21198-9684-47ef-98ae-fc5657511998`
-- Meetings: `e94cc98f-2f66-4c53-ac6d-62b9d8f7d5aa`
-- Activities: `38f6c451-9465-814d-a383-ce59038b6e8d` (⚠️ the original ID `38f6c451-9465-8166-a862-e531d15f467f` was accidentally trashed in Notion UI ~2026-06-30/07-02; there were two Activities DBs — always verify `in_trash`/`archived` before trusting a cached ID)
-
-**Key schema changes applied:**
-- Deals: Lead Source (7 options), 9 Stages (incl. Discovery/First Meeting, No Answer, Waiting for Response), Expected Close Date, Owner (person), Created time, Meetings relation, Weighted Value formula fixed
-- People: Name (was Nom), Priority (🔥/🌡/🧊), Relationship (Close/Warm/Cold/None), Lead Source
-- Companies: Revenue Potential, Sector (11 options), Size (7 buckets), Market Segment (was Activities)
-- Meetings: Name (was Nom), Tags (was Étiquettes), Deal relation ↔ Deals, Company relation, Meeting Objective, Advanced Deal? checkbox
-- Activities: new DB — Type (8 options), Outcome (4 options), Deal/Person/Company relations, Owner (person), Next Step, Next Step Date
-
-**Formulas on Deals (Notion Formula 1.0 API — binary or/and, no cross-formula refs):**
-- Days Since Last Activity: terminal→0, no activity→999, else dateBetween
-- Deal Age (days): dateBetween(now(), Created time, "days")
-- Deal Temperature: terminal→"—", ≤7→🔥 Hot, ≤21→🌡 Warm, else ❄️ Cold
-- Stale Deal: open + empty Next Step + >14 days since activity
-- Next Step Scheduled: not(empty(Next Step Date))
-
-**Pending manual steps:** follow `scripts/crm/NOTION_UI_STEPS.md` in Notion UI (views, dashboard, automation, People option remapping)
-
-**Env var (set):** `NOTION_ACTIVITIES_DATABASE_ID=38f6c451-9465-814d-a383-ce59038b6e8d`
-
-## CRM Deal List Review + Prosper Enrichment (2026-07-02)
-
-Full pass over all 29 leads in the Deal Board: backfilled 18 Activities from the Meetings backlog, filled Notes/Next Step/Primary contact per-deal based on live conversation with Louis, enriched 27/29 linked Companies via the Prosper MCP server (SIREN, Website, Country, Sector, Size, Clearbit logo as page icon — no dedicated Logo property).
-
-**New Companies property:** `SIREN` (rich_text) — added for durable Prosper lookups, avoids re-searching every enrichment pass.
-
-**Prosper MCP details:** runs locally at `http://localhost:8090`, SSE transport only (no native Claude Code tool registered — must hand-roll the MCP `initialize`/`tools/call` handshake over SSE each session). Covers ~23M French SIREN entities (`gold.companies`) + curated ~93k layer; has no logo/website/non-French data. Large public entities (EDF, Veolia, RTE, MAIF) often show `is_active: false` on their well-known parent SIREN — appears to be stale registry data in Prosper's build, not real status.
-
-**Reusable prompt** for repeating this workflow (mapping tables, gotchas, cold-prospect default template) written to session scratchpad — not yet copied into the repo. Consider moving it into `scripts/crm/` if this becomes a recurring task.
-
-## MCP Server + CRM Sync Layer (from `develop`, 2026-07-14/16)
-
-- Thin CRM sync layer (SIREN auto-population + enrichment migration to prosper) merged as PR #16.
-- MCP server (`notion_pilot/mcp/`) merged as PR #18 — exposes CRM upsert/dedup/enrich/rank/search/read as 11 MCP tools, registered in `.claude/settings.json` as `notion-crm` (needs a Claude Code restart to connect via stdio). No MCP tool creates a Lead/Deal yet — only `upsert_people`/`upsert_companies` write, `get_open_leads` is read-only.
-- PR #19 (`af2d718`) fixed: People DB schema mismatch, "Rte France"/"RTE" duplicate creation, wrong-SIREN attachment, no-fallback-enrichment. Top-3 SIREN candidates with a name-divergence gate now used instead of blind top-1.
-- Fixed during the PR #15 merge (2026-07-17): `web/server.py`'s `/lead`, create-lead, and create-deal inline-person-creation paths all wrote to the wrong `"Nom"` property — same root cause as the People DB schema bug PR #19 fixed, different code paths. All three now write `"Name"`.
-- Deferred: archive the stale, empty "Rte France" duplicate Notion page (`39e6c451-9465-81d1-ad4e-f80e58fc3070`) once the original live test is re-run to confirm no further duplicates.
-- 2026-07-22: MCP server now also reachable over `streamable-http` at `/mcp` on the web service (mounted only when `NOTION_TOKEN` + `MCP_BEARER_TOKEN` are both set), in addition to stdio — gated by a static bearer token, not FastMCP's OAuth resource-server auth. Same-session fix: `PersonRecord.name`/`.company`/`CompanyRecord.name` plus a few optional fields (`linkedin_url`, `website`, `country`, `sector`) now reject empty/whitespace-only strings — previously an empty `name` could create a blank-titled Notion page since `Field(...)` only requires presence, not content. See ARCHITECTURE.md "Non-Obvious Decisions" and `[[2026-07-22-mcp-http-transport-and-field-validation]]`.
+See [[2026-07-17-mcp-people-knowledge-fixes]] for the full implementation + live-test bug writeup.
 
 ## What's New (2026-06-04, UX polish)
 
 ### Cockpit layout
-- Panel order: Chat → Workspace → MCP Server (was Automation until 2026-07-20)
+- Panel order: Chat → Workspace → Automation
 - Workspace panel moved above Automation for discoverability
 
 ### Ask your data (ChatPanel)
@@ -104,15 +81,13 @@ Full pass over all 29 leads in the Deal Board: backfilled 18 Activities from the
 
 ## Next Steps
 
-1. Run `scripts/crm/NOTION_UI_STEPS.md` checklist in Notion UI
-2. Remap existing People records (Priority and Relationship old option values) in Notion UI
-3. Add `NOTION_ACTIVITIES_DATABASE_ID` to `.env` and devbox infisical
-4. Fix Telegram conflict error (two getUpdates pollers running simultaneously)
-5. Add `crm_prospect.py` to `config/scripts.yaml` once CLI args confirmed
-6. Phase 5: `data/{workspace_id}/` namespacing, LinkedIn upload endpoint, shared bot dispatcher
-7. Notion conversation history (log chat sessions to Notion — roadmap item)
-8. Phase 2: email "à relire" pipeline
-9. Verify the sibling `artelys-crystal-hpc-lead-generation` project's `.claude/settings.json` MCP registration still resolves now that this repo's branches are merged
+1. Fix Telegram conflict error (two getUpdates pollers running simultaneously)
+2. Improve LLM prompt to prevent fictional/unknown contacts in lead suggestions
+3. End-to-end test: sign-out → OAuth → cockpit → run script → compose workflow → save → run from list
+4. Add `crm_prospect.py` to `config/scripts.yaml` once CLI args confirmed
+5. Phase 5: `data/{workspace_id}/` namespacing, LinkedIn upload endpoint, shared bot dispatcher
+6. Notion conversation history (log chat sessions to Notion — roadmap item)
+7. Phase 2: email "à relire" pipeline
 
 ## Web module layout
 
@@ -133,6 +108,26 @@ web/
       pages/Cockpit.tsx          ← panel layout, savingDbId state
       features/chat/ChatPanel.tsx ← Ask your data, example prompts, lead modal
       features/workspace/WorkspacePanel.tsx ← per-card save loading state
-      features/mcp/McpPanel.tsx ← MCP tool list (collapsible write/read-only groups, kind badges) + stdio/http connection info (replaced features/automation/ 2026-07-20)
+      features/automation/AutomationPanel.tsx ← scripts + graph view
       styles/globals.css         ← all UI styles
 ```
+
+## In Progress
+<!-- added by ai-dotfiles upgrade -->
+
+- MCP server (`notion_pilot/mcp/`) merged to `develop` 2026-07-15 (PR #18, squash `8e705b7`) — 11 tools (upsert/dedup/enrich/rank/search/read), registered in this repo's `.claude/settings.json` as `notion-crm` (needs a Claude Code restart to connect for real via stdio).
+- **Resolved (2026-07-16), shipped, PR #19 merged (`af2d718`):** the live-test blocker above (People DB schema mismatch) plus the "Rte France"/"RTE" duplicate, wrong-SIREN-attachment, and no-fallback-enrichment bugs from `[[2026-07-15-mcp-server-test]]` are all fixed. See `[[2026-07-16-mcp-crm-fixes]]` and DECISIONS.md 2026-07-16 entry.
+- **New (2026-07-17), shipped in open PR #20, not yet merged:** Task A7's live retest against production Notion surfaced a second SIREN-gate gap — `upsert()` didn't enforce the same divergence block `preview()` already had, and created 2 real, unreviewed company pages. Fixed and both pages archived. See [[2026-07-17-mcp-people-knowledge-fixes]] and DECISIONS.md 2026-07-17 entry.
+
+## Open Questions
+<!-- added by ai-dotfiles upgrade -->
+
+- Both prior open questions here are resolved (schema fix: changed the code, not the live DB; SIREN lookup: now returns top-3 candidates with a name-divergence gate) — see DECISIONS.md 2026-07-16 entry.
+- **New:** `web/server.py`'s `/lead` and web-cockpit person-create path independently writes to the same wrong `"Nom"` property — same root cause as the fixed bug, different code path, not covered by PR #19. Needs its own fix.
+- **Still open:** the stale, empty "Rte France" duplicate Notion page (`39e6c451-9465-81d1-ad4e-f80e58fc3070`) has not been archived yet — PR #19 merged 2026-07-16, so this can now be actioned (re-run the original live test first to confirm it resolves to `needs_review` against "RTE", then archive).
+- **Resolved (2026-07-17):** the *separate* "Ugent"/"Sqli" pages created by this session's SIREN-gate `upsert()` bug (see DECISIONS.md 2026-07-17 entry) were archived after the fix shipped.
+- **New (2026-07-17):** a Pydantic `ValidationError` on an unrelated sibling field (`NOTION_OAUTH_REDIRECT_URI`) dumped a partial real Notion OAuth token via its raw `input_value`. User explicitly chose not to rotate it — left as-is. Avoid printing raw `Settings` field values on validation errors going forward; print booleans/derived facts only.
+- **Root-caused (2026-07-24):** the trigger for that same `NOTION_OAUTH_REDIRECT_URI` validator is `INFISICAL_ENV` defaulting to `"prod"` when unset — see DECISIONS.md 2026-07-24 entry. Fixed for the `notion-crm` MCP server specifically; still open whether other local entry points (scripts, other MCP configs) have the same gap.
+- **Resolved via workaround (2026-07-24):** `notion-crm` MCP still does not connect even after a confirmed genuine fresh relaunch — root cause remains open, but no longer blocking, since the direct-Notion-API fallback (`Settings()` + `notion_client.AsyncClient`) is now proven and documented in the skill. RTE and LCH's Finance writes are done; a full batch (13 more companies, plus Sector/Size/Country/Website/Linkedin enrichment on all 22 open leads) is also done. See [[2026-07-24-companies-finance-section]].
+- **New (2026-07-24):** `naf_section_to_sector()` in `siren_lookup.py` doesn't match the live Companies Sector select options — needs a fix (either update the hardcoded vocabulary or read the DB's actual options at runtime) before it's used for real again.
+- **New (2026-07-24):** the Companies data source has no `Notes` property — the `company-open-data-enrichment` skill's BODACC/dirigeants `[open-data]` block plan doesn't apply to this real workspace as written; needs either a schema addition (with explicit `go`) or a skill-doc correction.
