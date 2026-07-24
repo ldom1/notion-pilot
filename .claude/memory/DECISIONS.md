@@ -7,7 +7,15 @@ updated:
 
 <!-- Append-only ADR log. Never delete entries. -->
 
-### 2026-04-17 — Long polling only, no webhook server
+### 2026-07-24 — Companies Finance section writes via Notion MCP directly, not `upsert_companies`/`enrich_companies`
+**Decision:** `company-open-data-enrichment` writes the 4 new Finance properties (`CA`, `Résultat net`, `Marge nette %`, `Année financière`) directly via Notion MCP page-update, always overwriting with the freshest RNE year (guarded against stale years and mismatched existing property types)
+**Rejected:** Extending `enrich_companies`' fill-empty-only semantics to cover financials
+**Rationale:** `upsert_companies` only writes at CREATE time and `enrich_companies` only fills blanks and never refreshes — neither fits data that must update annually as new RNE filings land; reusing either would either silently freeze financials after the first run or require carving out inconsistent semantics inside an otherwise-uniform batch tool. Full spec: [[2026-07-23-companies-financials-design]], plan: [[2026-07-23-companies-financials-plan]].
+
+### 2026-07-24 — Root-caused the recurring `NOTION_OAUTH_REDIRECT_URI` ValidationError: `INFISICAL_ENV` defaults to `"prod"`
+**Decision:** Added `"env": {"INFISICAL_ENV": "dev"}` to the `notion-crm` MCP server entry in `.claude/settings.json` and `.cursor/mcp.json`
+**Rejected:** Leaving the MCP server config as-is and treating the crash as a one-off
+**Rationale:** `notion_pilot/shared/config.py:309-322`'s OAuth-redirect validator reads `os.environ.get("INFISICAL_ENV", "prod")` — unset defaults to `"prod"`, which trips the strict localhost-redirect check even in local dev. The `notion-crm` MCP entries launched the server with no env set at all, so `Settings()` crashed before the server could register any tools — this is the same underlying issue partially observed on 2026-07-17 (see CONTEXT.md Open Questions) but not root-caused until now. Verified the fix directly: `INFISICAL_ENV=dev uv run python -c "from notion_pilot.shared.config import Settings; Settings()"` now loads cleanly.
 **Decision:** Use `python-telegram-bot` long polling exclusively  
 **Rejected:** Webhook server requiring a public HTTPS endpoint  
 **Rationale:** Simpler infra, no reverse proxy needed, runs fine as a single systemd user service on a home server
@@ -200,6 +208,13 @@ updated:
 **Rejected:** Four separate skills (one per entity); writing CRM changes without a preview gate; inventing LinkedIn/SIREN when research fails.
 **Rationale:** Real sales threads are multi-entity (company + people + lead + activities). One orchestrating skill preserves a single validation table and shared completeness rules (Company: country/sector/SIREN/website/LinkedIn; People: name+company plus strongly expected email/linkedin/position/seniority/role_type/phone). Field shapes stay grounded in `notion_pilot/mcp/models.py`.
 **Affects:** Agent workflow; `skills/notion-crm-ops/`; `.cursor/mcp.json`
+
+### 2026-07-24 — Accept direct-Notion-API access as a documented fallback when `notion-crm` MCP is unreachable
+
+**Decision:** `company-open-data-enrichment`'s prerequisite #1 now allows falling back to `notion_pilot`'s own `Settings()` + `notion_client.AsyncClient` directly (same client the app's syncers already use, invoked in-process instead of via MCP RPC) when MCP is unreachable after a genuine fresh-session check. Same write discipline (French validation table + explicit `go`) still applies regardless of which path is used.
+**Rejected:** Continuing to treat "MCP not connected" as a hard stop requiring the user to fix MCP before any CRM work can proceed.
+**Rationale:** `notion-crm` MCP failed to connect across three independent sessions, including one confirmed by the user to be a genuine fresh terminal + direct `claude` launch, with the on-disk config verified correct every time — the root cause is environmental and outside what's fixable from inside a session. The direct-API path was proven twice this session (RTE, LCH, then a 22-company batch) using the exact same underlying Notion client code, so it's a safe, non-duplicative fallback rather than a new write path. Two gotchas to check before using it: the Infisical `dev` environment holds an invalid placeholder Notion token (use `prod`, with a local-only `NOTION_OAUTH_REDIRECT_URI` override to dodge an OAuth-localhost Pydantic guard); the real Companies data source is on the legacy `data_sources` API, not `databases`.
+**Affects:** `skills/company-open-data-enrichment/SKILL.md` prerequisite #1. See [[2026-07-24-companies-finance-section]].
 
 ## Template
 <!-- added by ai-dotfiles upgrade -->

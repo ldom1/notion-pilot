@@ -114,6 +114,10 @@ Target: 4 custom knowledge DBs — Notions, Ideas, Tools, Data & Technology.
 - [ ] Prospection pipeline: batch enrich a list from CSV/LinkedIn export
 - [ ] Dedup: merge duplicate People/Companies via LLM similarity
 - [ ] Robustify enrichment for People and Companies: retry logic, partial-failure recovery, progress logging per record, idempotent runs (skip already-enriched records), dry-run mode that reports what would change
+- [ ] Wire Prosper MCP once it's live (`~/lab_perso/prosper`, currently early-stage/not reliably up): re-promote it from optional accelerator back to the primary source in `skills/company-open-data-enrichment/SKILL.md` (`resolve_company`/`get_company`/`get_company_rne`/`get_company_dirigeants`/`enrich_company`), keep the direct-API fallback (SIREN/BODACC/RNE via `recherche-entreprises.api.gouv.fr` + `bodacc-datadila.opendatasoft.com`, added 2026-07-23) as the degraded path instead of the only path
+- [x] Companies Finance section (`CA`/`Résultat net`/`Marge nette %`/`Année financière`) live-tested end-to-end: RTE, LCH, and all 13 other companies behind currently-open (non-Closed-Lost) leads with real RNE data, via the direct-Notion-API fallback (2026-07-24, see DECISIONS.md same date). PR #25 (doc-only) still open, not yet merged.
+- [ ] Fix `notion_pilot/shared/siren_lookup.py::naf_section_to_sector()` — its output vocabulary (`"Public Sector"`, `"Energy"`, `"Finance"`, etc.) doesn't match the live Companies Sector select options (`"Government & Public Sector"`, `"Energy & Utilities"`, `"Financial Services"`, etc.); found 2026-07-24 while enriching CRE/Gasunie by hand. Either update the hardcoded mapping or read the DB's actual select options at runtime.
+- [ ] Decide what to do about the Companies data source having no `Notes` property at all (found 2026-07-24) — the `company-open-data-enrichment` skill's BODACC/dirigeants `[open-data]` block assumes one exists. Either add the property (schema change, needs explicit `go`) or correct the skill doc.
 
 ## Later / Won't Do Now
 
