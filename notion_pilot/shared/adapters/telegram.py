@@ -586,7 +586,7 @@ class TelegramAdapter:
             if app.updater is None:
                 raise RuntimeError("Telegram Application updater is None — cannot start polling")
             await app.updater.start_polling(
-                allowed_updates=Update.ALL_TYPES, drop_pending_updates=True
+                allowed_updates=Update.ALL_TYPES, drop_pending_updates=False
             )
             logger.info("telegram adapter: polling started")
             await asyncio.Event().wait()  # block until cancelled
