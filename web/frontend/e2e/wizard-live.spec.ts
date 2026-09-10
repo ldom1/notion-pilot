@@ -30,12 +30,11 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
  *      "Internal integrations aren't owned by a single user, so creating
  *      workspace-level private pages is not supported." Only a public-integration
  *      OAuth token has the insert_content capability the wizard needs.
- *   3. `E2E_ALLOW_REAL_DEPLOY=1` — an explicit acknowledgement, because this
- *      cannot be sandboxed. create_workspace_root_page posts
- *      `parent: {workspace: true}`, so the wizard always creates a **top-level**
- *      page; there is no parent to confine it to. Set `E2E_NOTION_TOKEN` as well
- *      and the test archives what it created; without it the page id is printed
- *      for you to archive by hand.
+ *   3. `E2E_NOTION_PARENT_PAGE_ID` — the scratch page to deploy **into**. The
+ *      wizard now accepts a parent, so the run is confined: everything it
+ *      creates lands under that page and is archived in teardown when
+ *      `E2E_NOTION_TOKEN` is set. Share the page with the integration first
+ *      (page → ··· → Connections), or the picker will be empty.
  *
  * Run:
  *   uv run uvicorn web.server:create_app --factory --port 8080     # terminal 1
@@ -47,8 +46,25 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 const AUTH = path.join(HERE, ".auth", "state.json");
 const LIVE = process.env.E2E_LIVE_BASE_URL;
-const ALLOWED = process.env.E2E_ALLOW_REAL_DEPLOY === "1";
+const PARENT = process.env.E2E_NOTION_PARENT_PAGE_ID;
 const CLEANUP_TOKEN = process.env.E2E_NOTION_TOKEN;
+
+/** Title of a page, so the test can find it through the wizard's search box. */
+async function pageTitle(pageId: string): Promise<string | null> {
+  if (!CLEANUP_TOKEN) return null;
+  const res = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+    headers: { Authorization: `Bearer ${CLEANUP_TOKEN}`, "Notion-Version": "2022-06-28" },
+  });
+  if (!res.ok) return null;
+  const body = (await res.json()) as { properties?: Record<string, any> };
+  for (const prop of Object.values(body.properties ?? {})) {
+    if (prop?.type === "title") {
+      const text = (prop.title ?? []).map((t: any) => t.plain_text ?? "").join("");
+      if (text.trim()) return text;
+    }
+  }
+  return null;
+}
 
 /** Archive a page so a real deploy does not litter the workspace. */
 async function archive(pageId: string): Promise<string> {
@@ -66,12 +82,13 @@ async function archive(pageId: string): Promise<string> {
 }
 
 test.describe("wizard against real Notion", () => {
+  // The id check reads config the deploy writes, so these must run in order and
+  // in the same worker — in parallel it inspects a workspace nothing created yet.
+  test.describe.configure({ mode: "serial" });
+
   test.skip(!LIVE, "set E2E_LIVE_BASE_URL to a running FastAPI app");
   test.skip(!existsSync(AUTH), "run scripts/e2e/mint_session.py first — no e2e/.auth/state.json");
-  test.skip(
-    !ALLOWED,
-    "set E2E_ALLOW_REAL_DEPLOY=1 — this creates a real top-level Notion page and cannot be sandboxed",
-  );
+  test.skip(!PARENT, "set E2E_NOTION_PARENT_PAGE_ID to a scratch page shared with the integration");
 
   test.use({ storageState: AUTH });
   // a real deploy creates six databases and patches rollups onto three of them
@@ -91,6 +108,24 @@ test.describe("wizard against real Notion", () => {
 
     const name = `E2E CRM ${new Date().toISOString().slice(0, 19)}`;
     await page.locator("input.modal-param-input").fill(name);
+
+    // Deploy into the scratch page, so the run is confined and reversible.
+    await page.getByRole("button", { name: "Inside an existing page" }).click();
+
+    // The unqueried list is bounded to a few recently-edited pages (search
+    // returns database rows too), so search for the scratch page by name rather
+    // than hoping it lands in the default set.
+    const title = await pageTitle(PARENT!);
+    if (title) await page.locator('input[placeholder="Search your pages…"]').fill(title);
+
+    const picker = page.locator("select.db-edit-select");
+    await expect(
+      picker,
+      "picker never appeared — is the scratch page shared with the integration?",
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(picker.locator(`option[value="${PARENT}"]`)).toHaveCount(1, { timeout: 15_000 });
+    await picker.selectOption(PARENT!);
+
     await page.getByRole("button", { name: "CRM", exact: true }).click();
     await page.getByRole("button", { name: /Deploy|Create/i }).click();
 

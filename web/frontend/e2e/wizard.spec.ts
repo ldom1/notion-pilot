@@ -30,6 +30,31 @@ async function stubStatus(page: Page) {
   );
 }
 
+/** Placement probe + page list. `ownerType: "workspace"` = internal integration. */
+async function stubPlacement(
+  page: Page,
+  { ownerType = "user", pages = [{ id: "page-1", name: "99 - Integration" }] } = {},
+) {
+  await page.route("**/api/setup/capabilities", (route: Route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        can_create_top_level: ownerType !== "workspace",
+        owner_type: ownerType,
+        workspace_name: "Playwright",
+      }),
+    }),
+  );
+  await page.route("**/api/cockpit/notion-pages", (route: Route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ pages }),
+    }),
+  );
+}
+
 /** The log lines web/server.py emits for a `crm` deploy, in order. */
 const CRM_LOG = [
   { type: "log", message: "Creating root page…" },
@@ -48,6 +73,7 @@ const CRM_LOG = [
 test.describe("deploy wizard", () => {
   test.beforeEach(async ({ page }) => {
     await stubStatus(page);
+    await stubPlacement(page);
   });
 
   test("renders after the OAuth callback and defaults to both scopes", async ({ page }) => {
@@ -72,6 +98,61 @@ test.describe("deploy wizard", () => {
     await expect(desc).toContainText("Leads");
     await expect(desc).toContainText("Activities");
     await expect(desc).toContainText("Meetings");
+  });
+
+  test("defaults to top level when the token allows it", async ({ page }) => {
+    await page.goto("/?connected=1");
+    await expect(page.getByRole("button", { name: "Top level of my workspace" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Top level of my workspace" })).toHaveClass(
+      /selected/,
+    );
+  });
+
+  test("requires a parent page when the integration is internal", async ({ page }) => {
+    // Notion refuses workspace-level pages for internal integrations, so the
+    // wizard must not offer a placement that is guaranteed to 400.
+    await stubPlacement(page, { ownerType: "workspace" });
+    await page.goto("/?connected=1");
+
+    const top = page.getByRole("button", { name: "Top level of my workspace" });
+    await expect(top).toBeDisabled();
+    await expect(page.getByText(/integration is internal/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Inside an existing page" })).toHaveClass(
+      /selected/,
+    );
+    // and deploying is blocked until a page is actually chosen
+    await expect(page.getByRole("button", { name: /Deploy|Create/i })).toBeDisabled();
+    await page.selectOption("select.db-edit-select", "page-1");
+    await expect(page.getByRole("button", { name: /Deploy|Create/i })).toBeEnabled();
+  });
+
+  test("teaches the Connections step when no page is shared", async ({ page }) => {
+    await stubPlacement(page, { ownerType: "workspace", pages: [] });
+    await page.goto("/?connected=1");
+
+    await expect(page.getByText(/No pages are shared with this integration/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "refresh" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Deploy|Create/i })).toBeDisabled();
+  });
+
+  test("sends the chosen parent page to the deploy", async ({ page }) => {
+    let sent: Record<string, unknown> | null = null;
+    await page.route("**/api/setup/stream", (route: Route) => {
+      sent = route.request().postDataJSON();
+      return route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: sse([{ type: "done", url: "https://www.notion.so/abc" }]),
+      });
+    });
+
+    await page.goto("/?connected=1");
+    await page.getByRole("button", { name: "Inside an existing page" }).click();
+    await page.selectOption("select.db-edit-select", "page-1");
+    await page.getByRole("button", { name: /Deploy|Create/i }).click();
+    await expect(page.getByRole("heading", { name: "Workspace ready!" })).toBeVisible();
+
+    expect(sent).toMatchObject({ parent_page_id: "page-1" });
   });
 
   test("streams every log line and reaches the ready state", async ({ page }) => {

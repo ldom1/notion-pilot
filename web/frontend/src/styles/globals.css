@@ -309,3 +309,4 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f5f4ff; c
 .chat-opt.skip:hover { border-color: #ccc; color: #666; background: #f9f9f9; }
 .chat-clear-btn { font-size: 0.72rem; color: #bbb; background: none; border: none; cursor: pointer; padding: 0.2rem 0.4rem; }
 .chat-clear-btn:hover { color: #888; }
+.link-button { background: none; border: none; padding: 0; color: var(--ink); font: inherit; text-decoration: underline; cursor: pointer; }

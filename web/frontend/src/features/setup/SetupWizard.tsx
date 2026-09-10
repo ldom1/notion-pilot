@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { runSetup } from "../../api/client";
-import type { SSEEvent } from "../../api/client";
+import { fetchNotionPages, fetchSetupCapabilities, runSetup } from "../../api/client";
+import type { NotionPage, SSEEvent } from "../../api/client";
 
 type DeployState = "idle" | "deploying" | "done" | "error";
 
@@ -36,6 +36,14 @@ function LogLine({ line, isLast, deploying }: { line: string; isLast: boolean; d
 export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.ReactElement {
   const [workspaceName, setWorkspaceName] = useState("My Notion Workspace");
   const [scope, setScope] = useState<"crm" | "inbox" | "both">("both");
+  // Placement. `canTopLevel === false` means an internal integration, for which
+  // Notion refuses workspace-level pages outright — a parent is then required.
+  const [canTopLevel, setCanTopLevel] = useState<boolean | null>(null);
+  const [placement, setPlacement] = useState<"top" | "page">("top");
+  const [pages, setPages] = useState<NotionPage[] | null>(null);
+  const [pageQuery, setPageQuery] = useState("");
+  const [pagesTruncated, setPagesTruncated] = useState(false);
+  const [parentPageId, setParentPageId] = useState("");
   const [deployState, setDeployState] = useState<DeployState>("idle");
   const [logs, setLogs] = useState<string[]>([]);
   const [notionUrl, setNotionUrl] = useState<string | null>(null);
@@ -45,12 +53,57 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [logs]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const caps = await fetchSetupCapabilities();
+        if (cancelled) return;
+        setCanTopLevel(caps.can_create_top_level);
+        if (!caps.can_create_top_level) setPlacement("page");
+      } catch {
+        // the probe is advisory; assume top level and let the deploy speak
+        if (!cancelled) setCanTopLevel(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const loadPages = React.useCallback(async (q = "") => {
+    setPages(null);
+    try {
+      const res = await fetchNotionPages(q);
+      setPages(res.pages);
+      setPagesTruncated(res.truncated);
+    } catch {
+      setPages([]);
+      setPagesTruncated(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (placement !== "page") return;
+    // Debounced: /v1/search returns pages and database rows together, so a
+    // query is much cheaper than walking a workspace full of CRM records.
+    const t = setTimeout(() => void loadPages(pageQuery), pageQuery ? 350 : 0);
+    return () => clearTimeout(t);
+  }, [placement, pageQuery, loadPages]);
+
+  const needsParent = placement === "page";
+  const parentMissing = needsParent && !parentPageId;
+
   async function handleDeploy(): Promise<void> {
-    if (!workspaceName.trim() || deployState === "deploying") return;
+    if (!workspaceName.trim() || parentMissing || deployState === "deploying") return;
     setDeployState("deploying");
     setLogs([]);
     try {
-      const stream = runSetup({ scope, workspace_name: workspaceName.trim() });
+      const stream = runSetup({
+        scope,
+        workspace_name: workspaceName.trim(),
+        parent_page_id: needsParent ? parentPageId : null,
+      });
       for await (const event of stream as AsyncIterable<SSEEvent>) {
         if (event.type === "log") {
           setLogs((prev) => [...prev, String(event.message ?? "")]);
@@ -113,6 +166,97 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
       </div>
 
       <div style={s.field}>
+        <label style={s.label}>Where should this live?</label>
+        <div style={s.scopeRow}>
+          <button
+            type="button"
+            className={`deal-wizard-opt${placement === "top" ? " selected" : ""}`}
+            onClick={() => setPlacement("top")}
+            disabled={deployState === "deploying" || canTopLevel === false}
+            style={{ flex: 1 }}
+            title={
+              canTopLevel === false
+                ? "Notion does not allow internal integrations to create top-level pages"
+                : undefined
+            }
+          >
+            Top level of my workspace
+          </button>
+          <button
+            type="button"
+            className={`deal-wizard-opt${placement === "page" ? " selected" : ""}`}
+            onClick={() => setPlacement("page")}
+            disabled={deployState === "deploying"}
+            style={{ flex: 1 }}
+          >
+            Inside an existing page
+          </button>
+        </div>
+
+        {canTopLevel === false && (
+          <div style={s.scopeDesc}>
+            Your integration is internal, so Notion cannot create top-level pages. Pick a page
+            instead.
+          </div>
+        )}
+
+        {placement === "page" && (
+          <div style={{ marginTop: "0.5rem" }}>
+            <input
+              className="modal-param-input"
+              style={{ width: "100%", boxSizing: "border-box", marginBottom: "0.4rem" }}
+              value={pageQuery}
+              onChange={(e) => setPageQuery(e.target.value)}
+              disabled={deployState === "deploying"}
+              placeholder="Search your pages…"
+            />
+            {pages === null && <div style={s.scopeDesc}>Searching…</div>}
+            {pages !== null && pages.length === 0 && (
+              <div style={s.scopeDesc}>
+                {pageQuery ? (
+                  <>No page matches “{pageQuery}”.</>
+                ) : (
+                  <>
+                    No pages are shared with this integration yet. In Notion, open the page you want
+                    → ··· → Connections → add this integration, then{" "}
+                    <button
+                      type="button"
+                      className="link-button"
+                      onClick={() => void loadPages(pageQuery)}
+                    >
+                      refresh
+                    </button>
+                    .
+                  </>
+                )}
+              </div>
+            )}
+            {pages !== null && pages.length > 0 && (
+              <select
+                className="db-edit-select"
+                style={{ width: "100%" }}
+                value={parentPageId}
+                onChange={(e) => setParentPageId(e.target.value)}
+                disabled={deployState === "deploying"}
+              >
+                <option value="">Choose a page…</option>
+                {pages.map((pg) => (
+                  <option key={pg.id} value={pg.id}>
+                    {pg.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {pages !== null && pagesTruncated && (
+              <div style={s.scopeDesc}>
+                Showing the most recently edited pages — type to narrow the search.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div style={s.field}>
         <label style={s.label}>What do you need?</label>
         <div style={s.scopeRow}>
           {(["crm", "inbox", "both"] as const).map((opt) => (
@@ -156,7 +300,7 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
           type="button"
           className="btn-primary"
           onClick={() => void handleDeploy()}
-          disabled={deployState === "deploying" || !workspaceName.trim()}
+          disabled={deployState === "deploying" || !workspaceName.trim() || parentMissing}
         >
           {deployState === "deploying" ? "Creating…" : deployState === "error" ? "Retry" : "Deploy"}
         </button>
