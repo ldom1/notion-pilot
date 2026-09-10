@@ -140,7 +140,9 @@ Target: 4 custom knowledge DBs — Notions, Ideas, Tools, Data & Technology.
 <!-- added by ai-dotfiles upgrade -->
 
 - MCP server (`notion_pilot/mcp/`) merged to `develop` 2026-07-15 (PR #18, squash commit `8e705b7`) — exposes CRM upsert/dedup/enrich/rank/read as 11 MCP tools. Registered in this repo's own `.claude/settings.json` as `notion-crm` (needs a Claude Code restart to connect). Still needs: verify the *sibling* `artelys-crystal-hpc-lead-generation` project's `.claude/settings.json` registration (added earlier, points at this repo's main checkout — the worktree it may have referenced is gone now that the branch merged) actually resolves.
-- No MCP tool creates a Lead/Deal yet — only `upsert_people`/`upsert_companies` write, `get_open_leads` is read-only. Add if Deal creation via MCP is wanted.
+- No MCP tool creates a Lead/Deal yet — only `upsert_people`/`upsert_companies` write, `get_open_leads` is read-only. Add if Deal creation via MCP is wanted. *(Superseded: `upsert_deal`, `log_activity` and `get_activities` shipped later — see CHANGELOG.)*
+- CRM v1 (2026-09-10, PR #28): the deploy wizard now creates five databases with rollups and formulas. Still out of scope from that spec: the Meetings→Activities poller (needs a persisted token and a running job), Notion views/dashboard/automation (the API cannot create them — see `scripts/crm/NOTION_UI_STEPS.md`), and OAuth token persistence for multi-tenant automation.
+- Landing + cockpit (2026-09-10, PR #27): three appendix screenshots and the CTA booking link in the executive deck are still placeholders. The `.claude-plugin` marketplace manifests are schema-correct but unverified — run `/plugin marketplace add ldom1/notion-pilot` once before advertising it on the site.
 
 ## Later
 <!-- added by ai-dotfiles upgrade -->

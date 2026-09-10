@@ -216,5 +216,19 @@ updated:
 **Rationale:** `notion-crm` MCP failed to connect across three independent sessions, including one confirmed by the user to be a genuine fresh terminal + direct `claude` launch, with the on-disk config verified correct every time — the root cause is environmental and outside what's fixable from inside a session. The direct-API path was proven twice this session (RTE, LCH, then a 22-company batch) using the exact same underlying Notion client code, so it's a safe, non-duplicative fallback rather than a new write path. Two gotchas to check before using it: the Infisical `dev` environment holds an invalid placeholder Notion token (use `prod`, with a local-only `NOTION_OAUTH_REDIRECT_URI` override to dodge an OAuth-localhost Pydantic guard); the real Companies data source is on the legacy `data_sources` API, not `databases`.
 **Affects:** `skills/company-open-data-enrichment/SKILL.md` prerequisite #1. See [[2026-07-24-companies-finance-section]].
 
+### 2026-09-10 — Resolve Notion back-relation names at runtime rather than hardcoding them
+
+**Decision:** `create_crm_workspace` creates dual relations, then reads the reverse property back from the API, renames it for readability, and keys the rollups on whatever name is actually live (`_resolve_back_relation`). Because the name is then known rather than guessed, a rollup failure is raised instead of warned about.
+**Rejected:** The v1 spec's literal instruction — request `Activities` as the reverse name via dual-property relations, and treat a rollup 400 as a hard failure.
+**Rationale:** Those two cannot both hold. Notion names the reverse property itself and `synced_property_name` is read-only on create. The repo already showed the consequence: `crm_create_activities_db.py` used `single_property` (no reverse property at all) while `crm_add_activity_rollups.py` hardcoded `"Activities"` with a "verified by probe" comment and `allow_400=True`. Nothing in `scripts/` or `NOTION_UI_STEPS.md` ever created those back-relations — they were made by hand in the UI. Implementing the spec literally would have hard-failed the deploy on the step it called highest-leverage. **Still unproven against the live API** — all tests are mocked; one real deploy is needed.
+**Affects:** `notion_pilot/shared/workspace.py`; PR #28. See [[2026-09-10-landing-cockpit-redesign]].
+
+### 2026-09-10 — One monochrome design system for both web surfaces, and `develop` as the integration base
+
+**Decision:** Landing and cockpit share `tokens.css`: a true achromatic ramp (every grey `chroma 0`), near-black as the only brand colour, and colour reserved for CRM data (Notion select palette + status dots). `develop` — which existed only locally, 60 commits behind `main` with zero unique commits — was refreshed to `main` and published as the remote integration base.
+**Rejected:** The purple-on-white palette (named as a saturated "AI attractor zone" by the palette tooling, and what the cockpit still used); also rejected adding Tailwind, which would have added a build step without changing a pixel given the design lives in the token layer.
+**Rationale:** The chrome must not compete with the data it displays — the page is mostly table and board mockups, so monochrome chrome makes those the focal point. Publishing `develop` was safe because it held nothing `main` did not, and CI already gates its integration-test job on that branch name.
+**Affects:** `web/frontend/src/styles/{tokens,landing,globals}.css`; branch model; PRs #27 and #28.
+
 ## Template
 <!-- added by ai-dotfiles upgrade -->
