@@ -77,10 +77,13 @@ data/
 
 # --- Claude ---
 .claude/worktrees/
-.superpowers
+.superpowers/
 # Per-workspace data (DB pointers, workflows — not committed)
 web/workspaces/
 
 # Frontend build
 web/dist/
 web/frontend/node_modules/
+
+# Real CRM export used only as design reference — never commit (contains client names)
+docs/notion_export/
