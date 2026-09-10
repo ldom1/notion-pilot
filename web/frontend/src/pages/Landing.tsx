@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { fetchStatus } from "../api/client";
 import { SetupWizard } from "../features/setup/SetupWizard";
 import { Spinner } from "../components/Spinner";
@@ -8,70 +8,390 @@ type CheckState = "idle" | "checking" | "authenticated" | "unauthenticated" | "s
 
 const CLAUDEFORCE_URL =
   "https://www.salesforce.com/news/press-releases/2026/08/26/salesforce-and-anthropic-announce-claudeforce/";
-const NOTION_MCP_URL = "https://mcp.notion.com/mcp";
+const RESIDENCY_URL = "https://www.notion.com/help/data-residency";
+const NOTION_MCP = "https://mcp.notion.com/mcp";
 
-// Preformatted blocks: template literals, because JSX collapses whitespace at
-// line boundaries and would eat the indentation.
+// ── icons ─────────────────────────────────────────────────────────────────────
+// One authored set: 24px grid, 1.6 stroke, round caps. No emoji stand-ins.
+
+const PATHS: Record<string, ReactNode> = {
+  company: (
+    <>
+      <path d="M3 21h18M5 21V6l7-3v18M19 21V11l-7-3" />
+      <path d="M8.5 9.5h0M8.5 13h0M8.5 16.5h0M15.5 14h0M15.5 17.5h0" />
+    </>
+  ),
+  people: (
+    <>
+      <path d="M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-4A3.5 3.5 0 0 0 5 18.5V20" />
+      <circle cx="10.5" cy="8" r="3.2" />
+      <path d="M17 11.2a3 3 0 0 0 0-5.9M19 20v-1.6a3.4 3.4 0 0 0-2-3" />
+    </>
+  ),
+  deal: (
+    <>
+      <path d="M3 5h18l-6.5 7.6V20L9.5 17v-4.4L3 5Z" />
+    </>
+  ),
+  activity: (
+    <>
+      <path d="M3 12h3.5l2-5.5 3.5 11 2.5-7 1.8 3.5H21" />
+    </>
+  ),
+  meeting: (
+    <>
+      <rect x="3" y="5" width="18" height="16" rx="2.5" />
+      <path d="M3 10h18M8 3v4M16 3v4M8.5 15h3" />
+    </>
+  ),
+  telegram: (
+    <>
+      <path d="M21 4 3 11l5.5 2.2L11 20l3.2-4.4L20 6" />
+      <path d="M8.5 13.2 20 6" />
+    </>
+  ),
+  agent: (
+    <>
+      <rect x="4" y="7" width="16" height="12" rx="3" />
+      <path d="M12 3v4M9 13h0M15 13h0M10 16.5h4M2 12h2M20 12h2" />
+    </>
+  ),
+  shield: (
+    <>
+      <path d="M12 3 5 5.6v6c0 4.2 2.9 7.6 7 9.4 4.1-1.8 7-5.2 7-9.4v-6L12 3Z" />
+      <path d="m9 12 2.3 2.3L15.5 10" />
+    </>
+  ),
+  server: (
+    <>
+      <rect x="3" y="4" width="18" height="7" rx="2" />
+      <rect x="3" y="13" width="18" height="7" rx="2" />
+      <path d="M7 7.5h0M7 16.5h0M11 7.5h4M11 16.5h4" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+      <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5M12 14.5v2" />
+    </>
+  ),
+  link: (
+    <>
+      <path d="M10 13.8a3.6 3.6 0 0 0 5.1 0l2.6-2.6a3.6 3.6 0 0 0-5.1-5.1L11.4 7.3" />
+      <path d="M14 10.2a3.6 3.6 0 0 0-5.1 0l-2.6 2.6a3.6 3.6 0 0 0 5.1 5.1l1.2-1.2" />
+    </>
+  ),
+  views: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2.5" />
+      <path d="M3 9h18M9 9v11M15 9v11" />
+    </>
+  ),
+  check: (
+    <>
+      <path d="m4 12.5 5 5L20 6.5" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12S18 18.5 12 18.5 2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m16 16 4.5 4.5" />
+    </>
+  ),
+  grow: (
+    <>
+      <path d="M3 20h18M6.5 20v-6M11.5 20V9M16.5 20v-9.5" />
+      <path d="m13.5 5 3.5-2 2 3.5" />
+    </>
+  ),
+  skill: (
+    <>
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H18v18H6.5A2.5 2.5 0 0 1 4 18.5v-13Z" />
+      <path d="M8 8h6M8 12h4" />
+    </>
+  ),
+  formula: (
+    <>
+      <path d="M6 20V5.5A2.5 2.5 0 0 1 8.5 3h1M4.5 11h7" />
+      <path d="M14 10.5 20 19M20 10.5 14 19" />
+    </>
+  ),
+  arrow: (
+    <>
+      <path d="M4 12h15m-5.5-5.5L19 12l-5.5 5.5" />
+    </>
+  ),
+};
+
+function Icon({ name, size = 20 }: { name: keyof typeof PATHS | string; size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {PATHS[name]}
+    </svg>
+  );
+}
+
+function T({ tag }: { tag: Tag }) {
+  return <span className={`lp-t lp-t-${tag[1]}`}>{tag[0]}</span>;
+}
+
+function Dot({ health }: { health: Health }) {
+  return <i className={`lp-sd lp-sd-${health}`} />;
+}
+
+function Rec({ when, dot, rows }: { when: string; dot: Health; rows: RecRow[] }) {
+  return (
+    <div className="lp-rec">
+      <div className="lp-rec-when">
+        <Dot health={dot} />
+        {when}
+      </div>
+      <div className="lp-rec-title">Voltaris — Platform licence</div>
+      <div className="lp-rec-props">
+        {rows.map((r) => (
+          <div className="lp-rec-row" key={r.prop}>
+            <span>
+              <Icon name="formula" size={11} />
+              {r.prop}
+            </span>
+            {r.tag ? (
+              <span>
+                <T tag={r.tag} />
+              </span>
+            ) : (
+              <span className={`lp-rec-val ${r.rot ? "lp-rec-rot" : ""}`}>
+                {r.dot ? (
+                  <span className="lp-dot-cell">
+                    <Dot health={r.dot} />
+                    {r.value}
+                  </span>
+                ) : (
+                  r.value
+                )}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Logo() {
+  // A page of records, with the approval mark sweeping out past its edge.
+  return (
+    <svg className="lp-logo" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <rect
+        x="3.3"
+        y="3.3"
+        width="20.4"
+        height="25.4"
+        rx="4"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+      <path
+        d="M8.4 11h8.2M8.4 15.6h5.2M8.4 20.2h3"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      <path
+        d="m12.6 21.4 5.2 5.4L30.2 9.6"
+        stroke="var(--primary)"
+        strokeWidth="3.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// ── content ───────────────────────────────────────────────────────────────────
+
 const PASTED_EMAIL = `Subject: RE: optimisation platform — next steps
 
-Hi, thanks for Tuesday's demo. The team is convinced on the solver
+Thanks for Tuesday's demo. The team is convinced on the solver
 side. We need a security review before signing, and our budget
 window closes 15 December. Can you send a proposal for 12 licences?
 
 — Camille Dubois, Head of Grid Analytics, Voltaris Énergie`;
 
 const MCP_SNIPPET = `# Claude Code
-claude mcp add --transport http notion ${NOTION_MCP_URL}
+claude mcp add --transport http notion ${NOTION_MCP}
 # then run /mcp and complete the OAuth flow
 
 # Cursor — .cursor/mcp.json
-{ "mcpServers": { "notion": { "url": "${NOTION_MCP_URL}" } } }`;
+{ "mcpServers": { "notion": { "url": "${NOTION_MCP}" } } }`;
 
-const COMPANIES = [
-  ["Voltaris Énergie", "Energy", "Tier 1", "lp-pill-amber", "843 219 004", "412 M€", "3 contacts", "2 days ago", "Active", "lp-pill-teal"],
-  ["Néorégie Grid", "Public Sector", "Tier 2", "lp-pill-grey", "512 008 771", "96 M€", "1 contact", "11 days ago", "Prospect", ""],
-  ["Hexalis Industries", "Industry", "Tier 2", "lp-pill-grey", "779 431 250", "1.2 Md€", "5 contacts", "34 days ago", "Prospect", ""],
-  ["Cerena Renouvelables", "Energy", "Tier 3", "lp-pill-grey", "901 774 663", "28 M€", "2 contacts", "6 days ago", "Active", "lp-pill-teal"],
+const INSTALL_SNIPPET = `/plugin marketplace add ldom1/notion-pilot
+/plugin install notion-crm@notion-pilot`;
+
+const TAKEAWAYS: [string, string][] = [
+  [
+    "People love chat and tolerate CRMs.",
+    "Fifteen clicks to update an opportunity is a task nobody does on a Friday.",
+  ],
+  [
+    "The governance survives.",
+    "Permissions, workflows and audit trail stay in the system of record — no record access, no agent access.",
+  ],
+  [
+    "But it ships with Salesforce underneath.",
+    "The idea travels. The licence, the migration and the seat price do not.",
+  ],
 ];
 
-const ENTITIES: { icon: string; name: string; props: string; auto: boolean }[] = [
-  { icon: "🏭", name: "Companies", props: "Sector · Tier · SIREN · CA · Country", auto: true },
-  { icon: "⚡", name: "Activities", props: "Type · Date · Outcome · Next Step · Duration", auto: true },
-  { icon: "👥", name: "People", props: "Position · Seniority · Email pro · LinkedIn · Role Type", auto: true },
-  { icon: "🤝", name: "Meetings", props: "Notes · Attendees · Linked deal", auto: false },
+const ARGUMENTS_: [string, string][] = [
+  [
+    "The interface was the bottleneck",
+    "Nobody quits a CRM over a missing field. They quit over fifteen clicks between two meetings.",
+  ],
+  [
+    "The process still holds",
+    "The agent inherits the CRM's permissions instead of bypassing them. No access to a record, no access for the AI.",
+  ],
+  [
+    "The idea outlives the vendor",
+    "Claudeforce only works if you already pay for Salesforce. Same idea, without the estate — that is this page.",
+  ],
 ];
 
-const RELATIONS = [
-  ["Companies 1 → n Leads", "a client can run several deals at once"],
+type Tag = [label: string, colour: string];
+type Health = "ok" | "warn" | "bad" | "idle";
+
+const COMPANIES: {
+  name: string; sector: Tag; tier: Tag; people: string; last: string; health: Health; status: Tag;
+}[] = [
+  { name: "Voltaris Énergie", sector: ["Energy", "yellow"], tier: ["Tier 1", "red"], people: "3 contacts", last: "2d", health: "ok", status: ["Active", "green"] },
+  { name: "Néorégie Grid", sector: ["Public Sector", "purple"], tier: ["Tier 2", "blue"], people: "1 contact", last: "11d", health: "warn", status: ["Prospect", "gray"] },
+  { name: "Hexalis Industries", sector: ["Industry", "blue"], tier: ["Tier 2", "blue"], people: "5 contacts", last: "34d", health: "bad", status: ["Prospect", "gray"] },
+  { name: "Cerena Renouvelables", sector: ["Energy", "yellow"], tier: ["Tier 3", "gray"], people: "2 contacts", last: "6d", health: "ok", status: ["Active", "green"] },
+];
+
+const LEADS: {
+  name: string; stage: Tag; value: string; prob: string; acts: string;
+  last: string; health: Health; row?: string;
+}[] = [
+  { name: "Voltaris — Platform licence", stage: ["Proposal Sent", "orange"], value: "120 000", prob: "60 %", acts: "7 activities", last: "today", health: "ok" },
+  { name: "Astria — Optimisation", stage: ["Negotiation", "purple"], value: "80 000", prob: "75 %", acts: "12 activities", last: "3d", health: "ok" },
+  { name: "Cerena — Consulting", stage: ["Qualified", "blue"], value: "45 000", prob: "40 %", acts: "4 activities", last: "6d", health: "ok" },
+  { name: "Hexalis — Platform licence", stage: ["Waiting for a Response", "yellow"], value: "—", prob: "10 %", acts: "2 activities", last: "34d · stale", health: "bad", row: "lp-row-risk" },
+  { name: "Kaleo — Licence", stage: ["Closed Won", "green"], value: "52 000", prob: "100 %", acts: "9 activities", last: "12d", health: "idle", row: "lp-row-won" },
+];
+
+const ACTIVITIES: {
+  name: string; type: Tag; outcome: Tag; next: string; when: string; fresh?: boolean;
+}[] = [
+  { name: "Demo follow-up", type: ["Email", "blue"], outcome: ["Follow-up Needed", "yellow"], next: "Send proposal, 12 licences", when: "logged by AI", fresh: true },
+  { name: "Technical demo", type: ["Demo", "purple"], outcome: ["Positive", "green"], next: "Loop in security", when: "4d" },
+  { name: "Discovery call", type: ["Call", "green"], outcome: ["Positive", "green"], next: "Book demo", when: "11d" },
+];
+
+const ENTITIES: { icon: string; name: string; props: string[]; auto: boolean }[] = [
+  { icon: "company", name: "Companies", props: ["Sector", "Tier", "SIREN", "CA", "Country"], auto: true },
+  { icon: "activity", name: "Activities", props: ["Type", "Date", "Outcome", "Next Step"], auto: true },
+  { icon: "people", name: "People", props: ["Position", "Seniority", "Email", "LinkedIn"], auto: true },
+  { icon: "meeting", name: "Meetings", props: ["Notes", "Attendees", "Linked deal"], auto: false },
+];
+
+const RELATIONS: [string, string][] = [
+  ["Companies 1 → n Leads", "one client, several deals running at once"],
   ["People n → 1 Companies", "every contact sits under one organisation"],
-  ["Leads n → n People", "Primary contact plus everyone else in the loop"],
+  ["Leads n → n People", "a primary contact, plus everyone else in the loop"],
   ["Activities n → 1 Leads", "and back to the person and the company"],
-  ["Meetings n → n People", "meeting notes attached to whoever was in the room"],
+  ["Meetings n → n People", "notes attached to whoever was in the room"],
 ];
 
-const BOARD: { stage: string; count: string; deals: [string, string][]; won?: boolean }[] = [
-  { stage: "Prospect", count: "3", deals: [["Hexalis — Platform licence", "—  ·  cold"], ["Néorégie — Study", "18 k€"]] },
-  { stage: "Qualified", count: "2", deals: [["Cerena — Consulting", "45 k€  ·  40 %"]] },
-  { stage: "Discovery / First Meeting", count: "3", deals: [["Voltaris — Platform licence", "120 k€  ·  50 %"]] },
-  { stage: "Proposal Sent", count: "1", deals: [["Astria — Optimisation", "80 k€  ·  60 %"]] },
-  { stage: "Negotiation", count: "1", deals: [["Vireo — Renewal", "64 k€  ·  75 %"]] },
-  { stage: "Closed Won", count: "—", deals: [["Kaleo — Licence", "52 k€  ·  ✅"]], won: true },
+const BOARD: {
+  stage: string; n: string; dot: Health; cards: { name: string; value: string; tag: Tag }[];
+}[] = [
+  { stage: "Prospect", n: "3", dot: "idle", cards: [{ name: "Néorégie — Study", value: "18 000", tag: ["Cold", "gray"] }] },
+  { stage: "Qualified", n: "2", dot: "ok", cards: [{ name: "Cerena — Consulting", value: "45 000", tag: ["40 %", "blue"] }] },
+  { stage: "Discovery", n: "3", dot: "ok", cards: [{ name: "Vireo — Renewal", value: "64 000", tag: ["Warm", "orange"] }] },
+  { stage: "Proposal Sent", n: "1", dot: "ok", cards: [{ name: "Voltaris — Platform", value: "120 000", tag: ["60 %", "orange"] }] },
+  { stage: "Waiting", n: "5", dot: "bad", cards: [{ name: "Hexalis — Platform", value: "—", tag: ["Stale 34d", "red"] }] },
+  { stage: "Closed Won", n: "1", dot: "ok", cards: [{ name: "Kaleo — Licence", value: "52 000", tag: ["Won", "green"] }] },
 ];
 
-const DECAY = [
-  ["Deal Age (days)", "Computes perfectly — from a stage nobody moved."],
-  ["Days Since Last Activity", "Computes perfectly — from an activity nobody logged."],
-  ["Stale Deal", "Flags everything, because everything looks stale."],
+type RecRow = { prop: string; value: string; tag?: Tag; dot?: Health; rot?: boolean };
+
+const REC_FRESH: RecRow[] = [
+  { prop: "Stage", value: "", tag: ["Discovery / First Meeting", "blue"] },
+  { prop: "Next Step", value: "Send proposal · due 20 Nov" },
+  { prop: "Last Activity", value: "today", dot: "ok" },
+  { prop: "Deal Age", value: "4 days" },
+  { prop: "Days Since Last Activity", value: "0" },
+  { prop: "Stale Deal", value: "", tag: ["No", "gray"] },
 ];
 
-const AGENT_STEPS = [
-  ["Search before write", "Every proposal starts with a lookup — email, LinkedIn, then fuzzy name plus company — so an existing record gets updated instead of duplicated."],
-  ["Dry run by default", "Write tools return a preview unless you pass confirm=true. The default answer to “should I write this?” is no."],
-  ["You approve the diff", "A table of exactly what changes, per database. Ambiguous matches are escalated instead of guessed."],
-  ["Same for calls", "Dictate or paste your notes after a call. Type 📞 Call, an outcome, a next step with a date — the follow-up stops living in your head."],
+const REC_ROTTED: RecRow[] = [
+  { prop: "Stage", value: "", tag: ["Discovery / First Meeting", "blue"] },
+  { prop: "Next Step", value: "Send proposal · overdue 14 days", rot: true },
+  { prop: "Last Activity", value: "34 days ago", dot: "bad", rot: true },
+  { prop: "Deal Age", value: "38 days" },
+  { prop: "Days Since Last Activity", value: "34", rot: true },
+  { prop: "Stale Deal", value: "", tag: ["Yes", "red"] },
 ];
 
-// ── Landing page ──────────────────────────────────────────────────────────────
+const EVOLVE: [string, string][] = [
+  [
+    "We deploy a sensible CRM",
+    "Companies, People, Leads, Activities — relations wired, stages filled, views that make sense on day one.",
+  ],
+  [
+    "You reshape it",
+    "A property here, a stage split there, a tier system nobody else would want. That is the whole reason to build a CRM in Notion.",
+  ],
+  [
+    "The automation follows",
+    "The assistant reads your workspace through Notion's own MCP server, so it works on the structure you grew into — not one hardcoded a year ago. Add a field on Monday, it fills it on Tuesday.",
+  ],
+];
+
+const DIFF: { db: string; action: Tag; record: string; detail: string }[] = [
+  { db: "Companies", action: ["matched", "gray"], record: "Voltaris Énergie", detail: "no change" },
+  { db: "People", action: ["create", "green"], record: "Camille Dubois", detail: "Head of Grid Analytics · director" },
+  { db: "Leads", action: ["update", "orange"], record: "Voltaris — Platform licence", detail: "Discovery → Proposal Sent · 50 → 60 % · close 15 Dec" },
+  { db: "Activities", action: ["create", "green"], record: "Demo follow-up", detail: "Email · Follow-up Needed · proposal due 20 Nov" },
+];
+
+const AGENT_STEPS: [string, string, string][] = [
+  ["search", "It looks before it writes", "Email, then LinkedIn, then fuzzy name plus company. An existing record gets updated, not duplicated."],
+  ["eye", "Dry run is the default", "Write tools return a preview unless confirm=true. The default answer to “should I write this?” is no."],
+  ["check", "You approve the diff", "Exactly what changes, per database. Ambiguous matches are escalated, never guessed."],
+  ["telegram", "Calls work the same way", "Dictate your notes walking back to the office. Type, outcome, next step with a date."],
+];
+
+const EU_MARKS: [string, string, string][] = [
+  ["server", "Frankfurt, not Oregon", "Notion pins workspace data at rest to eu-central-1 on the Enterprise plan, free of charge."],
+  ["shield", "Your own machine", "The automation layer is self-hosted. No third-party SaaS sits between your team and Notion."],
+  ["lock", "Your permissions", "The assistant connects as you and sees what you see. Revoke it in Notion, not in a support ticket."],
+];
+
+const SKILLS: [string, string][] = [
+  ["notion-crm-ops", "Operate the CRM — create and update leads, log activities, enrich people and companies. Always shows a validation table and waits for your go."],
+  ["company-open-data-enrichment", "Fill firmographics from French open data — SIREN, NAF/APE, BODACC, RNE financials — instead of typing them."],
+];
+
+// ── page ──────────────────────────────────────────────────────────────────────
 
 export default function Landing() {
   const [checkState, setCheckState] = useState<CheckState>("idle");
@@ -98,15 +418,15 @@ export default function Landing() {
     return (
       <div className="lp">
         <nav className="lp-nav">
-          <div className="lp-brand">
-            <span className="lp-mark">P</span> Notion Pilot
-          </div>
-          <a href="/auth/logout" className="lp-hero-note">
+          <span className="lp-brand">
+            <Logo /> Notion Pilot
+          </span>
+          <a className="lp-small" href="/auth/logout">
             Sign out
           </a>
         </nav>
         <main className="lp-wrap lp-section">
-          <div style={{ maxWidth: 480, margin: "0 auto" }}>
+          <div style={{ maxWidth: 480, marginInline: "auto" }}>
             <SetupWizard
               onComplete={() => {
                 window.location.href = "/cockpit";
@@ -121,15 +441,14 @@ export default function Landing() {
     );
   }
 
-  // unauthenticated — the marketing homepage
   return (
     <div className="lp">
       <nav className="lp-nav">
-        <div className="lp-brand">
-          <span className="lp-mark">P</span> Notion Pilot
-        </div>
-        <div className="lp-navlinks">
-          <a className="lp-btn lp-btn-ghost" href="#model">
+        <a className="lp-brand" href="/">
+          <Logo /> Notion Pilot
+        </a>
+        <div className="lp-nav-actions">
+          <a className="lp-btn lp-btn-quiet" href="#model">
             The data model
           </a>
           <a className="lp-btn lp-btn-primary" href="/auth/notion">
@@ -138,197 +457,308 @@ export default function Landing() {
         </div>
       </nav>
 
-      {/* ── hero ────────────────────────────────────────────────────────── */}
-      <header className="lp-hero">
-        <div className="lp-wrap lp-hero-grid">
+      {/* ── hero ─────────────────────────────────────────────────────────── */}
+      <header className="lp-hero lp-wrap">
+        <div className="lp-hero-grid">
           <div>
-            <span className="lp-eyebrow">Notion CRM · AI-maintained · EU-hosted</span>
-            <h1 className="lp-h1">
-              Your CRM doesn't have a feature problem.
-              <br />
-              <em>It has a data-entry problem.</em>
+            <h1 className="lp-display">
+              Your CRM doesn't have a feature problem. It has a{" "}
+              <span className="lp-stamp">data-entry problem</span>.
             </h1>
-            <p>
-              Salesforce just conceded the point. In August 2026 it put its entire CRM inside Claude
-              so that sellers never have to open Salesforce again. The lesson isn't about Salesforce
-              — it's that <strong>a CRM never dies of missing features. It dies of nobody updating
-              it.</strong>
+            <p className="lp-hero-sub">
+              Notion Pilot is that idea for a CRM you actually own — data kept up to date by AI
+              assistance, on a workspace you can host in Europe.
             </p>
-            <p className="lp-mt">
-              Notion Pilot is that idea for a CRM you actually own: five Notion databases, kept
-              current from Telegram or straight from your AI assistant, on a workspace you can host
-              in Europe.
-            </p>
-            <div className="lp-cta-row">
+            <div className="lp-btn-row" style={{ marginTop: "1.9rem" }}>
               <a className="lp-btn lp-btn-primary lp-btn-lg" href="/auth/notion">
-                Deploy the CRM to Notion
+                Deploy the CRM to Notion <Icon name="arrow" size={17} />
               </a>
-              <a className="lp-btn lp-btn-ghost lp-btn-lg" href="#model">
+              <a className="lp-btn lp-btn-quiet lp-btn-lg" href="#model">
                 See the data model
               </a>
             </div>
-            <p className="lp-hero-note">
-              Self-hosted · every write needs your confirmation · Notion stays the source of truth
-            </p>
+            <div className="lp-hero-terms">
+              <span className="lp-term">
+                <Icon name="server" size={16} /> Self-hosted
+              </span>
+              <span className="lp-term">
+                <Icon name="check" size={16} /> Every write needs your approval
+              </span>
+              <span className="lp-term">
+                <Icon name="shield" size={16} /> EU data residency
+              </span>
+            </div>
           </div>
 
-          <aside className="lp-news">
-            <span className="lp-news-date">26 August 2026 · Salesforce newsroom</span>
-            <h3>Salesforce and Anthropic announce Claudeforce</h3>
+          <aside className="lp-dispatch">
+            <span className="lp-dispatch-meta">26 August 2026 · Salesforce newsroom</span>
+            <h2>Salesforce and Anthropic announce Claudeforce</h2>
             <p>
               “Salesforce in Claude” ships as a plugin with 37 prebuilt sales skills — meeting prep,
               deal-health review, pipeline review, composing emails, updating records — so sellers
-              reason over live pipeline and act on it without opening the CRM. Open beta from
-              September.
+              reason over live pipeline and act on it without opening the CRM.
             </p>
-            <ul>
-              <li>
-                <span className="lp-tick">1</span>
-                <span>
-                  <strong>People love chat and tolerate CRMs.</strong> Fifteen clicks to update an
-                  opportunity is a task nobody does on a Friday.
-                </span>
-              </li>
-              <li>
-                <span className="lp-tick">2</span>
-                <span>
-                  <strong>The governance survives.</strong> Permissions, workflows and audit trail
-                  stay in the system of record — no record access, no agent access.
-                </span>
-              </li>
+            <ul className="lp-takeaways">
+              {TAKEAWAYS.map(([lead, rest]) => (
+                <li key={lead}>
+                  <b>{lead}</b> {rest}
+                </li>
+              ))}
             </ul>
-            <p className="lp-src">
-              Source: <a href={CLAUDEFORCE_URL}>Salesforce press release</a>. Framing inspired by a
-              public post from Samuel Cherubin (Kokoro).
+            <p className="lp-source">
+              Source: <a href={CLAUDEFORCE_URL}>Salesforce press release</a>
             </p>
           </aside>
         </div>
       </header>
 
-      {/* ── why it matters ──────────────────────────────────────────────── */}
-      <section className="lp-section lp-section-tint">
+      {/* ── the signal ───────────────────────────────────────────────────── */}
+      <section className="lp-section lp-tint">
         <div className="lp-wrap">
-          <span className="lp-eyebrow">The signal</span>
           <h2 className="lp-h2">Why that announcement matters more than it looks</h2>
-          <p className="lp-lede">
-            Two things happened at once, and the second one is the reason this page exists.
-          </p>
-          <div className="lp-cards">
-            <div className="lp-card">
-              <div className="lp-card-num">1</div>
-              <h3>The interface was the bottleneck</h3>
-              <p>
-                Nobody abandons a CRM because it lacks a field. They abandon it because updating one
-                opportunity costs fifteen clicks between two meetings. Dictating three sentences on
-                the way to the car park costs nothing — so that is the interaction that actually
-                happens.
+          <div className="lp-args">
+            {ARGUMENTS_.map(([title, body]) => (
+              <div className="lp-arg" key={title}>
+                <h3 className="lp-h3">{title}</h3>
+                <p>{body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Notion is already the database ───────────────────────────────── */}
+      <section className="lp-section">
+        <div className="lp-wrap">
+          <div className="lp-intro">
+            <h2 className="lp-h2">
+              Notion is built on a database structure. It just isn't a CRM yet.
+            </h2>
+            <div className="lp-intro-copy">
+              <p className="lp-lede">
+                Every Notion table lives inside that structure — and a row in one table can{" "}
+                <strong>relate</strong> to a row in another. A contact relates to a company. A deal
+                relates to both. Rename that company once, and every deal, contact, and activity
+                referencing it updates instantly — because they hold a relation, not a copy.
+              </p>
+              <p className="lp-lede">
+                That single property is the{" "}
+                <strong>entire difference between a CRM and a spreadsheet</strong>. Notion has had
+                it all along.
+              </p>
+              <p className="lp-body">
+                What Notion doesn't give you is a schema shaped like a pipeline — and someone to
+                keep it current. That's exactly what we bring.
               </p>
             </div>
-            <div className="lp-card">
-              <div className="lp-card-num">2</div>
-              <h3>The process still holds</h3>
-              <p>
-                The agent inherits the CRM's permissions rather than bypassing them. No access to a
-                record means no access for the AI either. Workflows, business rules and audit trail
-                all survive — which is what makes it usable in a company rather than a demo.
-              </p>
+          </div>
+
+          <div style={{ marginTop: "1rem" }}>
+            <div className="lp-stack">
+              <div className="lp-stack-head">
+                <div>
+                  <div className="lp-icon">
+                    <Icon name="link" />
+                  </div>
+                  <h3 className="lp-h3">One company. One row. Everywhere.</h3>
+                </div>
+                <div className="lp-intro-copy">
+                <p>
+                  This is the thing a spreadsheet can never do, no matter how many tabs you add.
+                </p>
+                <div className="lp-versus">
+                  <div>
+                    <h4>In Excel</h4>
+                    <p>
+                      A client renames itself and you find-and-replace across six sheets. You will
+                      miss one, and nobody will notice until the QBR.
+                    </p>
+                  </div>
+                  <div className="lp-versus-good">
+                    <h4>In Notion</h4>
+                    <p>
+                      You edit the company row. Every deal, contact and activity pointing at it
+                      updates, because they were never copies.
+                    </p>
+                  </div>
+                </div>
+                </div>
+              </div>
+              <div className="lp-win">
+                <div className="lp-win-bar">
+                  <Icon name="company" size={16} /> Companies
+                  <div className="lp-views">
+                    <span className="lp-view" aria-current="true">
+                      Table
+                    </span>
+                    <span className="lp-view">By tier</span>
+                    <span className="lp-view">Map</span>
+                  </div>
+                </div>
+                <div className="lp-x">
+                  <table className="lp-grid">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Sector</th>
+                        <th>Tier</th>
+                        <th>People</th>
+                        <th>Last activity</th>
+                        <th>CRM status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {COMPANIES.map((c) => (
+                        <tr key={c.name}>
+                          <td>{c.name}</td>
+                          <td><T tag={c.sector} /></td>
+                          <td><T tag={c.tier} /></td>
+                          <td>
+                            <span className="lp-link">
+                              <Icon name="link" size={12} />
+                              {c.people}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="lp-dot-cell">
+                              <Dot health={c.health} />
+                              <span className="lp-num">{c.last}</span>
+                            </span>
+                          </td>
+                          <td><T tag={c.status} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-            <div className="lp-card">
-              <div className="lp-card-num">3</div>
-              <h3>But it needs Salesforce underneath</h3>
-              <p>
-                Claudeforce is only available if you already pay for the CRM it sits on. The
-                interesting question is what happens when your system of record is something you
-                already own, shape yourself, and can keep inside the EU.
-              </p>
+
+            <div className="lp-stack">
+              <div className="lp-stack-head">
+                <div>
+                  <div className="lp-icon">
+                    <Icon name="views" />
+                  </div>
+                  <h3 className="lp-h3">The same rows, seen six ways</h3>
+                </div>
+                <div className="lp-intro-copy">
+                <p>
+                  A view is a lens, not a copy. Board for the Monday pipeline review, table for the
+                  audit, calendar for next steps, timeline for the quarter — every one of them
+                  reading the identical rows, live.
+                </p>
+                <p>
+                  So nobody exports anything, nobody rebuilds a deck, and there is no “which version
+                  is current?”. Leadership opens the view. That is the whole reporting story, and it
+                  replaces the weekly spreadsheet ritual outright.
+                </p>
+                </div>
+              </div>
+              <div className="lp-win">
+                <div className="lp-win-bar">
+                  <Icon name="deal" size={16} /> Leads
+                  <div className="lp-views">
+                    <span className="lp-view">Table</span>
+                    <span className="lp-view" aria-current="true">
+                      Board
+                    </span>
+                    <span className="lp-view">Stale</span>
+                    <span className="lp-view">Calendar</span>
+                  </div>
+                </div>
+                <div className="lp-x">
+                  <div className="lp-board">
+                    {BOARD.map((lane) => (
+                      <div className="lp-lane" key={lane.stage}>
+                        <div className="lp-lane-head">
+                          <b>
+                            <Dot health={lane.dot} />
+                            {lane.stage}
+                          </b>
+                          <span>{lane.n}</span>
+                        </div>
+                        {lane.cards.map((c) => (
+                          <div className="lp-cardlet" key={c.name}>
+                            <b>{c.name}</b>
+                            <div className="lp-cardlet-row">
+                              <span className="lp-cardlet-val">{c.value} €</span>
+                              <T tag={c.tag} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── step 1 · Notion ─────────────────────────────────────────────── */}
-      <section className="lp-section">
+      {/* ── pipeline + activities, joined ────────────────────────────────── */}
+      <section className="lp-section lp-tint">
         <div className="lp-wrap">
-          <span className="lp-eyebrow">Step 1 — the system of record</span>
-          <h2 className="lp-h2">Start with Notion. You already have it.</h2>
-          <p className="lp-lede">
-            Notion is a relational database wearing the interface of a document. Your team already
-            knows how to use it, every seat can read the pipeline without a per-seat CRM licence, and{" "}
-            <strong>on the Enterprise plan your data sits in Frankfurt, not Oregon.</strong>
-          </p>
-
-          <div className="lp-cards lp-mb-xl">
-            <div className="lp-card">
-              <h3>Real relations</h3>
-              <p>
-                A contact belongs to a company; a deal points at both. Rollups and formulas
-                recompute on every edit — no VLOOKUP, no rebuild.
+          <div className="lp-intro">
+            <h2 className="lp-h2">Two databases, one join. One pipeline you can trust.</h2>
+            <div className="lp-intro-copy">
+              <p className="lp-lede">
+                Every lead carries its own activity trail, so “what happened on this deal?” is a
+                click, not an archaeology project — and the one number every pipeline review
+                actually turns on finally means something:
               </p>
-            </div>
-            <div className="lp-card">
-              <h3>Views, not reports</h3>
-              <p>
-                Board, table, calendar and timeline are the same rows seen differently. Leadership
-                gets a shared view instead of an emailed export.
-              </p>
-            </div>
-            <div className="lp-card">
-              <h3>Shaped by you</h3>
-              <p>
-                Add <code>SIREN</code>, <code>Deal Temperature</code> or <code>Weighted Value</code>{" "}
-                in a click. No admin, no consultant, no change request.
-              </p>
-            </div>
-            <div className="lp-card">
-              <h3>European by choice</h3>
-              <p>
-                Enterprise workspaces can pin data at rest to the EU region. Free of charge, and
-                existing workspaces can be migrated on request.
-              </p>
+              <div className="lp-propline">
+                <span className="lp-propref">
+                  <Icon name="formula" size={13} /> Days Since Last Activity
+                </span>
+                <Icon name="arrow" size={15} />
+                <span>a number you can trust, instead of a guess.</span>
+              </div>
             </div>
           </div>
 
-          <div className="lp-frame">
-            <div className="lp-frame-bar">
-              <span className="lp-dot" /> 🏭 Companies
-              <div className="lp-tabs">
-                <span className="lp-tab is-on">Table</span>
-                <span className="lp-tab">Board</span>
-                <span className="lp-tab">By tier</span>
+          <div className="lp-win" style={{ marginTop: "2rem" }}>
+            <div className="lp-win-bar">
+              <Icon name="deal" size={16} /> Leads
+              <div className="lp-views">
+                <span className="lp-view" aria-current="true">
+                  Table
+                </span>
+                <span className="lp-view">Board</span>
+                <span className="lp-view">Weighted</span>
               </div>
             </div>
-            <div className="lp-scroll">
-              <table className="lp-table">
+            <div className="lp-x">
+              <table className="lp-grid">
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Sector</th>
-                    <th>Tier</th>
-                    <th>SIREN</th>
-                    <th>CA</th>
-                    <th>People</th>
+                    <th>Deal</th>
+                    <th>Stage</th>
+                    <th>Value</th>
+                    <th>Prob.</th>
+                    <th>Activities</th>
                     <th>Last activity</th>
-                    <th>CRM status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {COMPANIES.map(([name, sector, tier, tierCls, siren, ca, people, last, status, statusCls]) => (
-                    <tr key={name}>
-                      <td>{name}</td>
+                  {LEADS.map((l) => (
+                    <tr key={l.name} className={l.row ?? ""}>
+                      <td>{l.name}</td>
+                      <td><T tag={l.stage} /></td>
+                      <td className="lp-num">{l.value === "—" ? "—" : `${l.value} €`}</td>
+                      <td className="lp-num">{l.prob}</td>
                       <td>
-                        <span className="lp-pill">{sector}</span>
+                        <span className="lp-link">
+                          <Icon name="link" size={12} />
+                          {l.acts}
+                        </span>
                       </td>
                       <td>
-                        <span className={`lp-pill ${tierCls}`}>{tier}</span>
-                      </td>
-                      <td>{siren}</td>
-                      <td>{ca}</td>
-                      <td>
-                        <span className="lp-rel">{people}</span>
-                      </td>
-                      <td>{last}</td>
-                      <td>
-                        <span className={`lp-pill ${statusCls}`}>{status}</span>
+                        <span className="lp-dot-cell">
+                          <Dot health={l.health} />
+                          <span className="lp-num">{l.last}</span>
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -336,276 +766,315 @@ export default function Landing() {
               </table>
             </div>
           </div>
-          <p className="lp-hero-note">
-            Firmographics like <code>SIREN</code>, <code>CA</code> and <code>Résultat net</code> are
-            filled from French open data — no manual lookup.
-          </p>
+
+          <div className="lp-win" style={{ marginTop: "1rem" }}>
+            <div className="lp-win-bar">
+              <Icon name="activity" size={16} /> Activities
+              <span className="lp-surface-when" style={{ marginLeft: "0.6rem" }}>
+                filtered to Voltaris — Platform licence
+              </span>
+            </div>
+            <div className="lp-x">
+              <table className="lp-grid">
+                <thead>
+                  <tr>
+                    <th>Activity</th>
+                    <th>Type</th>
+                    <th>Outcome</th>
+                    <th>Next step</th>
+                    <th>When</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ACTIVITIES.map((a) => (
+                    <tr key={a.name}>
+                      <td>{a.name}</td>
+                      <td><T tag={a.type} /></td>
+                      <td>
+                        <span className="lp-dot-cell">
+                          <Dot health={a.outcome[0] === "Positive" ? "ok" : "warn"} />
+                          <T tag={a.outcome} />
+                        </span>
+                      </td>
+                      <td>{a.next}</td>
+                      <td className="lp-num">
+                        {a.fresh ? <span className="lp-tag lp-tag-new">{a.when}</span> : a.when}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ── step 2 · the data model ─────────────────────────────────────── */}
-      <section className="lp-section lp-section-tint" id="model">
+      {/* ── the model ────────────────────────────────────────────────────── */}
+      <section className="lp-section" id="model">
         <div className="lp-wrap">
-          <span className="lp-eyebrow">Step 2 — the data model</span>
-          <h2 className="lp-h2">Five databases. One relational spine.</h2>
-          <p className="lp-lede">
-            Everything hangs off the deal. A call logged this morning shows up on the lead, on the
-            contact and on the company — because it is one row related three ways, not three copies.
-          </p>
+          <div className="lp-intro">
+            <h2 className="lp-h2">Five databases. One relational spine.</h2>
+            <div className="lp-intro-copy">
+              <p className="lp-lede">
+                Everything hangs off the deal. A call logged this morning appears on the lead, on
+                the contact and on the company — one row, related three ways, never three copies.
+              </p>
+            </div>
+          </div>
 
           <div className="lp-schema">
-            <div className="lp-node">
-              <h4>
-                {ENTITIES[0].icon} {ENTITIES[0].name}{" "}
-                <span className="lp-badge lp-badge-auto">Automated</span>
-              </h4>
-              <p className="lp-node-props">{ENTITIES[0].props}</p>
+            <div className="lp-ent">
+              <div className="lp-ent-head">
+                <Icon name="company" size={18} />
+                <h4>Companies</h4>
+                <span className="lp-ent-flag lp-flag-auto">auto</span>
+              </div>
+              <div className="lp-ent-props">
+                {ENTITIES[0].props.map((p) => (
+                  <span className="lp-prop" key={p}>
+                    {p}
+                  </span>
+                ))}
+              </div>
             </div>
 
-            <div className="lp-node lp-node-hub lp-schema-mid">
-              <h4>
-                💼 Leads <span className="lp-badge lp-badge-auto">Automated</span>
-              </h4>
-              <p className="lp-node-props">
-                Stage · Value (€) · Probability · Deal Temperature · Expected Close · Stale Deal
-              </p>
-              <p className="lp-hub-note">← the pipeline everything points at</p>
+            <div className="lp-hub">
+              <div className="lp-ent lp-ent-hub">
+                <div className="lp-ent-head">
+                  <Icon name="deal" size={18} />
+                  <h4>Leads</h4>
+                  <span className="lp-ent-flag lp-flag-auto">auto</span>
+                </div>
+                <div className="lp-ent-props">
+                  {["Stage", "Value (€)", "Probability", "Expected Close", "Deal Temperature", "Stale Deal"].map(
+                    (p) => (
+                      <span className="lp-prop" key={p}>
+                        {p}
+                      </span>
+                    ),
+                  )}
+                </div>
+                <p className="lp-small" style={{ margin: 0 }}>
+                  The pipeline everything points at.
+                </p>
+              </div>
             </div>
 
             {ENTITIES.slice(1).map((e) => (
-              <div className="lp-node" key={e.name}>
-                <h4>
-                  {e.icon} {e.name}{" "}
-                  <span className={`lp-badge ${e.auto ? "lp-badge-auto" : "lp-badge-manual"}`}>
-                    {e.auto ? "Automated" : "Manual today"}
+              <div className={`lp-ent ${e.auto ? "" : "lp-ent-manual"}`} key={e.name}>
+                <div className="lp-ent-head">
+                  <Icon name={e.icon} size={18} />
+                  <h4>{e.name}</h4>
+                  <span className={`lp-ent-flag ${e.auto ? "lp-flag-auto" : "lp-flag-manual"}`}>
+                    {e.auto ? "auto" : "manual"}
                   </span>
-                </h4>
-                <p className="lp-node-props">{e.props}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="lp-rels">
-            {RELATIONS.map(([rel, note]) => (
-              <span key={rel}>
-                <code>{rel}</code> · {note}
-              </span>
-            ))}
-          </div>
-
-          <div className="lp-legend">
-            <span>
-              <span className="lp-badge lp-badge-auto">Automated</span> Notion Pilot reads and
-              writes these four
-            </span>
-            <span>
-              <span className="lp-badge lp-badge-manual">Manual today</span> Meetings lives in
-              Notion; Notion Pilot does not write to it yet
-            </span>
-          </div>
-
-          <h3 className="lp-h3-mid">And the pipeline it produces</h3>
-          <div className="lp-frame">
-            <div className="lp-frame-bar">
-              <span className="lp-dot" /> 💼 Leads — pipeline
-              <div className="lp-tabs">
-                <span className="lp-tab">Table</span>
-                <span className="lp-tab is-on">Board</span>
-                <span className="lp-tab">Stale</span>
-              </div>
-            </div>
-            <div className="lp-board">
-              {BOARD.map((col) => (
-                <div className="lp-col" key={col.stage}>
-                  <div className="lp-col-head">
-                    <b>{col.stage}</b>
-                    <span>{col.count}</span>
-                  </div>
-                  {col.deals.map(([title, meta]) => (
-                    <div className={`lp-deal ${col.won ? "lp-deal-won" : ""}`} key={title}>
-                      <b>{title}</b>
-                      <span>{meta}</span>
-                    </div>
+                </div>
+                <div className="lp-ent-props">
+                  {e.props.map((p) => (
+                    <span className="lp-prop" key={p}>
+                      {p}
+                    </span>
                   ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
-        </div>
-      </section>
 
-      {/* ── the question ────────────────────────────────────────────────── */}
-      <section className="lp-band">
-        <div className="lp-wrap">
-          <h2 className="lp-h2">But who keeps all of this up to date?</h2>
-          <p>
-            Building that schema is one good afternoon. Then reality starts: every property on the
-            diagram has to be filled in by someone who has just walked out of a meeting, with four
-            emails waiting and a train to catch.
-          </p>
-          <div className="lp-band-cols">
-            {DECAY.map(([prop, note]) => (
-              <div className="lp-band-col" key={prop}>
-                <b>
-                  <code>{prop}</code>
-                </b>
+          <div className="lp-relations">
+            {RELATIONS.map(([rel, note]) => (
+              <div className="lp-relation" key={rel}>
+                <b>{rel}</b>
                 <span>{note}</span>
               </div>
             ))}
           </div>
-          <p className="lp-band-note">
-            A CRM that depends on discipline decays at the speed of your busiest week.
+
+          <p className="lp-small" style={{ marginTop: "1.4rem" }}>
+            <span className="lp-ent-flag lp-flag-auto">auto</span> Notion Pilot reads and writes
+            these four. <span className="lp-ent-flag lp-flag-manual">manual</span> Meetings lives in
+            Notion and stays yours.
           </p>
         </div>
       </section>
 
-      {/* ── step 3 · two ways in ────────────────────────────────────────── */}
+      {/* ── the turn ─────────────────────────────────────────────────────── */}
+      <section className="lp-section lp-tint lp-turn">
+        <div className="lp-wrap">
+          <div className="lp-intro">
+            <h2 className="lp-h2">But who keeps all of this up to date?</h2>
+            <div className="lp-intro-copy">
+              <p className="lp-lede">
+                Building the schema is one good afternoon. Keeping it true is every afternoon after
+                that. Here is the same deal record, and nobody touched it in between.
+              </p>
+            </div>
+          </div>
+
+          <div className="lp-pair">
+            <Rec when="DAY 0 · straight after the demo" dot="ok" rows={REC_FRESH} />
+            <div className="lp-gap">
+              <span className="lp-gap-line" />
+              <b>+34 days</b>
+              <span>one busy quarter, four other deals</span>
+              <span className="lp-gap-line" />
+            </div>
+            <Rec when="DAY 34 · nothing logged since" dot="bad" rows={REC_ROTTED} />
+          </div>
+
+          <p className="lp-punch">
+            Nothing here is broken. Every formula is still correct — they were simply{" "}
+            <em>never fed</em>. A CRM that runs on discipline decays at the speed of your busiest
+            week.
+          </p>
+
+          <ol className="lp-evolve">
+            {EVOLVE.map(([title, body]) => (
+              <li key={title}>
+                <b>{title}</b>
+                <span>{body}</span>
+              </li>
+            ))}
+          </ol>
+
+          <p className="lp-feedback">
+            <Icon name="grow" size={17} />
+            <span>
+              And when it gets something wrong, tell us — an awkward property, a stage the matcher
+              misreads, a report you still rebuild by hand. Feedback from real pipelines is what
+              shapes this roadmap.
+            </span>
+            <a href="https://github.com/ldom1/notion-pilot/issues">Open an issue →</a>
+          </p>
+        </div>
+      </section>
+
+      {/* ── the two surfaces ─────────────────────────────────────────────── */}
       <section className="lp-section">
         <div className="lp-wrap">
-          <span className="lp-eyebrow">Step 3 — keeping it alive</span>
-          <h2 className="lp-h2">Notion Pilot does the typing. You keep the judgement.</h2>
-          <p className="lp-lede">
-            Two ways in, both ending in the same place: a preview you approve before a single row
-            changes. <strong>Nothing is written that you haven't seen.</strong>
-          </p>
-          <div className="lp-cards">
-            <div className="lp-card">
-              <h3>💬 Telegram — for the thirty-second update</h3>
-              <p className="lp-mb">
-                Between two meetings, on the phone, no laptop. <code>/lead</code>,{" "}
-                <code>/people</code>, <code>/company</code>, <code>/deal</code> — the bot asks for
-                whatever you skipped and shows the preview before writing.
+          <div className="lp-intro">
+            <h2 className="lp-h2">Notion Pilot does the typing. You keep the judgement.</h2>
+            <div className="lp-intro-copy">
+              <p className="lp-lede">
+                Two ways in, one rule:{" "}
+                <strong>nothing reaches Notion that you haven't approved.</strong> Both surfaces end
+                in a preview and wait for a human.
               </p>
-              <div className="lp-frame lp-frame-flat">
-                <div className="lp-chat lp-chat-compact">
-                  <div className="lp-msg lp-msg-user lp-msg-sm">/lead</div>
-                  <div className="lp-msg lp-msg-bot lp-msg-sm">Company? Contact? Source?</div>
-                  <div className="lp-msg lp-msg-user lp-msg-sm">Voltaris · C. Dubois · inbound</div>
-                  <div className="lp-msg lp-msg-bot lp-msg-sm">
-                    Preview: 1 new Lead, 1 matched Company. Confirm?
+            </div>
+          </div>
+
+          <div className="lp-surfaces">
+            <div className="lp-surface">
+              <div className="lp-surface-head">
+                <Icon name="telegram" />
+                <h3 className="lp-h3">Telegram</h3>
+                <span className="lp-surface-when">30 seconds, one hand</span>
+              </div>
+              <p>
+                Walking out of the building, no laptop. Send <code>/deal</code> and answer what the
+                bot asks. It shows you the record it is about to write.
+              </p>
+              <div className="lp-chat">
+                <div className="lp-bubble lp-bubble-me">/deal Voltaris proposal sent 120k</div>
+                <div className="lp-bubble lp-bubble-bot">
+                  <span className="lp-who">Preview — nothing written yet</span>
+                  <table className="lp-diff">
+                    <tbody>
+                      <tr>
+                        <td>Deal</td>
+                        <td>
+                          <b>Voltaris — Platform licence</b>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Company</td>
+                        <td>
+                          <span className="lp-link">
+                            <Icon name="link" size={12} />
+                            Voltaris Énergie
+                          </span>{" "}
+                          matched
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Stage</td>
+                        <td>
+                          Discovery → <span className="lp-t lp-t-orange">Proposal Sent</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Value</td>
+                        <td className="lp-num">120 000 €</td>
+                      </tr>
+                      <tr>
+                        <td>Activity</td>
+                        <td>Proposal · logged against the deal</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div className="lp-approve">
+                    <span className="lp-key">go</span>
+                    <span className="lp-small">to write · or tell it what to fix</span>
                   </div>
                 </div>
               </div>
             </div>
-            <div className="lp-card lp-card-accent">
-              <h3>🤖 AI assistant — for everything else</h3>
+
+            <div className="lp-surface lp-surface-lead">
+              <div className="lp-surface-head">
+                <Icon name="agent" />
+                <h3 className="lp-h3">Your AI assistant</h3>
+                <span className="lp-surface-when">the one that changes the job</span>
+              </div>
               <p>
-                This is the one that changes the job. Your assistant already reads your inbox and
-                your call notes. Give it access to the CRM and the pipeline stops being something
-                you maintain — it becomes something you approve.
+                Your assistant already reads your inbox and your call notes. Give it the CRM and one
+                email thread becomes four correct records — <strong>you only approve</strong>.
               </p>
-              <p className="lp-mt-sm">
-                Works in Claude, Claude Code and Cursor over MCP: it searches the CRM first, dedups
-                against what exists, then proposes a diff.
-              </p>
-              <p className="lp-teaser">Keep reading — this is the interesting part. ↓</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── agent deep dive ─────────────────────────────────────────────── */}
-      <section className="lp-section lp-section-tint">
-        <div className="lp-wrap">
-          <span className="lp-eyebrow">The AI agent workflow</span>
-          <h2 className="lp-h2">Paste the email. Approve the diff. The funnel moves.</h2>
-          <p className="lp-lede">
-            One real interaction — a reply to a demo — normally touches four databases and nine
-            properties. Here it costs one paste and one word.
-          </p>
-
-          <div className="lp-frame">
-            <div className="lp-frame-bar">
-              <span className="lp-dot" /> Claude · notion-crm MCP connected
-            </div>
-            <div className="lp-chat">
-              <div className="lp-msg lp-msg-user">
-                <span className="lp-msg-label">You — pasted from your inbox</span>
-                <span className="lp-mono">{PASTED_EMAIL}</span>
-              </div>
-
-              <div className="lp-msg lp-msg-bot">
-                <span className="lp-msg-label">
-                  Claude — searched the CRM first, nothing written yet
-                </span>
-                Voltaris Énergie already exists (SIREN 843 219 004) and has an open lead at{" "}
-                <em>Discovery / First Meeting</em>. Camille Dubois is not in People. Here is what I
-                propose:
-                <table className="lp-valid">
-                  <thead>
-                    <tr>
-                      <th>Database</th>
-                      <th>Action</th>
-                      <th>Record</th>
-                      <th>Detail</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>Companies</td>
-                      <td>
-                        <span className="lp-pill lp-pill-grey">matched</span>
-                      </td>
-                      <td>Voltaris Énergie</td>
-                      <td>no change</td>
-                    </tr>
-                    <tr>
-                      <td>People</td>
-                      <td>
-                        <span className="lp-pill lp-pill-teal">create</span>
-                      </td>
-                      <td>Camille Dubois</td>
-                      <td>
-                        Head of Grid Analytics · seniority <code>director</code> · linked to
-                        Voltaris
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Leads</td>
-                      <td>
-                        <span className="lp-pill lp-pill-amber">update</span>
-                      </td>
-                      <td>Voltaris — Platform licence</td>
-                      <td>
-                        Stage → <b>Proposal Sent</b> · Probability 50 → 60 % · Expected close{" "}
-                        <b>15 Dec</b> · Primary contact → C. Dubois
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Activities</td>
-                      <td>
-                        <span className="lp-pill lp-pill-teal">create</span>
-                      </td>
-                      <td>Demo follow-up</td>
-                      <td>
-                        Type <code>📧 Email</code> · Outcome <code>➡️ Follow-up Needed</code> · Next
-                        step “send proposal, 12 licences” due 20 Nov
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-                <p className="lp-note-sm">
-                  Blocker noted in the deal notes: security review required before signature. Reply{" "}
-                  <b>go</b> to write, or tell me what to change.
-                </p>
-              </div>
-
-              <div className="lp-msg lp-msg-user">go</div>
-
-              <div className="lp-msg lp-msg-bot">
-                <span className="lp-msg-label">Claude — written with confirm=true</span>✅ 2
-                created, 1 updated, 1 matched. Nothing duplicated.
-                <br />
-                Your pipeline moved 120 k€ from Discovery to Proposal Sent, and{" "}
-                <code>Days Since Last Activity</code> reset to 0.
+              <div className="lp-chat">
+                <div className="lp-bubble lp-bubble-me">
+                  <span className="lp-who">Pasted from your inbox</span>
+                  <pre className="lp-pre">{PASTED_EMAIL}</pre>
+                </div>
+                <div className="lp-bubble lp-bubble-bot">
+                  <span className="lp-who">Searched the CRM · nothing written yet</span>
+                  <table className="lp-diff">
+                    <thead>
+                      <tr>
+                        <th>Database</th>
+                        <th>Action</th>
+                        <th>Record</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {DIFF.map((d) => (
+                        <tr key={d.db}>
+                          <td>{d.db}</td>
+                          <td><T tag={d.action} /></td>
+                          <td>
+                            <b>{d.record}</b>
+                            <br />
+                            <span className="lp-small">{d.detail}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="lp-approve">
+                    <span className="lp-key">go</span>
+                    <span className="lp-small">
+                      2 created, 1 updated, 1 matched · 120 k€ moved to Proposal Sent
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
           <div className="lp-steps">
-            {AGENT_STEPS.map(([title, body]) => (
-              <div className="lp-step" key={title}>
-                <b>{title}</b>
+            {AGENT_STEPS.map(([icon, title, body]) => (
+              <div key={title}>
+                <b>
+                  <Icon name={icon} size={17} /> {title}
+                </b>
                 <span>{body}</span>
               </div>
             ))}
@@ -613,122 +1082,139 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── EU + trust ──────────────────────────────────────────────────── */}
+      {/* ── europe ───────────────────────────────────────────────────────── */}
+      <section className="lp-section lp-tint">
+        <div className="lp-wrap">
+          <div className="lp-eu">
+            <div>
+              <span className="lp-region">
+                <Icon name="shield" size={16} /> eu-central-1 · Frankfurt
+              </span>
+              <h2 className="lp-h2">European by deployment, not by promise</h2>
+              <p className="lp-body" style={{ marginTop: "1.1rem" }}>
+                Both halves of this system are hosted independently, and both can sit inside the EU.
+                Data residency is <strong>free on the Notion Enterprise plan</strong>, and an
+                existing workspace can be migrated into the EU region on request.
+              </p>
+              <p className="lp-small" style={{ marginTop: "0.9rem" }}>
+                Confirm the current region list and contractual terms with{" "}
+                <a href={RESIDENCY_URL}>Notion</a> for your own agreement.
+              </p>
+            </div>
+            <div className="lp-eu-marks">
+              {EU_MARKS.map(([icon, title, body]) => (
+                <div className="lp-eu-mark" key={title}>
+                  <Icon name={icon} />
+                  <b>{title}</b>
+                  <span>{body}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── get started ──────────────────────────────────────────────────── */}
       <section className="lp-section">
         <div className="lp-wrap">
-          <span className="lp-eyebrow">Where the data lives</span>
-          <h2 className="lp-h2">European by deployment, not by promise</h2>
-          <p className="lp-lede">
-            The two halves of this system are hosted independently — and both can sit in Europe.
-          </p>
-
-          <div className="lp-eu lp-mb-lg">
-            <div className="lp-eu-flag">★★★</div>
-            <div>
-              <h3>Your CRM data: Notion Enterprise, EU region</h3>
-              <p>
-                Notion offers data residency in <strong>eu-central-1 (Frankfurt)</strong>. It is{" "}
-                <strong>free of charge on the Enterprise plan</strong>, and Enterprise customers can
-                request that an existing workspace be migrated into the EU region. Region-specific
-                ingestion pipelines keep downstream processing inside that region too. GDPR-relevant
-                terms and the current region list should be confirmed with Notion for your contract.
+          <div className="lp-intro">
+            <h2 className="lp-h2">Deploy the CRM, then teach your assistant to run it</h2>
+            <div className="lp-intro-copy">
+              <p className="lp-lede">
+                Nothing to migrate, nothing to sign. The connection is your own Notion OAuth, and
+                the skills that know how to operate this CRM ship in the box.
               </p>
             </div>
           </div>
 
-          <div className="lp-cards">
-            <div className="lp-card">
-              <h3>The automation layer: your server</h3>
+          <div className="lp-stack">
+            <div className="lp-stack-head">
+              <div>
+                <div className="lp-icon">
+                  <Icon name="skill" />
+                </div>
+                <h3 className="lp-h3">The skills are the product</h3>
+              </div>
+              <div className="lp-intro-copy">
               <p>
-                Notion Pilot is self-hosted — Docker or systemd, your infrastructure, your Notion
-                token. It holds no copy of your CRM beyond a runtime cache, and there is no
-                third-party SaaS between your team and your workspace.
+                An MCP connection alone just gives an assistant hands. These are the instructions
+                that make it useful on a CRM — search before write, dedup, a validation table, and a
+                hard stop until you approve.
               </p>
+              <div className="lp-skills">
+                {SKILLS.map(([name, what]) => (
+                  <div className="lp-skill" key={name}>
+                    <Icon name="skill" size={16} />
+                    <span>
+                      <b>{name}</b>
+                      <br />
+                      <span>{what}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+              </div>
             </div>
-            <div className="lp-card">
-              <h3>Human in the loop, by default</h3>
-              <p>
-                Writes are dry-run unless explicitly confirmed. The AI proposes, you validate,
-                Notion remains the source of truth. That order is enforced in the tools, not just in
-                the documentation.
-              </p>
-            </div>
-            <div className="lp-card">
-              <h3>Your permissions, not the agent's</h3>
-              <p>
-                The assistant reaches Notion through your own connection and inherits what you can
-                see. Access is revoked by disconnecting the integration in Notion — no separate key
-                to chase.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* ── get started ─────────────────────────────────────────────────── */}
-      <section className="lp-section lp-section-tint" id="deploy">
-        <div className="lp-wrap">
-          <span className="lp-eyebrow">Get started</span>
-          <h2 className="lp-h2">Two commands and a workspace</h2>
-          <p className="lp-lede">
-            Deploy the databases, then point your assistant at them. Nothing to migrate, nothing to
-            sign.
-          </p>
+            <div className="lp-install">
+              <div>
+                <h4 className="lp-install-h">
+                  <span className="lp-step-n">1</span> Install the skills
+                </h4>
+                <p className="lp-small">
+                  Two lines in Claude Code. Add the marketplace, install the plugin — both skills
+                  arrive together and update with the repo. No clone, no symlinks, no config file.
+                </p>
+                <pre className="lp-code">{INSTALL_SNIPPET}</pre>
+              </div>
+              <div>
+                <h4 className="lp-install-h">
+                  <span className="lp-step-n">2</span> Connect Notion
+                </h4>
+                <p className="lp-small">
+                  Notion's official MCP server, over your own OAuth connection. Restart the
+                  assistant and the skills trigger on their own — paste an email and ask.
+                </p>
+                <pre className="lp-code">{MCP_SNIPPET}</pre>
+              </div>
+            </div>
 
-          <div className="lp-cards lp-cards-start">
-            <div className="lp-card">
-              <div className="lp-card-num">1</div>
-              <h3>Deploy the CRM into your Notion</h3>
-              <p className="lp-mb">
-                Connect with Notion and Notion Pilot creates the CRM page with Companies, People and
-                Leads — relations wired, select options filled, demo rows included so the views make
-                sense on day one.
-              </p>
+            <div className="lp-btn-row" style={{ marginTop: "1.6rem" }}>
               <a className="lp-btn lp-btn-primary" href="/auth/notion">
-                Deploy to Notion
+                Deploy to Notion <Icon name="arrow" size={17} />
+              </a>
+              <a className="lp-btn lp-btn-quiet" href="https://github.com/ldom1/notion-pilot">
+                Read the source
               </a>
             </div>
-            <div className="lp-card">
-              <div className="lp-card-num">2</div>
-              <h3>Connect your AI assistant</h3>
-              <p className="lp-mb">
-                Use Notion's official MCP server to let Claude or Cursor read and write your
-                workspace over your own OAuth connection.
-              </p>
-              <pre className="lp-code">{MCP_SNIPPET}</pre>
-            </div>
           </div>
         </div>
       </section>
 
-      {/* ── final CTA ───────────────────────────────────────────────────── */}
-      <section className="lp-final">
-        <div className="lp-wrap">
-          <h2 className="lp-h2">Run your next real deal through it</h2>
-          <p>
-            Pick one channel and one database. Put a week of real emails through it and see whether
-            the pipeline still looks right on Monday morning.
-          </p>
-          <div className="lp-cta-row lp-center">
-            <a className="lp-btn lp-btn-primary lp-btn-lg" href="/auth/notion">
-              Deploy to Notion
-            </a>
-            <a className="lp-btn lp-btn-ghost lp-btn-lg" href="#model">
-              See the data model again
-            </a>
-          </div>
+      {/* ── close ────────────────────────────────────────────────────────── */}
+      <section className="lp-close lp-wrap">
+        <h2 className="lp-h2">Run your next real deal through it</h2>
+        <p>
+          One channel, one database, a week of real emails. Then look at the pipeline on Monday and
+          decide whether you believe it.
+        </p>
+        <div className="lp-btn-row">
+          <a className="lp-btn lp-btn-primary lp-btn-lg" href="/auth/notion">
+            Deploy the CRM to Notion <Icon name="arrow" size={17} />
+          </a>
+          <a className="lp-btn lp-btn-quiet lp-btn-lg" href="#model">
+            See the data model again
+          </a>
         </div>
       </section>
 
-      <footer className="lp-foot">
-        <div className="lp-wrap lp-foot-row">
-          <div className="lp-brand lp-brand-sm">
-            <span className="lp-mark">P</span> Notion Pilot
-          </div>
-          <span>Self-hosted CRM automation for Notion · human-in-the-loop by default</span>
-          <span>
-            <a href="/auth/notion?next=/cockpit">Sign in</a>
+      <footer className="lp-wrap">
+        <div className="lp-foot">
+          <span className="lp-brand" style={{ fontSize: "0.92rem" }}>
+            <Logo /> Notion Pilot
           </span>
+          <span>Self-hosted CRM automation for Notion · human-in-the-loop by default</span>
+          <a href="/auth/notion?next=/cockpit">Sign in</a>
         </div>
       </footer>
     </div>
