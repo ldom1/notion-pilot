@@ -129,7 +129,7 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
           ))}
         </div>
         <div style={s.scopeDesc}>
-          {scope === "crm" && "People, Companies, Leads — full CRM with demo data"}
+          {scope === "crm" && "Companies, People, Leads, Activities, Meetings — with relations, formulas and demo data"}
           {scope === "inbox" && "Notions, Ideas, Tools, Data & Tech databases"}
           {scope === "both" && "CRM + Knowledge inbox — the full Notion Pilot suite"}
         </div>

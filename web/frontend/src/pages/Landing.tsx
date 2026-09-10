@@ -38,7 +38,11 @@ export default function Landing() {
         <main style={{ ...styles.hero, alignItems: "flex-start", paddingTop: "3rem" }}>
           <div style={{ maxWidth: "480px", width: "100%", margin: "0 auto" }}>
             <SetupWizard
-              onComplete={() => { window.location.href = "/cockpit"; }}
+              // Deliberately does NOT navigate: the wizard's success card is the
+              // only place the user is offered a link to the workspace they just
+              // created. Redirecting here rendered it for a single frame and threw
+              // the Notion URL away. "Go to Cockpit" (onSkip) is the way out.
+              onComplete={() => {}}
               onSkip={() => { window.location.href = "/cockpit"; }}
             />
           </div>
