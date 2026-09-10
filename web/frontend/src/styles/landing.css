@@ -16,31 +16,12 @@
  */
 
 .lp {
-  /* achromatic ramp — chroma 0 throughout, no hidden tint */
-  --bg: oklch(1 0 0);
-  --surface: oklch(0.978 0 0);
-  --surface-2: oklch(0.956 0 0);
-  --ink: oklch(0.17 0 0);
-  --muted: oklch(0.52 0 0);
-  --rule: oklch(0.915 0 0);
-  --rule-strong: oklch(0.845 0 0);
-
-  /* "brand" is near-black — action, automation, emphasis */
-  --primary: oklch(0.22 0 0);
-  --primary-deep: oklch(0.12 0 0);
-  --primary-wash: oklch(0.965 0 0);
-  --accent: oklch(0.3 0 0);
-
-  /* the mark — the rule that draws itself under the claim */
-  --mark: oklch(0.17 0 0);
-  --mark-ink: oklch(1 0 0);
-
   --measure: 76ch;
   --gap: clamp(3.5rem, 7vw, 7rem);
 
   color: var(--ink);
   background: var(--bg);
-  font-family: Archivo, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-family: var(--font);
   font-size: 16px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -102,7 +83,7 @@
 
 .lp code,
 .lp .lp-num {
-  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   font-feature-settings: "tnum" 1;
   font-variant-numeric: tabular-nums;
 }
@@ -120,7 +101,7 @@
 .lp h2,
 .lp h3,
 .lp h4 {
-  font-family: Archivo, ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font);
   font-weight: 700;
   letter-spacing: -0.035em;
   text-wrap: balance;
@@ -176,7 +157,7 @@
   border-radius: 5px;
   background: var(--surface);
   color: var(--ink);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.84em;
   font-weight: 500;
   white-space: nowrap;
@@ -226,7 +207,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
-  font-family: Archivo, ui-sans-serif, sans-serif;
+  font-family: var(--font);
   font-size: 1.02rem;
   font-weight: 700;
   letter-spacing: -0.03em;
@@ -427,7 +408,7 @@
   align-items: center;
   gap: 0.55rem;
   color: var(--muted);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.7rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -796,7 +777,7 @@
   margin-left: auto;
   padding: 0.08rem 0.4rem;
   border-radius: 99px;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.62rem;
   font-weight: 500;
   letter-spacing: 0.04em;
@@ -825,7 +806,7 @@
   border-radius: 4px;
   background: var(--surface);
   color: var(--muted);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.7rem;
 }
 
@@ -847,7 +828,7 @@
 
 .lp-relation b {
   color: var(--ink);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
   font-weight: 500;
 }
@@ -879,7 +860,7 @@
 
 .lp-lane-head span {
   color: var(--muted);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-weight: 400;
 }
 
@@ -908,7 +889,7 @@
 
 .lp-cardlet-val {
   color: var(--muted);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.74rem;
 }
 
@@ -940,14 +921,14 @@
   border-bottom: 1px solid var(--rule);
   background: var(--surface);
   color: var(--muted);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   letter-spacing: 0.02em;
 }
 
 .lp-rec-title {
   padding: 0.8rem 0.9rem 0.2rem;
-  font-family: Archivo, sans-serif;
+  font-family: var(--font);
   font-size: 0.98rem;
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -1010,7 +991,7 @@
 
 .lp-gap b {
   display: block;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.74rem;
   font-weight: 500;
   white-space: nowrap;
@@ -1025,7 +1006,7 @@
 .lp-punch {
   max-width: 60ch;
   margin: 2rem 0 0;
-  font-family: Archivo, sans-serif;
+  font-family: var(--font);
   font-size: clamp(1.05rem, 1.6vw, 1.3rem);
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -1067,14 +1048,14 @@
   border-radius: 50%;
   background: var(--ink);
   color: var(--bg);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
 }
 
 .lp-evolve b {
   display: block;
   margin: 0.5rem 0 0.35rem;
-  font-family: Archivo, sans-serif;
+  font-family: var(--font);
   font-size: 1.02rem;
   letter-spacing: -0.02em;
 }
@@ -1176,7 +1157,7 @@
 .lp-surface-when {
   margin-left: auto;
   color: var(--muted);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
 }
 
@@ -1221,7 +1202,7 @@
   display: block;
   margin-bottom: 0.35rem;
   color: var(--muted);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.64rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1229,7 +1210,7 @@
 
 .lp-pre {
   margin: 0;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.78rem;
   line-height: 1.55;
   white-space: pre-wrap;
@@ -1285,7 +1266,7 @@
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 0.16),
     0 1px 2px oklch(0 0 0 / 0.2);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.78rem;
   font-weight: 500;
 }
@@ -1367,7 +1348,7 @@
   padding: 0.4rem 0.8rem 0.4rem 0.5rem;
   border: 1px solid var(--rule-strong);
   border-radius: 99px;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.8rem;
 }
 
@@ -1382,7 +1363,7 @@
   border-radius: 9px;
   background: oklch(0.17 0 0);
   color: oklch(0.93 0 0);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.79rem;
   line-height: 1.7;
   overflow-x: auto;
@@ -1414,7 +1395,7 @@
 }
 
 .lp-skill b {
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.83rem;
   font-weight: 500;
 }
@@ -1544,7 +1525,7 @@
   border-radius: 50%;
   background: var(--primary);
   color: oklch(1 0 0);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.74rem;
   font-weight: 500;
 }
@@ -1565,15 +1546,15 @@
   white-space: nowrap;
 }
 
-.lp-t-gray   { background: oklch(0.945 0 0);        color: oklch(0.42 0 0); }
-.lp-t-brown  { background: oklch(0.945 0.022 60);   color: oklch(0.44 0.06 60); }
-.lp-t-orange { background: oklch(0.95 0.052 65);    color: oklch(0.5 0.13 55); }
-.lp-t-yellow { background: oklch(0.958 0.062 95);   color: oklch(0.48 0.1 85); }
-.lp-t-green  { background: oklch(0.952 0.042 160);  color: oklch(0.44 0.11 162); }
-.lp-t-blue   { background: oklch(0.948 0.038 250);  color: oklch(0.45 0.13 253); }
-.lp-t-purple { background: oklch(0.948 0.036 300);  color: oklch(0.46 0.14 300); }
-.lp-t-pink   { background: oklch(0.95 0.036 350);   color: oklch(0.49 0.14 350); }
-.lp-t-red    { background: oklch(0.952 0.038 22);   color: oklch(0.5 0.15 22); }
+.lp-t-gray   { background: var(--n-gray-bg); color: var(--n-gray-fg); }
+.lp-t-brown   { background: var(--n-brown-bg); color: var(--n-brown-fg); }
+.lp-t-orange   { background: var(--n-orange-bg); color: var(--n-orange-fg); }
+.lp-t-yellow   { background: var(--n-yellow-bg); color: var(--n-yellow-fg); }
+.lp-t-green   { background: var(--n-green-bg); color: var(--n-green-fg); }
+.lp-t-blue   { background: var(--n-blue-bg); color: var(--n-blue-fg); }
+.lp-t-purple   { background: var(--n-purple-bg); color: var(--n-purple-fg); }
+.lp-t-pink   { background: var(--n-pink-bg); color: var(--n-pink-fg); }
+.lp-t-red   { background: var(--n-red-bg); color: var(--n-red-fg); }
 
 /* status dots — "this one is fine" at a glance */
 .lp-dot-cell {

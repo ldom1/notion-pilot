@@ -42,14 +42,14 @@ const LogPanel: React.FC<LogPanelProps> = ({
         {isRunning && (
           <button
             onClick={onStop}
-            style={{ marginLeft: 'auto', background: '#dc2626', color: '#fff', border: 'none', fontSize: '0.72rem', fontWeight: 700, padding: '0.25rem 0.65rem', borderRadius: '4px', cursor: 'pointer' }}
+            style={{ marginLeft: 'auto', background: 'var(--bad)', color: 'var(--bg)', border: 'none', fontSize: '0.72rem', fontWeight: 700, padding: '0.25rem 0.65rem', borderRadius: '4px', cursor: 'pointer' }}
           >
             ■ Stop
           </button>
         )}
         <button
           onClick={onClose}
-          style={{ background: 'none', border: '1px solid #444', color: '#666', fontSize: '0.72rem', padding: '0.25rem 0.55rem', borderRadius: '4px', cursor: 'pointer', marginLeft: isRunning ? '0.35rem' : 'auto' }}
+          style={{ background: 'none', border: '1px solid var(--dark-rule)', color: 'var(--dark-muted)', fontSize: '0.72rem', padding: '0.25rem 0.55rem', borderRadius: '4px', cursor: 'pointer', marginLeft: isRunning ? '0.35rem' : 'auto' }}
           aria-label="Close"
         >
           ✕

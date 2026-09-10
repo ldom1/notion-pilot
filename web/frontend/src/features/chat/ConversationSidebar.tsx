@@ -51,7 +51,7 @@ export function ConversationSidebar({
             >
               <div className="conv-item-title">{conv.title}</div>
               {conv.preview && (
-                <div style={{ fontSize: '0.64rem', color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '0.1rem' }}>
+                <div style={{ fontSize: '0.64rem', color: 'var(--rule-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '0.1rem' }}>
                   {conv.preview}
                 </div>
               )}

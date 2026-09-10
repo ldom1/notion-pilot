@@ -16,7 +16,7 @@ function LogLine({ line, isLast, deploying }: { line: string; isLast: boolean; d
   return (
     <div
       style={{
-        color: isError ? "#c0392b" : isSuccess ? "#1e7e34" : isSubStep ? "#888" : "#333",
+        color: isError ? "var(--bad)" : isSuccess ? "var(--ok)" : isSubStep ? "var(--muted)" : "var(--ink)",
         fontWeight: isSuccess ? 700 : "normal",
         paddingLeft: isSubStep ? "0.75rem" : undefined,
         display: "flex",
@@ -138,7 +138,7 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
       {(deployState === "deploying" || deployState === "error") && (
         <div style={s.logBox} ref={logRef}>
           {logs.length === 0
-            ? <div style={{ color: "#999", fontSize: "0.78rem", fontFamily: "monospace" }}>Connecting to Notion…</div>
+            ? <div style={{ color: "var(--muted)", fontSize: "0.78rem", fontFamily: "monospace" }}>Connecting to Notion…</div>
             : logs.map((l, i) => (
                 <LogLine key={i} line={l} isLast={i === logs.length - 1} deploying={deployState === "deploying"} />
               ))
@@ -167,9 +167,9 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
 
 const s: Record<string, React.CSSProperties> = {
   card: {
-    background: "#fff",
+    background: "var(--bg)",
     borderRadius: "12px",
-    border: "1px solid #e8e8e8",
+    border: "1px solid var(--rule)",
     padding: "2rem",
     maxWidth: "480px",
     width: "100%",
@@ -177,14 +177,14 @@ const s: Record<string, React.CSSProperties> = {
     flexDirection: "column",
     gap: "1.25rem",
   },
-  title: { fontSize: "1.4rem", fontWeight: 800, color: "#1a1a1a", margin: 0 },
-  sub: { fontSize: "0.9rem", color: "#666", margin: 0, lineHeight: 1.5 },
+  title: { fontSize: "1.4rem", fontWeight: 800, color: "var(--ink)", margin: 0 },
+  sub: { fontSize: "0.9rem", color: "var(--muted)", margin: 0, lineHeight: 1.5 },
   field: { display: "flex", flexDirection: "column", gap: "0.5rem" },
-  label: { fontSize: "0.85rem", fontWeight: 600, color: "#444" },
+  label: { fontSize: "0.85rem", fontWeight: 600, color: "var(--ink-soft)" },
   scopeRow: { display: "flex", gap: "0.5rem" },
-  scopeDesc: { fontSize: "0.8rem", color: "#888", minHeight: "1.2em" },
+  scopeDesc: { fontSize: "0.8rem", color: "var(--muted)", minHeight: "1.2em" },
   logBox: {
-    background: "#f7f7f7",
+    background: "var(--surface)",
     borderRadius: "6px",
     padding: "0.75rem",
     maxHeight: "160px",

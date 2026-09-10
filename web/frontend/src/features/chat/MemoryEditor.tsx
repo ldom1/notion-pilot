@@ -49,7 +49,7 @@ export function MemoryEditor({ open, onClose }: MemoryEditorProps): React.ReactE
           type="button"
           onClick={onClose}
           aria-label="Close"
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: '0.78rem', padding: '0.1rem 0.3rem', lineHeight: 1 }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rule-strong)', fontSize: '0.78rem', padding: '0.1rem 0.3rem', lineHeight: 1 }}
         >
           ✕
         </button>
