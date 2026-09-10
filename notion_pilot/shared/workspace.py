@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
 import httpx
@@ -115,7 +116,6 @@ _DEMO_COMPANIES: list[JsonDict] = [
         "crm_status": "Active",
         "tier": "1",
         "tech_stack": ["Python", "AWS", "PostgreSQL"],
-        "activities": ["R&D & Consulting", "Energy"],
         "tags": ["Key Account", "ERP"],
         "notes": "Key account — ERP opportunity Q3. Decision-maker is Alice Martin (CTO).",
     },
@@ -130,7 +130,6 @@ _DEMO_COMPANIES: list[JsonDict] = [
         "crm_status": "Prospect",
         "tier": "2",
         "tech_stack": ["SAP", "Excel", "Tableau"],
-        "activities": ["R&D & Consulting"],
         "tags": ["Warm Lead", "Finance"],
         "notes": "Warm intro via Pierre Lambert. Finance transformation project.",
     },
@@ -145,7 +144,6 @@ _DEMO_COMPANIES: list[JsonDict] = [
         "crm_status": "Active",
         "tier": "1",
         "tech_stack": ["Python", "Spark", "dbt", "Snowflake"],
-        "activities": ["Data & IA"],
         "tags": ["Pilot", "Data"],
         "notes": "Digital Twin pilot project. Strong fit with our optimization stack.",
     },
@@ -160,7 +158,6 @@ _DEMO_COMPANIES: list[JsonDict] = [
         "crm_status": "Partner",
         "tier": "1",
         "tech_stack": ["MATLAB", "Simulink", "C++"],
-        "activities": ["Energy", "R&D & Consulting"],
         "tags": ["Partner", "HPC"],
         "notes": "Strategic partner for grid optimization projects in DACH region.",
     },
@@ -175,7 +172,6 @@ _DEMO_COMPANIES: list[JsonDict] = [
         "crm_status": "Prospect",
         "tier": "3",
         "tech_stack": ["Python", "BigQuery", "Looker"],
-        "activities": ["Data & IA"],
         "tags": ["Inbound", "Analytics"],
         "notes": "Inbound lead from the website. Analytics migration use case.",
     },
@@ -539,6 +535,8 @@ class CRMWorkspaceResult:
     companies_id: str
     people_id: str
     deals_id: str
+    meetings_id: str
+    activities_id: str
 
 
 @dataclass
@@ -610,6 +608,63 @@ async def _create_db(
     return db_id
 
 
+async def _patch_db(
+    client: httpx.AsyncClient, db_id: str, properties: dict[str, Any], *, what: str
+) -> None:
+    """Add properties to an existing database."""
+    r = await client.patch(f"{NOTION_API}/databases/{db_id}", json={"properties": properties})
+    if r.status_code != 200:
+        raise RuntimeError(f"Failed to add {what} to database {db_id}: {r.status_code} {r.text}")
+    logger.info("workspace: {} applied to {}", what, db_id)
+
+
+async def _resolve_back_relation(
+    client: httpx.AsyncClient, parent_db_id: str, target_db_id: str, desired: str
+) -> str:
+    """Return the name of the property on `parent_db_id` that points at `target_db_id`.
+
+    A dual-property relation makes Notion create the reverse property itself, and
+    it names it — `synced_property_name` is read-only on create, so the name
+    cannot be requested up front. The repo's own history shows what happens if
+    you assume it: `crm_add_activity_rollups.py` hardcodes "Activities" with a
+    "verified by probe" comment, and tolerates a 400 because the guess can be
+    wrong. So: read the reverse name back, rename it to `desired` for
+    readability, and return whatever name is actually live. The rollup then keys
+    on a known-good property instead of a hopeful string.
+    """
+    r = await client.get(f"{NOTION_API}/databases/{parent_db_id}")
+    r.raise_for_status()
+    target = target_db_id.replace("-", "")
+    found = [
+        name
+        for name, prop in r.json().get("properties", {}).items()
+        if prop.get("type") == "relation"
+        and str(prop.get("relation", {}).get("database_id", "")).replace("-", "") == target
+    ]
+    if not found:
+        raise RuntimeError(
+            f"No relation from database {parent_db_id} to {target_db_id} was created. "
+            "The rollups that depend on it cannot be built."
+        )
+    current = desired if desired in found else found[0]
+    if current != desired:
+        rename = await client.patch(
+            f"{NOTION_API}/databases/{parent_db_id}",
+            json={"properties": {current: {"name": desired}}},
+        )
+        if rename.status_code == 200:
+            logger.info("workspace: renamed '{}' -> '{}' on {}", current, desired, parent_db_id)
+            return desired
+        logger.warning(
+            "workspace: could not rename '{}' to '{}' on {} ({}); keying on the live name",
+            current,
+            desired,
+            parent_db_id,
+            rename.status_code,
+        )
+    return current
+
+
 async def _create_db_page(client: httpx.AsyncClient, db_id: str, properties: dict[str, Any]) -> str:
     r = await client.post(
         f"{NOTION_API}/pages",
@@ -636,7 +691,6 @@ async def _seed_companies(client: httpx.AsyncClient, companies_id: str) -> dict[
             "CRM Status": {"select": {"name": c["crm_status"]}},
             "Tier": {"select": {"name": c["tier"]}},
             "Tech Stack": {"multi_select": [{"name": t} for t in c["tech_stack"]]},
-            "Activities": {"multi_select": [{"name": a} for a in c["activities"]]},
             "Tags": {"multi_select": [{"name": t} for t in c["tags"]]},
             "Notes": {"rich_text": _rt(c["notes"])},
         }
@@ -679,8 +733,9 @@ async def _seed_deals(
     deals_id: str,
     company_ids: dict[str, str],
     people_ids: dict[str, str],
-) -> None:
+) -> dict[str, str]:
     logger.info("workspace: seeding {} deals", len(_DEMO_DEALS))
+    deal_ids: dict[str, str] = {}
     for d in _DEMO_DEALS:
         contacts = [{"id": people_ids[n]} for n in d["contacts"] if n in people_ids]
         props: dict[str, Any] = {
@@ -697,7 +752,280 @@ async def _seed_deals(
         }
         if contacts:
             props["Contacts"] = {"relation": contacts}
-        await _create_db_page(client, deals_id, props)
+        deal_ids[d["name"]] = await _create_db_page(client, deals_id, props)
+    return deal_ids
+
+
+async def _create_meetings_db(
+    client: httpx.AsyncClient,
+    crm_page_id: str,
+    companies_id: str,
+    people_id: str,
+    deals_id: str,
+) -> str:
+    """Meetings — created and related, but never written by an agent (spec §3.2).
+
+    Property names follow the live database via scripts/crm/crm_patch_meetings.py.
+    `Advanced Deal?` and `Activity Created?` exist so a later operator-run sync
+    has somewhere to write; nothing in v1 reads them.
+    """
+    return await _create_db(
+        client,
+        crm_page_id,
+        "Meetings",
+        {
+            "Name": {"title": {}},
+            "Date": {"date": {}},
+            "Type": {
+                "select": {
+                    "options": [
+                        {"name": "Discovery", "color": "blue"},
+                        {"name": "Demo", "color": "orange"},
+                        {"name": "Follow-up", "color": "yellow"},
+                        {"name": "Proposal Review", "color": "purple"},
+                        {"name": "Negotiation", "color": "red"},
+                        {"name": "Kick-off", "color": "green"},
+                        {"name": "Internal", "color": "gray"},
+                        {"name": "Conference", "color": "pink"},
+                        {"name": "Interview", "color": "brown"},
+                    ]
+                }
+            },
+            "Meeting Objective": {"rich_text": {}},
+            "Company": {"relation": {"database_id": companies_id, "dual_property": {}}},
+            "Deal": {"relation": {"database_id": deals_id, "dual_property": {}}},
+            "People": {"relation": {"database_id": people_id, "dual_property": {}}},
+            "Tags": {
+                "multi_select": {
+                    "options": [
+                        {"name": "meeting", "color": "default"},
+                        {"name": "conference", "color": "blue"},
+                        {"name": "internal", "color": "gray"},
+                    ]
+                }
+            },
+            "Advanced Deal?": {"checkbox": {}},
+            "Activity Created?": {"checkbox": {}},
+            "Notes": {"rich_text": {}},
+        },
+        "🤝",
+    )
+
+
+async def _create_activities_db(
+    client: httpx.AsyncClient,
+    crm_page_id: str,
+    companies_id: str,
+    people_id: str,
+    deals_id: str,
+    meetings_id: str,
+) -> str:
+    """Activities — the database log_activity hard-requires (spec §3.1).
+
+    Property names and select options come from ActivityRecord._to_properties
+    (notion_pilot/crm/activities.py) and scripts/crm/crm_create_activities_db.py.
+    The relation to People is `Person`, not `Contact` — that is the writer's
+    contract. Relations are dual so the reverse side exists for the rollups.
+    """
+    return await _create_db(
+        client,
+        crm_page_id,
+        "Activities",
+        {
+            "Name": {"title": {}},
+            "Type": {
+                "select": {
+                    "options": [
+                        {"name": "📞 Call", "color": "blue"},
+                        {"name": "📧 Email", "color": "green"},
+                        {"name": "💼 LinkedIn", "color": "purple"},
+                        {"name": "🎤 Demo", "color": "orange"},
+                        {"name": "🤝 Meeting", "color": "yellow"},
+                        {"name": "📄 Proposal", "color": "red"},
+                        {"name": "🎪 Conference", "color": "pink"},
+                        {"name": "📋 Other", "color": "gray"},
+                    ]
+                }
+            },
+            "Date": {"date": {}},
+            "Duration (min)": {"number": {"format": "number"}},
+            "Outcome": {
+                "select": {
+                    "options": [
+                        {"name": "✅ Positive", "color": "green"},
+                        {"name": "➡️ Follow-up Needed", "color": "yellow"},
+                        {"name": "❌ Negative", "color": "red"},
+                        {"name": "🔇 No Response", "color": "gray"},
+                    ]
+                }
+            },
+            "Deal": {"relation": {"database_id": deals_id, "dual_property": {}}},
+            "Person": {"relation": {"database_id": people_id, "dual_property": {}}},
+            "Company": {"relation": {"database_id": companies_id, "dual_property": {}}},
+            "Meeting": {"relation": {"database_id": meetings_id, "dual_property": {}}},
+            "Next Step": {"rich_text": {}},
+            "Next Step Date": {"date": {}},
+            "Notes": {"rich_text": {}},
+            "Owner": {"people": {}},
+        },
+        "⚡",
+    )
+
+
+# Formula text is copied verbatim from scripts/crm/crm_add_activity_rollups.py —
+# those expressions are the ones proven against the live workspace. Notion
+# formula 1.0 (what the API speaks) cannot reference other formula properties and
+# only takes 2-argument and()/or(), hence the inlining and the nesting.
+_TERMINAL = (
+    'or(or(prop("Stage") == "Closed Won", prop("Stage") == "Closed Lost"), '
+    'prop("Stage") == "No Answer")'
+)
+_DAYS = 'dateBetween(now(), prop("Last Activity Date"), "days")'
+_DAYS_SINCE_SIMPLE = (
+    'if(empty(prop("Last Activity Date")), 999, '
+    'dateBetween(now(), prop("Last Activity Date"), "days"))'
+)
+
+
+async def _add_activity_rollups(
+    client: httpx.AsyncClient,
+    *,
+    deals_id: str,
+    people_id: str,
+    companies_id: str,
+    activities_id: str,
+) -> None:
+    """Last Activity Date rollups + the pipeline formulas that read them.
+
+    This is what makes one logged call show up on the deal, the contact and the
+    company. Each rollup keys on the *resolved* back-relation name, so unlike the
+    one-shot script this cannot 400 on a guessed property name — which is why a
+    failure here is raised rather than warned about.
+    """
+    for db_id, label in ((deals_id, "Leads"), (people_id, "People"), (companies_id, "Companies")):
+        relation = await _resolve_back_relation(client, db_id, activities_id, "Activities")
+        await _patch_db(
+            client,
+            db_id,
+            {
+                "Last Activity Date": {
+                    "rollup": {
+                        "relation_property_name": relation,
+                        "rollup_property_name": "Date",
+                        "function": "latest_date",
+                    }
+                }
+            },
+            what=f"{label} Last Activity Date rollup",
+        )
+
+    await _patch_db(
+        client,
+        deals_id,
+        {
+            "Days Since Last Activity": {
+                "formula": {
+                    "expression": (
+                        f"if({_TERMINAL}, 0, "
+                        'if(empty(prop("Last Activity Date")), 999, '
+                        'dateBetween(now(), prop("Last Activity Date"), "days")))'
+                    )
+                }
+            },
+            "Deal Age (days)": {
+                "formula": {"expression": 'dateBetween(now(), prop("Created time"), "days")'}
+            },
+            "Next Step Scheduled": {
+                "formula": {"expression": 'not(empty(prop("Next Step Date")))'}
+            },
+            "Weighted Value (€)": {
+                "formula": {
+                    "expression": 'round(prop("Value (euros)") * prop("Probability (%)") / 100)'
+                }
+            },
+        },
+        what="Leads base formulas",
+    )
+
+    await _patch_db(
+        client,
+        deals_id,
+        {
+            "Deal Temperature": {
+                "formula": {
+                    "expression": (
+                        f'if({_TERMINAL}, "—", '
+                        f'if(empty(prop("Last Activity Date")), "❄️ Cold", '
+                        f'if({_DAYS} <= 7, "🔥 Hot", '
+                        f'if({_DAYS} <= 21, "🌡 Warm", '
+                        '"❄️ Cold"))))'
+                    )
+                }
+            },
+            "Stale Deal": {
+                "formula": {
+                    "expression": (
+                        f"and(not({_TERMINAL}), "
+                        f'and(empty(prop("Next Step")), '
+                        f'if(empty(prop("Last Activity Date")), true, {_DAYS} > 14)))'
+                    )
+                }
+            },
+        },
+        what="Leads temperature and stale formulas",
+    )
+
+    for db_id, label in ((people_id, "People"), (companies_id, "Companies")):
+        await _patch_db(
+            client,
+            db_id,
+            {"Days Since Last Activity": {"formula": {"expression": _DAYS_SINCE_SIMPLE}}},
+            what=f"{label} Days Since Last Activity formula",
+        )
+
+
+async def _seed_meeting_and_activity(
+    client: httpx.AsyncClient,
+    *,
+    meetings_id: str,
+    activities_id: str,
+    company_id: str,
+    person_id: str,
+    deal_id: str,
+) -> None:
+    """One meeting and one activity, so neither database opens as an empty shell."""
+    today = date.today().isoformat()
+    meeting_id = await _create_db_page(
+        client,
+        meetings_id,
+        {
+            "Name": {"title": _rt("Discovery call — Néorégie Grid")},
+            "Date": {"date": {"start": today}},
+            "Type": {"select": {"name": "Discovery"}},
+            "Meeting Objective": {"rich_text": _rt("Qualify the need and agree a next step.")},
+            "Company": {"relation": [{"id": company_id}]},
+            "People": {"relation": [{"id": person_id}]},
+            "Deal": {"relation": [{"id": deal_id}]},
+            "Tags": {"multi_select": [{"name": "meeting"}]},
+        },
+    )
+    await _create_db_page(
+        client,
+        activities_id,
+        {
+            "Name": {"title": _rt("Discovery call")},
+            "Type": {"select": {"name": "📞 Call"}},
+            "Date": {"date": {"start": today}},
+            "Duration (min)": {"number": 30},
+            "Outcome": {"select": {"name": "➡️ Follow-up Needed"}},
+            "Deal": {"relation": [{"id": deal_id}]},
+            "Person": {"relation": [{"id": person_id}]},
+            "Company": {"relation": [{"id": company_id}]},
+            "Meeting": {"relation": [{"id": meeting_id}]},
+            "Next Step": {"rich_text": _rt("Send a short recap and propose a demo.")},
+            "Next Step Date": {"date": {"start": today}},
+        },
+    )
 
 
 async def _seed_notions(client: httpx.AsyncClient, notions_id: str) -> None:
@@ -835,8 +1163,18 @@ async def create_crm_workspace(
                 }
             },
             "Tech Stack": {"multi_select": {"options": []}},
-            "Activities": {"multi_select": {"options": []}},
+            # No "Activities" property here: it is created as the reverse side of
+            # Activities.Company (dual relation) and the rollups key on it. A
+            # multi_select of the same name would collide.
             "Tags": {"multi_select": {"options": []}},
+            # French-market core (spec §3.4) — present before first enrichment so
+            # they are visible columns, not a surprise. company-open-data-enrichment
+            # writes these; upsert_companies writes SIREN on create.
+            "SIREN": {"rich_text": {}},
+            "CA": {"number": {"format": "euro"}},
+            "Résultat net": {"number": {"format": "euro"}},
+            "Marge nette %": {"number": {"format": "percent"}},
+            "Année financière": {"number": {"format": "number"}},
             "Notes": {"rich_text": {}},
         },
         "🏭",
@@ -900,7 +1238,7 @@ async def create_crm_workspace(
     deals_id = await _create_db(
         client,
         crm_page_id,
-        "Deals",
+        "Leads",
         {
             "Name": {"title": {}},
             "Client": {"relation": {"database_id": companies_id, "single_property": {}}},
@@ -910,8 +1248,10 @@ async def create_crm_workspace(
                     "options": [
                         {"name": "Prospect", "color": "gray"},
                         {"name": "Qualified", "color": "blue"},
+                        {"name": "Discovery / First Meeting", "color": "purple"},
                         {"name": "Proposal Sent", "color": "yellow"},
                         {"name": "Negotiation", "color": "orange"},
+                        {"name": "Waiting for a Response", "color": "brown"},
                         {"name": "Closed Won", "color": "green"},
                         {"name": "Closed Lost", "color": "red"},
                         {"name": "No Answer", "color": "default"},
@@ -925,31 +1265,69 @@ async def create_crm_workspace(
             "Product": {
                 "multi_select": {
                     "options": [
-                        {"name": "HPC-as-a-service"},
                         {"name": "Consulting"},
-                        {"name": "Optimization"},
+                        {"name": "Software"},
                         {"name": "Training"},
+                        {"name": "Other"},
                     ]
                 }
             },
             "Lead Source": {
                 "select": {
                     "options": [
-                        {"name": "Prospection froide", "color": "gray"},
-                        {"name": "Prospection tiède", "color": "yellow"},
-                        {"name": "Prospection chaude", "color": "orange"},
-                        {"name": "Lead qualifié", "color": "green"},
+                        {"name": "Cold Outreach", "color": "gray"},
+                        {"name": "Referral", "color": "green"},
+                        {"name": "Inbound", "color": "blue"},
+                        {"name": "Conference / Event", "color": "purple"},
+                        {"name": "Partner", "color": "orange"},
+                        {"name": "Existing Relationship", "color": "brown"},
+                        {"name": "LinkedIn", "color": "pink"},
                     ]
                 }
             },
             "Notes": {"rich_text": {}},
+            "Expected Close Date": {"date": {}},
+            "Primary contact": {"relation": {"database_id": people_id, "single_property": {}}},
+            # Deal Age (days) reads prop("Created time"); the built-in is only
+            # addressable from a formula once it exists as a property.
+            "Created time": {"created_time": {}},
+            "Owner": {"people": {}},
         },
         "💼",
     )
 
+    # Meetings before Activities: Activities holds the relation into Meetings,
+    # and its dual creates the reverse side, so Meetings must already exist.
+    meetings_id = await _create_meetings_db(client, crm_page_id, companies_id, people_id, deals_id)
+    activities_id = await _create_activities_db(
+        client, crm_page_id, companies_id, people_id, deals_id, meetings_id
+    )
+
+    # Name the reverse side of the Meetings relations before the rollup pass, so
+    # a deployed workspace reads "Meetings" rather than "Related to Meetings…".
+    for parent in (deals_id, people_id, companies_id):
+        await _resolve_back_relation(client, parent, meetings_id, "Meetings")
+
+    await _add_activity_rollups(
+        client,
+        deals_id=deals_id,
+        people_id=people_id,
+        companies_id=companies_id,
+        activities_id=activities_id,
+    )
+
     company_ids = await _seed_companies(client, companies_id)
     people_ids = await _seed_people(client, people_id, company_ids)
-    await _seed_deals(client, deals_id, company_ids, people_ids)
+    deal_ids = await _seed_deals(client, deals_id, company_ids, people_ids)
+    if company_ids and people_ids and deal_ids:
+        await _seed_meeting_and_activity(
+            client,
+            meetings_id=meetings_id,
+            activities_id=activities_id,
+            company_id=next(iter(company_ids.values())),
+            person_id=next(iter(people_ids.values())),
+            deal_id=next(iter(deal_ids.values())),
+        )
     logger.info("workspace: CRM ready — page_id={}", crm_page_id)
 
     return CRMWorkspaceResult(
@@ -957,6 +1335,8 @@ async def create_crm_workspace(
         companies_id=companies_id,
         people_id=people_id,
         deals_id=deals_id,
+        meetings_id=meetings_id,
+        activities_id=activities_id,
     )
 
 
