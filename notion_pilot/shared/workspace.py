@@ -618,6 +618,21 @@ async def _patch_db(
     logger.info("workspace: {} applied to {}", what, db_id)
 
 
+def find_relation_properties(properties: dict[str, Any], target_db_id: str) -> list[str]:
+    """Names of the relation properties in `properties` that point at `target_db_id`.
+
+    Ids are compared with dashes stripped: Notion returns them dashed from
+    /databases but callers often hold the undashed form from a page URL.
+    """
+    target = target_db_id.replace("-", "")
+    return [
+        name
+        for name, prop in properties.items()
+        if prop.get("type") == "relation"
+        and str(prop.get("relation", {}).get("database_id", "")).replace("-", "") == target
+    ]
+
+
 async def _resolve_back_relation(
     client: httpx.AsyncClient, parent_db_id: str, target_db_id: str, desired: str
 ) -> str:
@@ -634,13 +649,7 @@ async def _resolve_back_relation(
     """
     r = await client.get(f"{NOTION_API}/databases/{parent_db_id}")
     r.raise_for_status()
-    target = target_db_id.replace("-", "")
-    found = [
-        name
-        for name, prop in r.json().get("properties", {}).items()
-        if prop.get("type") == "relation"
-        and str(prop.get("relation", {}).get("database_id", "")).replace("-", "") == target
-    ]
+    found = find_relation_properties(r.json().get("properties", {}), target_db_id)
     if not found:
         raise RuntimeError(
             f"No relation from database {parent_db_id} to {target_db_id} was created. "
