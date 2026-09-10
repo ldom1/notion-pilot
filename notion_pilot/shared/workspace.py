@@ -511,13 +511,33 @@ _DEMO_DATA_TECH: list[JsonDict] = [
 # --- low-level helpers ---
 
 
-async def create_workspace_root_page(client: httpx.AsyncClient, name: str) -> str:
-    """Create a top-level page in the user's Notion workspace. Returns the page ID."""
-    logger.info("workspace: creating root page '{}'", name)
+async def create_workspace_root_page(
+    client: httpx.AsyncClient, name: str, parent_page_id: str | None = None
+) -> str:
+    """Create the deploy root page. Returns the page ID.
+
+    Without ``parent_page_id`` the page is created at the top level of the
+    workspace, which **only works for a public-integration OAuth token**. An
+    internal integration is rejected:
+
+        "Internal integrations aren't owned by a single user, so creating
+         workspace-level private pages is not supported."
+
+    Passing a parent page makes the deploy work for either kind of token, and is
+    the only way to confine a deploy — see the wizard parent-page design.
+    """
+    parent: dict[str, Any] = (
+        {"type": "page_id", "page_id": parent_page_id} if parent_page_id else {"workspace": True}
+    )
+    logger.info(
+        "workspace: creating root page '{}' ({})",
+        name,
+        f"under {parent_page_id}" if parent_page_id else "workspace top level",
+    )
     r = await client.post(
         f"{NOTION_API}/pages",
         json={
-            "parent": {"workspace": True},
+            "parent": parent,
             "icon": {"type": "emoji", "emoji": "🚀"},
             "properties": {"title": {"title": [{"type": "text", "text": {"content": name}}]}},
             "children": _ROOT_CHILDREN,

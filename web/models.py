@@ -11,6 +11,9 @@ class SetupRequest(BaseModel):
     scope: Literal["crm", "inbox", "both"]
     workspace_name: str
     notion_token: str | None = None
+    # Where to put the deploy. None means the top level of the workspace, which
+    # Notion only permits for public-integration OAuth tokens.
+    parent_page_id: str | None = None
 
 
 class SetupResponse(BaseModel):

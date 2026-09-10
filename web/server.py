@@ -47,7 +47,12 @@ from web.config import (
     save_memory,
     save_workflows,
 )
-from web.notion_db import format_notion_error, query_all_pages, query_db_status
+from web.notion_db import (
+    format_notion_error,
+    page_title,
+    query_all_pages,
+    query_db_status,
+)
 from web.models import (
     ChatRequest,
     CockpitConfigRequest,
@@ -323,7 +328,9 @@ def create_app(settings: Settings) -> FastAPI:
             )
         try:
             async with httpx.AsyncClient(headers=notion_headers(token), timeout=60) as client:
-                root_page_id = await create_workspace_root_page(client, req.workspace_name)
+                root_page_id = await create_workspace_root_page(
+                    client, req.workspace_name, req.parent_page_id
+                )
                 if req.scope in ("crm", "both"):
                     await create_crm_workspace(client, root_page_id)
                 if req.scope in ("inbox", "both"):
@@ -349,7 +356,9 @@ def create_app(settings: Settings) -> FastAPI:
             try:
                 async with httpx.AsyncClient(headers=notion_headers(token), timeout=120) as client:
                     yield sse("log", message="Creating root page…")
-                    root_page_id = await create_workspace_root_page(client, req.workspace_name)
+                    root_page_id = await create_workspace_root_page(
+                        client, req.workspace_name, req.parent_page_id
+                    )
                     yield sse("log", message="✓ Root page created")
 
                     db_ids: dict[str, str] = {}
@@ -463,6 +472,89 @@ def create_app(settings: Settings) -> FastAPI:
                 "error": format_notion_error(exc),
                 "notion_name": None,
             }
+
+    @app.get("/api/setup/capabilities")
+    async def setup_capabilities(request: Request) -> dict:
+        """What placements this token can actually use.
+
+        An internal integration cannot create a workspace-level page at all, so
+        the wizard has to require a parent for it. `bot.owner.type` is
+        "workspace" for an internal integration and "user" for a
+        public-integration OAuth token (which is what build_authorize_url
+        requests). Verified for the internal case against the live API.
+
+        Fails soft: if the probe cannot answer, claim top level is available and
+        let the deploy surface Notion's own message. A broken probe must never
+        block a deploy that would have worked.
+        """
+        token = _require_token(request)
+        try:
+            async with httpx.AsyncClient(headers=notion_headers(token), timeout=15) as client:
+                r = await client.get(f"{NOTION_API}/users/me")
+                r.raise_for_status()
+                me = r.json()
+        except Exception as exc:  # noqa: BLE001 — degrade, never block
+            logger.warning("capabilities probe failed, assuming top level is allowed: {}", exc)
+            return {"can_create_top_level": True, "owner_type": None, "workspace_name": ""}
+
+        bot = me.get("bot", {}) or {}
+        owner_type = (bot.get("owner", {}) or {}).get("type")
+        return {
+            "can_create_top_level": owner_type != "workspace",
+            "owner_type": owner_type,
+            "workspace_name": bot.get("workspace_name", "") or "",
+        }
+
+    @app.get("/api/cockpit/notion-pages")
+    async def cockpit_notion_pages(request: Request, q: str = "") -> dict:
+        """Pages this integration can see, as deploy-parent candidates.
+
+        Deliberately a list rather than a free-text id field: an id the
+        integration has no access to fails with Notion's "make sure the relevant
+        pages are shared" 404, which is this product's most confusing error.
+        Offering only reachable pages makes it unreachable.
+
+        Bounded by *requests*, not by results. /v1/search returns pages and
+        database rows together, and this filters the rows out — so on a real CRM
+        (1,200 companies, 1,800 people) an unbounded walk pages through
+        thousands of records to collect a handful of container pages. Measured:
+        45s. One search call is 0.8s, hence the cap plus the `q` passthrough so
+        the user can narrow instead of waiting.
+        """
+        token = _require_token(request)
+        max_requests = 3
+        pages: list[dict] = []
+        cursor: str | None = None
+        truncated = False
+
+        async with httpx.AsyncClient(headers=notion_headers(token), timeout=25) as client:
+            for attempt in range(max_requests):
+                payload: dict = {
+                    "filter": {"property": "object", "value": "page"},
+                    "sort": {"direction": "descending", "timestamp": "last_edited_time"},
+                    "page_size": 100,
+                }
+                if q.strip():
+                    payload["query"] = q.strip()
+                if cursor:
+                    payload["start_cursor"] = cursor
+                r = await client.post(f"{NOTION_API}/search", json=payload)
+                r.raise_for_status()
+                data = r.json()
+                for page in data.get("results", []):
+                    # Rows inside a database are records, not containers.
+                    if (page.get("parent", {}) or {}).get("type") == "database_id":
+                        continue
+                    pages.append({"id": page["id"], "name": page_title(page)})
+                if not data.get("has_more"):
+                    break
+                cursor = data.get("next_cursor")
+                if attempt == max_requests - 1:
+                    truncated = True
+
+        seen: set[str] = set()
+        unique = [p for p in pages if not (p["id"] in seen or seen.add(p["id"]))]
+        return {"pages": unique, "truncated": truncated}
 
     @app.get("/api/cockpit/notion-databases")
     async def cockpit_notion_databases(request: Request) -> dict:
