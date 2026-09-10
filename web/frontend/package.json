@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "e2e": "playwright test wizard.spec.ts",
+    "e2e:ui": "playwright test --ui",
+    "e2e:live": "playwright test wizard-live.spec.ts"
   },
   "dependencies": {
     "@xyflow/react": "^12.6.4",
@@ -15,6 +18,7 @@
     "react-router-dom": "^7.6.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/react": "^19.1.5",
     "@types/react-dom": "^19.1.5",
     "@vitejs/plugin-react": "^4.5.2",
