@@ -185,12 +185,22 @@ async def test_live_crm_activities_back_relations_are_discoverable(notion):
 
 
 @pytest.fixture
-async def scratch_parent() -> str:
+async def scratch_parent(notion) -> str:
     page_id = os.environ.get("NOTION_INTEGRATION_PARENT_PAGE_ID")
     if not page_id:
         pytest.skip(
             "set NOTION_INTEGRATION_PARENT_PAGE_ID to a throwaway Notion page to run the "
             "write round-trip (it creates and archives two databases under that page)"
+        )
+    # A page that exists but has not been shared with the integration returns 404
+    # here. That is a setup step, not a product failure, so skip with the fix
+    # rather than failing and looking like the schema logic is broken.
+    r = await notion.get(f"{NOTION_API}/pages/{page_id}")
+    if r.status_code != 200:
+        pytest.skip(
+            f"scratch page {page_id} is not reachable ({r.status_code}). In Notion open that "
+            "page -> ... -> Connections -> add the integration whose token this run uses, "
+            "then re-run."
         )
     return page_id
 
