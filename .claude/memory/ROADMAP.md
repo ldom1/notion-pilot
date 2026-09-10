@@ -144,8 +144,30 @@ Target: 4 custom knowledge DBs — Notions, Ideas, Tools, Data & Technology.
 - CRM v1 (2026-09-10, PR #28): the deploy wizard now creates five databases with rollups and formulas. Still out of scope from that spec: the Meetings→Activities poller (needs a persisted token and a running job), Notion views/dashboard/automation (the API cannot create them — see `scripts/crm/NOTION_UI_STEPS.md`), and OAuth token persistence for multi-tenant automation.
 - Landing + cockpit (2026-09-10, PR #27): three appendix screenshots and the CTA booking link in the executive deck are still placeholders. The `.claude-plugin` marketplace manifests are schema-correct but unverified — run `/plugin marketplace add ldom1/notion-pilot` once before advertising it on the site.
 
+## Next up (2026-09-11) — ordered
+
+1. **Land the stack.** #28 → `develop`, then #29 (stacked on #28), then #27. Squash-merge, delete branches. Only #27 touches `.claude/memory/`.
+2. **Verify `bot.owner.type == "user"`** with one real OAuth token. It is the only unproven half of the wizard's capability probe. If it turns out ambiguous, switch to the probe-free fallback the parent-page spec describes (attempt top level, re-prompt on the specific 400).
+3. **Run `/plugin marketplace add ldom1/notion-pilot`** once, to confirm the `.claude-plugin` manifests work before the landing page advertises a two-line install.
+4. **Look at the cockpit in a browser** after `make dev` — it was retokenised without visual verification. Selected-tab contrast and the dark log panel are the risky spots.
+5. **Add `NOTION_MEETINGS_DATABASE_ID` to `.env.example`** (a permission rule blocked Bash on that file this session).
+6. **Fill the deck's three appendix screenshots and the CTA booking link** before it leaves the building — `docs/marketing/README.md` has the checklist.
+
 ## Later
 <!-- added by ai-dotfiles upgrade -->
+
+### Closing the readiness audit
+`docs/notion-pilot-crm-readiness-audit.md` is the source of truth. The schema half is closed by #28/#29. Still open, in rough value order:
+
+- **Persist OAuth tokens server-side.** They live only in the signed cookie (`web/server.py`), so no background job — Telegram, the meetings poller, any scheduled enrichment — can act on a workspace someone connected through the wizard. This is the single biggest gap between "the wizard works" and "the product works".
+- **Per-request token for the MCP server.** `notion_pilot/mcp/server.py` binds one static workspace at import, so it cannot serve per-user OAuth. Fine for single-tenant, a cross-tenant leak if the hosted wizard ever gets real customers — keep `MCP_BEARER_TOKEN` private until then.
+- **Legacy `data_sources` vs `databases`.** The reference Artelys workspace has People and Companies as data sources; `_add_activity_rollups` PATCHes `/databases/{id}`. Wizard-deployed workspaces are unaffected, but any tooling pointed at Artelys needs the data-sources path.
+
+### From the CRM v1 spec, deliberately out of scope
+Meetings→Activities poller (needs a persisted token and a running job), Notion views / dashboard / database automations (the API cannot create them — `scripts/crm/NOTION_UI_STEPS.md` explains why), `Projet`/Projects relations (would need a sixth database the product does not own).
+
+### Marketing, not yet started
+The `launch` and `directory-submissions` skills were never run. Both are channel strategy and are better done *after* the audit gaps above close — a Product Hunt push against a wizard that cannot persist a token would burn the launch. `.agents/product-marketing.md` is the positioning doc they read from; it records **no invented metrics**, and proof points are marked "collect from the first three pilot users".
 
 ## Won't Do
 <!-- added by ai-dotfiles upgrade -->

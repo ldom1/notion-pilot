@@ -132,7 +132,61 @@ web/
 - **New (2026-07-24):** `naf_section_to_sector()` in `siren_lookup.py` doesn't match the live Companies Sector select options — needs a fix (either update the hardcoded vocabulary or read the DB's actual options at runtime) before it's used for real again.
 - **New (2026-07-24):** the Companies data source has no `Notes` property — the `company-open-data-enrichment` skill's BODACC/dirigeants `[open-data]` block plan doesn't apply to this real workspace as written; needs either a schema addition (with explicit `go`) or a skill-doc correction.
 - **New (2026-09-10):** two PRs open against `develop`, both CI-green, awaiting review — **#27** (landing page redesign + cockpit on the shared design system + CRM readiness audit + marketing deck) and **#28** (CRM v1 schema: Activities + Meetings in the deploy wizard). Neither is merged.
-- **Blocking before #28 merges:** the back-relation discovery has **never run against the real Notion API** — every test is mocked. One live deploy must confirm three things: that `dual_property: {}` yields a reverse property on `GET /databases/{id}`; that renaming a synced property via `PATCH /databases` is permitted; that the rollup then succeeds (the old script carried `allow_400` because it often did not).
+- **Resolved (2026-09-10, was blocking #28):** the back-relation behaviour is now **proven against the real Notion API**, not assumed. `dual_property: {}` does create a reverse property; Notion names it `Related to <child db> (<property>)`, **not** the target's name; the rename to `Activities` succeeds; and a rollup keyed on the resolved name is accepted. Hardcoding `"Activities"` would have keyed a rollup on a nonexistent property → 400 → aborted deploy, so `_resolve_back_relation` is load-bearing rather than defensive.
 - **New (2026-09-10):** `.env.example` still lacks `NOTION_MEETINGS_DATABASE_ID`. A permission rule blocks Bash access to that file, so it was left alone; the `Settings` field exists, so the variable already works.
 - **Resolved (2026-09-10):** the readiness audit (`docs/notion-pilot-crm-readiness-audit.md`) answered "is the public integration end-to-end ready" — no, and #28 closes the schema half of it. Still open from that audit: OAuth tokens live only in the signed cookie (`web/server.py`), so no background job can act on a workspace connected through the wizard, and the `notion-crm` MCP server binds one static workspace at import so it cannot serve per-user OAuth.
+
+## Where the work stands (2026-09-11)
+
+**Three PRs open, stacked. Nothing merged yet.**
+
+| PR | Branch → base | Contents |
+|---|---|---|
+| [#27](https://github.com/ldom1/notion-pilot/pull/27) | `feat/landing-and-cockpit-redesign` → `develop` | Landing page rewrite, cockpit on the shared token layer, readiness audit, executive deck, `.claude-plugin` manifests, product-marketing doc, **this project brain** |
+| [#28](https://github.com/ldom1/notion-pilot/pull/28) | `feat/crm-v1-schema` → `develop` | CRM v1 schema (Activities + Meetings in the wizard, rollups, SIREN/finance, English vocabulary), cockpit `log-activity`, Notion contract integration tests, Playwright suite |
+| [#29](https://github.com/ldom1/notion-pilot/pull/29) | `feat/wizard-parent-page` → **`feat/crm-v1-schema`** | Deploy wizard can target a parent page; capability probe; searchable page picker |
+
+**Merge order matters.** #29 is stacked on #28, so land #28 first (or merge #29 into #28 and land them together), then #27. Only #27 touches `.claude/memory/` — deliberately, so the other two cannot conflict on it.
+
+`develop` was published this session as the remote integration base (it had existed only locally, 60 commits behind `main` with zero unique commits, so refreshing it to `main` discarded nothing). CI already gates its integration-test job on that branch name.
+
+## Verified against the live Notion API (do not re-litigate)
+
+- A dual relation's reverse property is auto-named `Related to <db> (<prop>)`; `synced_property_name` is read-only on create. Renaming it afterwards works, and a rollup on the resolved name is accepted.
+- `parent: {"workspace": true}` is **rejected for internal integrations**: *"Internal integrations aren't owned by a single user, so creating workspace-level private pages is not supported."* Only a public-integration OAuth token can create top-level pages.
+- `GET /v1/users/me` → `bot.owner.type == "workspace"` for an internal integration. (The `"user"` value for an OAuth token is **still unverified** — only an internal token was available.)
+- With a parent page, an internal-integration token completes a full five-database wizard deploy in ~30s. Both test deploys were archived.
+- The live CRM's People and Companies are on the legacy `data_sources` API, so `GET /databases/{id}` 404s on them. A wizard-deployed workspace creates all five as real `databases`, so this only affects tooling pointed at the Artelys workspace.
+- `/v1/search` returns pages **and** database rows together. One call is ~0.8s; walking a real CRM to collect container pages took 45s, which is why the pages endpoint is bounded by requests and accepts a query.
+
+## Active blockers / unknowns
+
+- **`bot.owner.type == "user"` unverified.** The capability probe fails soft (assumes top level is allowed), so a wrong answer degrades to previous behaviour rather than blocking. Confirm with one real OAuth token; the parent-page spec names a probe-free fallback if it is ambiguous.
+- **`.env.example` still lacks `NOTION_MEETINGS_DATABASE_ID`.** A permission rule blocks Bash on that file. The `Settings` field exists, so the variable works — this is a docs gap only.
+- **`.claude-plugin` manifests unverified.** Schema-correct but `/plugin` cannot be invoked non-interactively. Run `/plugin marketplace add ldom1/notion-pilot` once before advertising it.
+- **Cockpit is visually unverified.** It needs a live Notion session to render; only compilation and token resolution were checked. Wants eyes on selected-tab contrast and the dark log panel after `make dev`.
+
+## Resuming: the commands that matter
+
+```bash
+# full CI gate locally
+uv run ruff check . && uv run ruff format --check . \
+  && uv run mypy notion_pilot && uv run pylint notion_pilot --fail-under=9.5 \
+  && uv run pytest tests/unit -q
+cd web/frontend && npm run build && npm run e2e      # 436 unit + 10 hermetic e2e
+
+# real-Notion tests (prod Infisical trips an OAuth-localhost guard, hence the override)
+export INFISICAL_ENV=prod \
+  NOTION_OAUTH_REDIRECT_URI="https://notion-pilot.dombot.tech/auth/notion/callback"
+uv run pytest tests/integration/test_notion_schema_contract.py -v -s   # needs the scratch page shared
+
+# live wizard deploy (creates and archives a real page under the scratch parent)
+uv run uvicorn web.server:app_factory --factory --port 8099            # note: app_factory, not create_app
+uv run python scripts/e2e/mint_session.py --base-url http://127.0.0.1:8099
+cd web/frontend && E2E_LIVE_BASE_URL=http://127.0.0.1:8099 \
+  E2E_NOTION_PARENT_PAGE_ID=3d76c451-9465-80f3-9ee8-dd9f840f31bf \
+  E2E_NOTION_TOKEN=<token> npm run e2e:live
+```
+
+Scratch page for real-API tests: **99 - Integration** (`3d76c451-9465-80f3-9ee8-dd9f840f31bf`), shared with the integration. Delete `web/frontend/e2e/.auth/state.json` when done — it holds a real token.
 
