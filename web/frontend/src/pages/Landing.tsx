@@ -354,7 +354,7 @@ const REC_ROTTED: RecRow[] = [
 const EVOLVE: [string, string][] = [
   [
     "We deploy a sensible CRM",
-    "Companies, People, Leads, Activities — relations wired, stages filled, views that make sense on day one.",
+    "Five databases — Companies, People, Leads, Activities, Meetings — relations wired, stages filled, and the pipeline formulas already computing.",
   ],
   [
     "You reshape it",
@@ -477,6 +477,14 @@ export default function Landing() {
                 See the data model
               </a>
             </div>
+            <p className="lp-scope">
+              <Icon name="shield" size={16} />
+              <span>
+                A CRM for teams working with <strong>French companies</strong> — every company
+                enriches automatically from open company data (SIRENE registry, financial filings).
+                Companies outside France are skipped, not enriched.
+              </span>
+            </p>
             <div className="lp-hero-terms">
               <span className="lp-term">
                 <Icon name="server" size={16} /> Self-hosted
