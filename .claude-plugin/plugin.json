@@ -1,0 +1,14 @@
+{
+  "name": "notion-crm",
+  "version": "0.1.0",
+  "description": "Operate a Notion CRM from your AI assistant — leads, activities, people and companies, with dedup, enrichment and human-in-the-loop writes.",
+  "author": {
+    "name": "Louis Giron",
+    "github": "ldom1"
+  },
+  "homepage": "https://github.com/ldom1/notion-pilot",
+  "repository": "https://github.com/ldom1/notion-pilot",
+  "license": "MIT",
+  "keywords": ["notion", "crm", "mcp", "sales", "pipeline"],
+  "skills": "./skills/"
+}
