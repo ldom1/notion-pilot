@@ -1,0 +1,589 @@
+{
+  "_comment": "All deck copy lives here. Edit text freely, then rebuild with: uv run python scripts/marketing/generate_crm_deck.py — see docs/marketing/README.md. Slide numbers are computed automatically, so slides can be reordered, added or removed without renumbering anything.",
+  "meta": {
+    "version": "2026-09-01",
+    "font": "Segoe UI",
+    "footer": "Notion Pilot · CRM automation for Notion",
+    "docTitle": "Notion Pilot — CRM executive deck",
+    "docAuthor": "Notion Pilot",
+    "docSubject": "Replacing a spreadsheet CRM with Notion, maintained by AI under human control",
+    "docKeywords": "Notion, CRM, MCP, automation, self-hosted, pipeline"
+  },
+  "slides": [
+    {
+      "id": "title",
+      "kind": "title",
+      "hero": "Stop maintaining your CRM.|Start trusting it.",
+      "tagline": "Capture anywhere → Structure in Notion → Maintain with AI assistants under human control",
+      "pills": [
+        [
+          "1",
+          "Capture"
+        ],
+        [
+          "2",
+          "Structure in Notion"
+        ],
+        [
+          "3",
+          "Maintain with AI"
+        ]
+      ],
+      "footer": "Self-hosted · human-in-the-loop · Notion stays the source of truth",
+      "purpose": "Set the executive promise before introducing any product detail.",
+      "notes": "Open with CRM adoption and data freshness, not product features."
+    },
+    {
+      "id": "spreadsheet",
+      "kind": "rows",
+      "phase": "PART 1 — THE FOUNDATION",
+      "accent": "phase1",
+      "hero": "Your pipeline is a spreadsheet nobody trusts after Tuesday",
+      "support": "Excel never crashes. It just quietly goes out of date.",
+      "split": 0.38,
+      "rows": [
+        [
+          "The spreadsheet CRM today",
+          "What it costs you"
+        ],
+        [
+          "One person keeps it current",
+          "As fresh as their last free hour"
+        ],
+        [
+          "Rows that don't know each other",
+          "Company, contact and deal history never join up"
+        ],
+        [
+          "A copy in everyone's inbox",
+          "Five versions, no agreed truth"
+        ],
+        [
+          "Reports rebuilt by hand",
+          "Numbers arrive late — and get argued with"
+        ],
+        [
+          "The big-CRM fix",
+          "Per-seat cost, rigid workflows, same stale data"
+        ]
+      ],
+      "purpose": "Start from the spreadsheet CRM the audience actually runs today.",
+      "notes": "Excel is the baseline; the last row is the bridge, not the main point. Not a guaranteed Salesforce replacement."
+    },
+    {
+      "id": "notion-foundation",
+      "kind": "cards3",
+      "phase": "PART 1 — THE FOUNDATION",
+      "accent": "phase1",
+      "hero": "Notion is already a database. Let's make it your CRM.",
+      "support": "Companies, People, Deals — linked, with the context on the same page.",
+      "cards": [
+        [
+          "C",
+          "Companies",
+          "Organizations, firmographics, and relationships"
+        ],
+        [
+          "P",
+          "People",
+          "Contacts, roles, and professional context"
+        ],
+        [
+          "D",
+          "Deals",
+          "Pipeline stages, value, and outcomes"
+        ]
+      ],
+      "callout": "Relations keep the three in sync — one company, one contact, one pipeline, no retyping.",
+      "purpose": "Show that Notion is a credible, flexible CRM foundation.",
+      "notes": "Notion is the system of record; some deployments label Deals as Leads."
+    },
+    {
+      "id": "schema",
+      "kind": "schema",
+      "phase": "PART 1 — THE FOUNDATION",
+      "accent": "phase1",
+      "hero": "Five databases. One relational spine.",
+      "support": "Every record joins up — a call logged today shows on the deal, the contact and the company.",
+      "hub": [
+        "Leads / Deals",
+        "Stage · value · probability · expected close · stale flag"
+      ],
+      "left": [
+        [
+          "Companies",
+          "Sector · Tier · SIREN · CA · country",
+          "1 company → n deals",
+          "auto"
+        ],
+        [
+          "People",
+          "Position · seniority · email · LinkedIn",
+          "1 contact → n deals",
+          "auto"
+        ]
+      ],
+      "right": [
+        [
+          "Activities",
+          "Type · date · outcome · next step",
+          "1 deal → n activities",
+          "auto"
+        ],
+        [
+          "Meetings",
+          "Notes · attendees · linked deal",
+          "meeting notes",
+          "manual"
+        ]
+      ],
+      "callout": "Notion Pilot reads and writes the four automated databases. Meetings stays human — and the default deploy creates only three.",
+      "purpose": "Show the full CRM data model and which parts Notion Pilot actually maintains.",
+      "notes": "Five databases, not four: Meetings is a real database, related from Activities.Meeting and People.Meetings. A meeting is ALSO an Activity type — both are true. Notion Pilot automates Companies/People/Leads/Activities; the public deploy currently creates only Companies/People/Leads. See docs/notion-pilot-crm-readiness-audit.md."
+    },
+    {
+      "id": "one-workspace",
+      "kind": "rows",
+      "phase": "PART 1 — THE FOUNDATION",
+      "accent": "phase1",
+      "hero": "One workspace. Every deal, with its whole story attached.",
+      "support": "Account history stops being a scavenger hunt.",
+      "split": 0.42,
+      "rows": [
+        [
+          "Before: fragmented",
+          "After: unified in Notion"
+        ],
+        [
+          "CRM in one tool, notes elsewhere",
+          "Records and context in one place"
+        ],
+        [
+          "Account history scattered",
+          "Linked timeline on each deal"
+        ],
+        [
+          "Leadership lacks visibility",
+          "Shared views across the company"
+        ]
+      ],
+      "purpose": "Demonstrate how Notion unifies pipeline, projects, and customer context.",
+      "notes": "Sell the Notion CRM vision for executives."
+    },
+    {
+      "id": "kpi",
+      "kind": "kpi",
+      "phase": "PART 1 — THE FOUNDATION",
+      "accent": "phase1",
+      "hero": "The weekly report that builds itself",
+      "support": "Rollups and formulas do the arithmetic. Views do the layout.",
+      "rows": [
+        [
+          "Pipeline KPI",
+          "Computed in Notion by"
+        ],
+        [
+          "Pipeline value by stage",
+          "Rollup on the Deals view, grouped by stage"
+        ],
+        [
+          "Win rate — won vs lost",
+          "Formula over Closed Won / Closed Lost"
+        ],
+        [
+          "Deal ageing and stale deals",
+          "Formula on last-activity date, surfaced in a view"
+        ],
+        [
+          "Activity volume per deal",
+          "Rollup from the Activities database"
+        ]
+      ],
+      "callout": "Every edit recomputes the numbers. Charts and dashboards are configuration work — not defaults.",
+      "purpose": "Answer the strongest spreadsheet objection — reporting — with native Notion mechanics.",
+      "notes": "Excel's charts are what people miss most. Dashboards are configuration work — do not promise a BI product."
+    },
+    {
+      "id": "governance",
+      "kind": "rows",
+      "phase": "PART 1 — THE FOUNDATION",
+      "accent": "phase1",
+      "hero": "Your data, in your region, under your IT's rules",
+      "support": "All of this comes from your Notion plan — confirm current terms with Notion.",
+      "split": 0.34,
+      "rows": [
+        [
+          "Notion Enterprise capability",
+          "What it means for us"
+        ],
+        [
+          "Choice of storage region",
+          "EU data residency is an Enterprise option — to be confirmed with Notion"
+        ],
+        [
+          "Workspace-wide collaboration",
+          "Shared pipeline views without a per-seat CRM licence"
+        ],
+        [
+          "SSO, SCIM, audit log",
+          "Access governance owned by IT, not by the CRM"
+        ],
+        [
+          "Teamspaces and permissions",
+          "Scope who sees which pipeline"
+        ]
+      ],
+      "purpose": "Address data-residency and governance questions before they derail the discussion.",
+      "notes": "Residency is a Notion Enterprise capability, not a Notion Pilot claim. Never state a guarantee from this deck — point to Notion's current terms."
+    },
+    {
+      "id": "maintenance",
+      "kind": "rows",
+      "phase": "PART 2 — THE ACCELERATION",
+      "accent": "phase2",
+      "hero": "The challenge is not managing a CRM. It is keeping the CRM alive.",
+      "support": "Customer data is born in a call. It dies on the way to the form.",
+      "split": 0.42,
+      "rows": [
+        [
+          "When data stays outside Notion",
+          "What breaks"
+        ],
+        [
+          "Delayed updates",
+          "Stale pipeline and missed follow-ups"
+        ],
+        [
+          "Duplicate records",
+          "Wasted outreach and confused ownership"
+        ],
+        [
+          "Incomplete records",
+          "Weak qualification and handoffs"
+        ],
+        [
+          "Manual data entry",
+          "CRM becomes admin work"
+        ]
+      ],
+      "purpose": "Pivot from Notion as foundation to the CRM maintenance problem.",
+      "notes": "Notion solves collaboration; Notion Pilot solves maintenance."
+    },
+    {
+      "id": "notion-pilot",
+      "kind": "flow",
+      "phase": "PART 2 — THE ACCELERATION",
+      "accent": "phase2",
+      "hero": "Notion Pilot does the typing. You keep the judgement.",
+      "support": "Self-hosted on your own server. Not a SaaS, not an autonomous agent.",
+      "quote": "“The AI proposes. The operator validates. Notion remains the source of truth.”",
+      "stages": [
+        [
+          "Capture",
+          "Telegram · email · AI assistants"
+        ],
+        [
+          "Notion Pilot",
+          "Match · dedup · enrich · preview"
+        ],
+        [
+          "Operator review",
+          "Confirm before anything is written"
+        ],
+        [
+          "Notion CRM",
+          "Companies · People · Deals · Activities"
+        ]
+      ],
+      "highlight": 1,
+      "caption": "Self-hosted end to end — no third-party SaaS sits between your team and your Notion workspace.",
+      "purpose": "Introduce Notion Pilot as the operator-controlled automation layer.",
+      "notes": "Operator-owned infrastructure that makes a Notion CRM sustainable."
+    },
+    {
+      "id": "capture",
+      "kind": "capture",
+      "phase": "PART 2 — THE ACCELERATION",
+      "accent": "phase2",
+      "hero": "The CRM comes to your team, not the other way round",
+      "support": "Telegram is the most mature surface today.",
+      "split": 0.34,
+      "rows": [
+        [
+          "Channel",
+          "CRM use"
+        ],
+        [
+          "Telegram",
+          "/lead · /people · /company · /deal"
+        ],
+        [
+          "AI assistants (MCP)",
+          "Search, prepare updates, log activities"
+        ],
+        [
+          "Web cockpit",
+          "Deploy, inspect DBs, run scripts"
+        ],
+        [
+          "Email (optional)",
+          "Route to People/Companies with dedup"
+        ]
+      ],
+      "chat_title": "Notion Pilot bot",
+      "chat": [
+        [
+          "me",
+          "/lead"
+        ],
+        [
+          "bot",
+          "Company? Contact? Source?"
+        ],
+        [
+          "me",
+          "Acme Énergie · J. Martin · inbound"
+        ],
+        [
+          "bot",
+          "Preview ready — 1 new Deal, 1 matched Company. Confirm?"
+        ]
+      ],
+      "chat_caption": "Illustration — Telegram capture flow",
+      "purpose": "Show where teams capture CRM information in daily workflows.",
+      "notes": "MCP details in appendix A1. The conversation panel is an illustration, not a screenshot — say so if asked."
+    },
+    {
+      "id": "data-quality",
+      "kind": "rows",
+      "phase": "PART 2 — THE ACCELERATION",
+      "accent": "phase2",
+      "hero": "Fast automation that creates duplicates is just faster mess",
+      "support": "Matching runs before the write; anything ambiguous goes to a human.",
+      "split": 0.34,
+      "rows": [
+        [
+          "Data quality capability",
+          "What it delivers"
+        ],
+        [
+          "Email & LinkedIn matching",
+          "Fewer duplicate contacts"
+        ],
+        [
+          "Fuzzy name + company search",
+          "Near-miss detection before write"
+        ],
+        [
+          "Duplicate scans",
+          "Conflicts surfaced for review"
+        ],
+        [
+          "Open data / Apollo / Brave",
+          "Richer company context when configured"
+        ]
+      ],
+      "purpose": "Prove that data quality improves before records reach Notion.",
+      "notes": "French open-data enrichment is deployment-specific."
+    },
+    {
+      "id": "lifecycle",
+      "kind": "journey",
+      "phase": "PART 2 — THE ACCELERATION",
+      "accent": "phase2",
+      "hero": "One message on Monday. A closed deal with its whole history.",
+      "support": "Won or lost — the reasoning stays attached.",
+      "chevrons": [
+        "Capture",
+        "Match",
+        "Review",
+        "Progress",
+        "Close"
+      ],
+      "input_title": "WHAT THE REP TYPES",
+      "input_quote": "\"Demo went well — proposal next week\"",
+      "input_caption": "One Telegram message. No form, no fields, no tab-switching.",
+      "output_title": "WHAT LANDS IN NOTION",
+      "output": [
+        [
+          "Company",
+          "Acme Énergie — matched, not duplicated"
+        ],
+        [
+          "Contact",
+          "J. Martin — role and email filled"
+        ],
+        [
+          "Deal",
+          "Stage moved to Proposal"
+        ],
+        [
+          "Activity",
+          "Demo logged against the deal"
+        ]
+      ],
+      "outcomes": [
+        "Closed Won",
+        "Closed Lost"
+      ],
+      "outcome_note": "Both outcomes keep the reasoning attached — \"why did we lose this\" is a search next year, not a memory.",
+      "purpose": "Walk through one end-to-end deal lifecycle from capture to close.",
+      "notes": "No invented revenue metrics."
+    },
+    {
+      "id": "trust",
+      "kind": "compare",
+      "phase": "PART 2 — THE ACCELERATION",
+      "accent": "phase2",
+      "hero": "Nothing gets written that you haven't seen",
+      "support": "MCP writes require explicit confirmation; Notion stays the source of truth.",
+      "is_title": "Notion Pilot IS",
+      "is": [
+        "A self-hosted automation layer",
+        "Human-in-the-loop on every write",
+        "Dry-run previews by default",
+        "Operator-owned and configurable"
+      ],
+      "isnot_title": "Notion Pilot IS NOT",
+      "isnot": [
+        "A packaged SaaS CRM",
+        "An autonomous sales agent",
+        "A black-box data overwrite",
+        "Zero-config plug-and-play"
+      ],
+      "purpose": "Build executive trust through honest, transparent positioning.",
+      "notes": "Trust slide for executives."
+    },
+    {
+      "id": "pilot",
+      "kind": "steps",
+      "phase": "PART 3 — CLOSE",
+      "accent": "phase2",
+      "hero": "One channel. One entity. Four weeks.",
+      "support": "At the end you have one pipeline view leadership actually trusts.",
+      "steps": [
+        [
+          "1",
+          "Connect",
+          "One capture source — Telegram or an MCP-aware assistant.",
+          "WEEK 1"
+        ],
+        [
+          "2",
+          "Configure",
+          "Companies, People, Deals, plus enrichment where it earns its place.",
+          "WEEKS 1–2"
+        ],
+        [
+          "3",
+          "Run",
+          "Live pilot with operator review on every single write.",
+          "WEEKS 2–4"
+        ]
+      ],
+      "callout": "The ask: pick the capture channel and the first entity type before we leave the room.",
+      "purpose": "Close with a concrete, low-risk pilot plan the audience can act on.",
+      "notes": "Offer to scope the pilot in a follow-up conversation."
+    },
+    {
+      "id": "cta",
+      "kind": "cta",
+      "phase": "PART 3 — CLOSE",
+      "accent": "phase2",
+      "hero": "Let's run your next real deal through it",
+      "support": "One scoping call, then a four-week pilot on your own workspace. Nothing to migrate, nothing to sign.",
+      "need_title": "What we need from you",
+      "need": [
+        "A Notion workspace — Enterprise if residency matters",
+        "One capture channel to start with",
+        "One named owner for config and review",
+        "Two hours of a salesperson's time"
+      ],
+      "get_title": "What you have in four weeks",
+      "get": [
+        "Your CRM schema live in Notion",
+        "One capture flow running every day",
+        "Dedup and enrichment on real records",
+        "A pipeline view leadership trusts"
+      ],
+      "cta": "Book the 30-minute scoping call",
+      "cta_fill": "‹ booking link or contact — fill in before sending ›",
+      "purpose": "Convert interest into a booked scoping call with an explicit, small commitment.",
+      "notes": "Do not leave the room without a date. If they hesitate, shrink the ask: one channel, one entity, one owner. Fill the booking link before this deck goes anywhere."
+    },
+    {
+      "id": "a1",
+      "kind": "chips",
+      "phase": "APPENDIX A1",
+      "accent": "muted",
+      "appendix": true,
+      "hero": "MCP architecture & toolset",
+      "support": "Technical reference — not for the executive main path.",
+      "chips": [
+        "Write tools default to dry-run; confirm=true for actual writes",
+        "Tools: upsert_people, upsert_companies, upsert_deal, log_activity",
+        "Read: search_*, get_open_leads, get_activities, find_duplicates",
+        "Access: stdio subprocess or HTTP /mcp with bearer token"
+      ],
+      "placeholder": "MCP dry-run output",
+      "purpose": "Document MCP tools and the dry-run / confirm write model for operators.",
+      "notes": "Translate MCP as safe AI-assisted CRM access."
+    },
+    {
+      "id": "a2",
+      "kind": "chips",
+      "phase": "APPENDIX A2",
+      "accent": "muted",
+      "appendix": true,
+      "hero": "Self-hosted deployment & security",
+      "support": "Honest operational model for IT decision-makers.",
+      "chips": [
+        "Python 3.12 · uv · Docker/systemd · FastAPI web cockpit",
+        "Notion API + optional OAuth; secrets via Infisical or equivalent",
+        "Optional: OpenRouter, Apollo, Brave, Prosper, email/discord",
+        "Self-hosted instance controls automation; Notion is system of record",
+        "No unsupported certification or residency claims"
+      ],
+      "purpose": "Describe the self-hosted deployment stack and operational responsibilities.",
+      "notes": "Teams manage config, secrets, and monitoring."
+    },
+    {
+      "id": "a3",
+      "kind": "chips",
+      "phase": "APPENDIX A3",
+      "accent": "muted",
+      "appendix": true,
+      "hero": "Artelys deployment pattern",
+      "support": "Confirm naming approval before external use.",
+      "chips": [
+        "B2B CRM: Companies, People, Leads/Deals, Activities",
+        "French open-data enrichment for company records",
+        "Telegram + MCP for daily capture and maintenance",
+        "Activities logged against deals and contacts",
+        "Deployment pattern — not a published ROI case study"
+      ],
+      "placeholder": "Anonymized CRM board",
+      "purpose": "Illustrate a real deployment pattern without inventing customer metrics.",
+      "notes": "Real-world example without invented metrics."
+    },
+    {
+      "id": "a4",
+      "kind": "chips",
+      "phase": "APPENDIX A4",
+      "accent": "muted",
+      "appendix": true,
+      "hero": "Extended CRM setup",
+      "support": "Optional capabilities — not universal defaults.",
+      "chips": [
+        "Default deploy creates: Companies, People, Leads",
+        "Activities and Meetings exist in Notion but are not created by the deploy",
+        "Notion Pilot writes Activities once its database id is configured",
+        "Meetings is maintained by humans — no tool writes to it",
+        "Reporting via Notion views, rollups, and formulas"
+      ],
+      "placeholder": "Extended CRM ERD",
+      "purpose": "Clarify default CRM bootstrap vs optional extended databases.",
+      "notes": "Do not present extensions as universal defaults."
+    }
+  ]
+}
