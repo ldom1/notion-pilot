@@ -16,8 +16,10 @@
  */
 
 .lp {
-  --measure: 76ch;
+  --measure: none; /* prose fills .lp-wrap; set a ch value to restore a reading line */
   --gap: clamp(3.5rem, 7vw, 7rem);
+  --section-y: 2rem;
+  --inner-y: 1.65rem;
 
   color: var(--ink);
   background: var(--bg);
@@ -177,7 +179,7 @@
 }
 
 .lp-section {
-  padding-block: var(--gap);
+  padding-block: var(--section-y);
 }
 
 .lp-section + .lp-section {
@@ -321,7 +323,7 @@
 /* ── hero ────────────────────────────────────────────────────────────────── */
 .lp-hero {
   position: relative;
-  padding-block: clamp(3rem, 8vw, 6rem) var(--gap);
+  padding-block: var(--section-y);
 }
 
 .lp-hero::before {
@@ -485,7 +487,7 @@
 }
 
 .lp-arg > p {
-  max-width: 62ch;
+  max-width: var(--measure);
   margin: 0;
   color: var(--muted);
 }
@@ -502,6 +504,8 @@
 
 .lp-intro-copy {
   max-width: var(--measure);
+  text-align: justify;
+  hyphens: auto;
 }
 
 .lp-intro-copy > p {
@@ -517,10 +521,91 @@
   color: var(--ink);
 }
 
+/* ── films ──────────────────────────────────────────────────────────────────
+ * The clips are rendered from this same token layer, so the frame around them
+ * is the only styling they need: one rule, one radius, and the page's own
+ * artifact shadow. They carry no audio and nothing outside the 16:9 box, which
+ * is what lets them sit inline next to the prose instead of in a media player.
+ */
+.lp-film {
+  margin: 0;
+}
+
+.lp-wrap > .lp-film {
+  margin-top: clamp(1.75rem, 3.5vw, 2.75rem);
+}
+
+.lp-film-frame {
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  background: var(--bg);
+  box-shadow: var(--shadow-2);
+}
+
+/* the aspect-ratio box holds the layout before the first byte of video lands */
+.lp-film-video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  background: var(--bg);
+}
+
+.lp-film-copy {
+  margin-top: 1.15rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid var(--rule);
+}
+
+.lp-film-copy .lp-h3 {
+  margin: 0;
+}
+
+.lp-film-copy > p {
+  max-width: 62ch;
+  margin: 0;
+  color: var(--muted);
+}
+
+.lp-film-stage {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-bottom: 0.5rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.lp-film-dur {
+  padding-left: 0.55rem;
+  border-left: 1px solid var(--rule-strong);
+  letter-spacing: 0.1em;
+}
+
+/* Every film runs the full measure. Halving the width halves the type inside
+ * them too, and these frames are tables and tool logs — at 540px nobody can
+ * read the thing the film exists to show. */
+.lp-film + .lp-film {
+  margin-top: clamp(2.25rem, 4.5vw, 3.5rem);
+}
+
+@media (max-width: 860px) {
+  .lp-film-copy {
+    margin-top: 1rem;
+    padding-top: 1rem;
+  }
+}
+
 /* ── feature blocks ─────────────────────────────────────────────────────── */
 /* full-width artifact under its prose — no horizontal scrolling to read a table */
 .lp-stack {
-  padding-block: clamp(2rem, 4vw, 3.25rem);
+  padding-block: var(--inner-y);
 }
 
 .lp-stack + .lp-stack {
@@ -528,7 +613,7 @@
 }
 
 .lp-stack-head {
-  margin-bottom: 1.8rem;
+  margin-bottom: var(--inner-y);
 }
 
 .lp-stack-head > *:first-child {
@@ -1004,7 +1089,7 @@
 }
 
 .lp-punch {
-  max-width: 60ch;
+  max-width: var(--measure);
   margin: 2rem 0 0;
   font-family: var(--font);
   font-size: clamp(1.05rem, 1.6vw, 1.3rem);
@@ -1072,7 +1157,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 0.8rem;
-  max-width: 78ch;
+  max-width: var(--measure);
   margin-top: 2.4rem;
   padding-top: 1.6rem;
   border-top: 1px solid var(--rule);
@@ -1118,15 +1203,13 @@
   }
 }
 
-/* ── the two surfaces ────────────────────────────────────────────────────── */
+/* ── the assistant surface ───────────────────────────────────────────────── */
 .lp-surfaces {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
-  gap: 1px;
+  grid-template-columns: minmax(0, 1fr);
   margin-top: 2.5rem;
   border: 1px solid var(--rule);
   border-radius: 14px;
-  background: var(--rule);
   overflow: hidden;
 }
 
@@ -1136,11 +1219,6 @@
   gap: 1rem;
   padding: clamp(1.25rem, 3vw, 1.9rem);
   background: var(--bg);
-}
-
-.lp-surface-lead {
-  background: var(--primary-wash);
-  box-shadow: inset 0 2px 0 var(--primary);
 }
 
 .lp-surface-head {
@@ -1312,7 +1390,7 @@
 
 .lp-eu-marks {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 132px), 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.7rem;
 }
 
@@ -1406,7 +1484,7 @@
 
 /* ── close ───────────────────────────────────────────────────────────────── */
 .lp-close {
-  padding-block: clamp(4rem, 9vw, 7rem);
+  padding-block: var(--section-y);
   border-top: 1px solid var(--rule);
   text-align: center;
 }
@@ -1416,7 +1494,7 @@
 }
 
 .lp-close p {
-  max-width: 54ch;
+  max-width: var(--measure);
   margin: 1.1rem auto 2rem;
   color: var(--muted);
   font-size: 1.05rem;
@@ -1440,6 +1518,11 @@
 
 .lp-foot a {
   color: var(--accent);
+}
+
+.lp-foot .lp-scope {
+  flex: 1 1 100%;
+  margin: 0.4rem 0 0;
 }
 
 /* ── responsive ──────────────────────────────────────────────────────────── */
@@ -1514,7 +1597,7 @@
 
 .lp-install p {
   margin: 0 0 0.8rem;
-  max-width: 52ch;
+  max-width: var(--measure);
 }
 
 .lp-step-n {
@@ -1612,20 +1695,17 @@
   vertical-align: middle;
 }
 
-/* market scope, stated before the Deploy click (spec §0) */
+/* market scope, stated in the footer */
 .lp-scope {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 0.55rem;
   align-items: start;
-  max-width: 56ch;
-  margin: 1.3rem 0 0;
-  padding: 0.7rem 0.85rem;
-  border: 1px solid var(--rule);
-  border-radius: var(--r);
-  background: var(--surface);
+  max-width: var(--measure);
+  margin: 0;
+  padding: 0;
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 0.83rem;
   line-height: 1.5;
 }
 

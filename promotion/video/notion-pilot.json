@@ -1,0 +1,25 @@
+{
+  "name": "Notion Pilot",
+  "tagline": "Your CRM lives in Notion. The agent keeps it current.",
+  "palette": {
+    "primary": "oklch(0.22 0 0)",
+    "accent": "oklch(0.17 0 0)",
+    "bg": "oklch(1 0 0)",
+    "text": "oklch(0.17 0 0)",
+    "muted": "oklch(0.52 0 0)",
+    "rule": "oklch(0.915 0 0)",
+    "ok": "oklch(0.55 0.11 162)",
+    "warn": "oklch(0.64 0.13 72)",
+    "bad": "oklch(0.57 0.15 20)"
+  },
+  "typography": { "heading": "Archivo", "body": "Archivo", "mono": "IBM Plex Mono" },
+  "tone": "minimal",
+  "cta": "Deploy the CRM in your own Notion",
+  "duration": 16,
+  "notes": [
+    "Monochrome instrument: white stock, achromatic grey ramp, near-black as the only brand colour.",
+    "Colour appears ONLY inside CRM data — won / stale / lost. Never decoration.",
+    "Same design system as web/frontend/src/styles/tokens.css. Do not invent new hues.",
+    "No audio: these render as muted autoplay loops on the landing page."
+  ]
+}

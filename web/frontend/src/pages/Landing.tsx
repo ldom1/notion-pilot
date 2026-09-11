@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { fetchStatus } from "../api/client";
 import { SetupWizard } from "../features/setup/SetupWizard";
 import { Spinner } from "../components/Spinner";
@@ -10,6 +10,7 @@ const CLAUDEFORCE_URL =
   "https://www.salesforce.com/news/press-releases/2026/08/26/salesforce-and-anthropic-announce-claudeforce/";
 const RESIDENCY_URL = "https://www.notion.com/help/data-residency";
 const NOTION_MCP = "https://mcp.notion.com/mcp";
+const NOTION_MCP_DOCS = "https://developers.notion.com/guides/mcp/get-started-with-mcp";
 
 // ── icons ─────────────────────────────────────────────────────────────────────
 // One authored set: 24px grid, 1.6 stroke, round caps. No emoji stand-ins.
@@ -42,12 +43,6 @@ const PATHS: Record<string, ReactNode> = {
     <>
       <rect x="3" y="5" width="18" height="16" rx="2.5" />
       <path d="M3 10h18M8 3v4M16 3v4M8.5 15h3" />
-    </>
-  ),
-  telegram: (
-    <>
-      <path d="M21 4 3 11l5.5 2.2L11 20l3.2-4.4L20 6" />
-      <path d="M8.5 13.2 20 6" />
     </>
   ),
   agent: (
@@ -194,6 +189,57 @@ function Rec({ when, dot, rows }: { when: string; dot: Health; rows: RecRow[] })
   );
 }
 
+// Autoplay is how a silent loop earns its place next to the prose — but a reader who
+// asked the OS for less motion gets a still frame and real controls instead.
+function Film({ film }: { film: Film }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [still, setStill] = useState(false);
+
+  useEffect(() => {
+    const q = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setStill(q.matches);
+    const onChange = (e: MediaQueryListEvent) => setStill(e.matches);
+    q.addEventListener("change", onChange);
+    return () => q.removeEventListener("change", onChange);
+  }, []);
+
+  const applyRate = () => {
+    const el = videoRef.current;
+    if (el && film.rate) el.playbackRate = film.rate;
+  };
+
+  return (
+    <figure className="lp-film">
+      <div className="lp-film-frame">
+        <video
+          ref={videoRef}
+          className="lp-film-video"
+          src={`/film/${film.slug}.mp4`}
+          poster={film.poster}
+          width={1920}
+          height={1080}
+          autoPlay={!still}
+          loop={!still}
+          controls={still}
+          muted
+          playsInline
+          preload="metadata"
+          aria-label={film.title}
+          onLoadedMetadata={applyRate}
+          onPlay={applyRate}
+        />
+      </div>
+      <figcaption className="lp-film-copy">
+        <span className="lp-film-stage">
+          {film.stage}
+          <span className="lp-film-dur">{film.seconds}s · no sound</span>
+        </span>
+        <h3 className="lp-h3">{film.title}</h3>
+      </figcaption>
+    </figure>
+  );
+}
+
 function Logo() {
   // A page of records, with the approval mark sweeping out past its edge.
   return (
@@ -258,6 +304,26 @@ const TAKEAWAYS: [string, string][] = [
     "The idea travels. The licence, the migration and the seat price do not.",
   ],
 ];
+
+type Film = {
+  slug: string;
+  stage: string;
+  title: string;
+  poster: string;
+  seconds: number;
+  rate?: number;
+};
+
+// One film on the page: the job, after the decay beat. Agent HITL and collab
+// are told in the surfaces and EU sections — a second autoplay would retell them.
+const PIPELINE_FILM: Film = {
+  slug: "notion-pilot-pipeline",
+  stage: "The job",
+  title: "One email in. Four records out. Numbers already right.",
+  poster: "/film/notion-pilot-pipeline.jpg",
+  seconds: 21,
+  rate: 0.85,
+};
 
 const ARGUMENTS_: [string, string][] = [
   [
@@ -353,7 +419,7 @@ const REC_ROTTED: RecRow[] = [
 
 const EVOLVE: [string, string][] = [
   [
-    "We deploy a sensible CRM",
+    "We deploy a ready-to-use CRM",
     "Five databases — Companies, People, Leads, Activities, Meetings — relations wired, stages filled, and the pipeline formulas already computing.",
   ],
   [
@@ -375,13 +441,13 @@ const DIFF: { db: string; action: Tag; record: string; detail: string }[] = [
 
 const AGENT_STEPS: [string, string, string][] = [
   ["search", "It looks before it writes", "Email, then LinkedIn, then fuzzy name plus company. An existing record gets updated, not duplicated."],
-  ["eye", "Dry run is the default", "Write tools return a preview unless confirm=true. The default answer to “should I write this?” is no."],
+  ["eye", "Dry run is the default", "Every write comes back as a preview. The default answer to “should I write this?” is no."],
   ["check", "You approve the diff", "Exactly what changes, per database. Ambiguous matches are escalated, never guessed."],
-  ["telegram", "Calls work the same way", "Dictate your notes walking back to the office. Type, outcome, next step with a date."],
 ];
 
 const EU_MARKS: [string, string, string][] = [
-  ["server", "Frankfurt, not Oregon", "Notion pins workspace data at rest to eu-central-1 on the Enterprise plan, free of charge."],
+  ["people", "The team already shares it", "Collaboration is native Notion — one workspace, live for everyone. Notion Pilot only does the typing."],
+  ["server", "Frankfurt, not Oregon", "Notion can pin that same workspace at rest to eu-central-1 on the Enterprise plan. Confirm region and terms with Notion."],
   ["shield", "Your own machine", "The automation layer is self-hosted. No third-party SaaS sits between your team and Notion."],
   ["lock", "Your permissions", "The assistant connects as you and sees what you see. Revoke it in Notion, not in a support ticket."],
 ];
@@ -416,7 +482,27 @@ export default function Landing() {
 
   if (checkState === "setup") {
     return (
-      <div className="lp">
+      <div className="lp lp-setup-scene">
+        <div className="lp-setup-bg" aria-hidden="true">
+          <svg className="lp-setup-bg-graph" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+            <g className="lp-setup-bg-edges">
+              <path d="M120 180H380L560 90H820" />
+              <path d="M380 180V420H640L860 520" />
+              <path d="M640 420V700H1100" />
+              <path d="M820 90V300H1280" />
+            </g>
+            <g className="lp-setup-bg-dots">
+              <circle cx="120" cy="180" r="3.5" />
+              <circle cx="380" cy="180" r="3.5" />
+              <circle cx="560" cy="90" r="3.5" />
+              <circle cx="820" cy="90" r="3.5" />
+              <circle cx="640" cy="420" r="3.5" />
+              <circle cx="860" cy="520" r="3.5" />
+              <circle className="lp-setup-bg-pulse" cx="1100" cy="700" r="3.5" />
+              <circle className="lp-setup-bg-pulse" cx="1280" cy="300" r="3.5" />
+            </g>
+          </svg>
+        </div>
         <nav className="lp-nav">
           <span className="lp-brand">
             <Logo /> Notion Pilot
@@ -426,16 +512,14 @@ export default function Landing() {
           </a>
         </nav>
         <main className="lp-wrap lp-section">
-          <div style={{ maxWidth: 480, marginInline: "auto" }}>
-            <SetupWizard
-              onComplete={() => {
-                window.location.href = "/cockpit";
-              }}
-              onSkip={() => {
-                window.location.href = "/cockpit";
-              }}
-            />
-          </div>
+          <SetupWizard
+            onComplete={() => {
+              window.location.href = "/cockpit";
+            }}
+            onSkip={() => {
+              window.location.href = "/cockpit";
+            }}
+          />
         </main>
       </div>
     );
@@ -477,14 +561,6 @@ export default function Landing() {
                 See the data model
               </a>
             </div>
-            <p className="lp-scope">
-              <Icon name="shield" size={16} />
-              <span>
-                A CRM for teams working with <strong>French companies</strong> — every company
-                enriches automatically from open company data (SIRENE registry, financial filings).
-                Companies outside France are skipped, not enriched.
-              </span>
-            </p>
             <div className="lp-hero-terms">
               <span className="lp-term">
                 <Icon name="server" size={16} /> Self-hosted
@@ -540,7 +616,7 @@ export default function Landing() {
         <div className="lp-wrap">
           <div className="lp-intro">
             <h2 className="lp-h2">
-              Notion is built on a database structure. It just isn't a CRM yet.
+              Notion is built on a database structure. It is not a CRM yet.
             </h2>
             <div className="lp-intro-copy">
               <p className="lp-lede">
@@ -561,7 +637,7 @@ export default function Landing() {
             </div>
           </div>
 
-          <div style={{ marginTop: "1rem" }}>
+          <div>
             <div className="lp-stack">
               <div className="lp-stack-head">
                 <div>
@@ -709,7 +785,7 @@ export default function Landing() {
       <section className="lp-section lp-tint">
         <div className="lp-wrap">
           <div className="lp-intro">
-            <h2 className="lp-h2">Two databases, one join. One pipeline you can trust.</h2>
+            <h2 className="lp-h2">The deal, and the trail that proves it</h2>
             <div className="lp-intro-copy">
               <p className="lp-lede">
                 Every lead carries its own activity trail, so “what happened on this deal?” is a
@@ -821,7 +897,7 @@ export default function Landing() {
       <section className="lp-section" id="model">
         <div className="lp-wrap">
           <div className="lp-intro">
-            <h2 className="lp-h2">Five databases. One relational spine.</h2>
+            <h2 className="lp-h2">Around that deal: companies, people, meetings</h2>
             <div className="lp-intro-copy">
               <p className="lp-lede">
                 Everything hangs off the deal. A call logged this morning appears on the lead, on
@@ -956,16 +1032,25 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── the two surfaces ─────────────────────────────────────────────── */}
+      {/* ── the job, on film — answers the decay beat, once ──────────────── */}
+      <section className="lp-section" id="film">
+        <div className="lp-wrap">
+          <div className="lp-intro">
+            <h2 className="lp-h2">Nobody opened Notion. The pipeline still moved.</h2>
+          </div>
+          <Film film={PIPELINE_FILM} />
+        </div>
+      </section>
+
+      {/* ── the assistant ────────────────────────────────────────────────── */}
       <section className="lp-section">
         <div className="lp-wrap">
           <div className="lp-intro">
             <h2 className="lp-h2">Notion Pilot does the typing. You keep the judgement.</h2>
             <div className="lp-intro-copy">
               <p className="lp-lede">
-                Two ways in, one rule:{" "}
-                <strong>nothing reaches Notion that you haven't approved.</strong> Both surfaces end
-                in a preview and wait for a human.
+                Your AI assistant reads the thread, searches the CRM, and shows a preview.{" "}
+                <strong>Nothing reaches Notion that you haven't approved.</strong>
               </p>
             </div>
           </div>
@@ -973,69 +1058,12 @@ export default function Landing() {
           <div className="lp-surfaces">
             <div className="lp-surface">
               <div className="lp-surface-head">
-                <Icon name="telegram" />
-                <h3 className="lp-h3">Telegram</h3>
-                <span className="lp-surface-when">30 seconds, one hand</span>
-              </div>
-              <p>
-                Walking out of the building, no laptop. Send <code>/deal</code> and answer what the
-                bot asks. It shows you the record it is about to write.
-              </p>
-              <div className="lp-chat">
-                <div className="lp-bubble lp-bubble-me">/deal Voltaris proposal sent 120k</div>
-                <div className="lp-bubble lp-bubble-bot">
-                  <span className="lp-who">Preview — nothing written yet</span>
-                  <table className="lp-diff">
-                    <tbody>
-                      <tr>
-                        <td>Deal</td>
-                        <td>
-                          <b>Voltaris — Platform licence</b>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Company</td>
-                        <td>
-                          <span className="lp-link">
-                            <Icon name="link" size={12} />
-                            Voltaris Énergie
-                          </span>{" "}
-                          matched
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Stage</td>
-                        <td>
-                          Discovery → <span className="lp-t lp-t-orange">Proposal Sent</span>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Value</td>
-                        <td className="lp-num">120 000 €</td>
-                      </tr>
-                      <tr>
-                        <td>Activity</td>
-                        <td>Proposal · logged against the deal</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                  <div className="lp-approve">
-                    <span className="lp-key">go</span>
-                    <span className="lp-small">to write · or tell it what to fix</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="lp-surface lp-surface-lead">
-              <div className="lp-surface-head">
                 <Icon name="agent" />
                 <h3 className="lp-h3">Your AI assistant</h3>
-                <span className="lp-surface-when">the one that changes the job</span>
+                <span className="lp-surface-when">paste · preview · go</span>
               </div>
               <p>
-                Your assistant already reads your inbox and your call notes. Give it the CRM and one
-                email thread becomes four correct records — <strong>you only approve</strong>.
+                The film above is this path. Paste a thread; get a preview; you only approve.
               </p>
               <div className="lp-chat">
                 <div className="lp-bubble lp-bubble-me">
@@ -1100,8 +1128,10 @@ export default function Landing() {
               </span>
               <h2 className="lp-h2">European by deployment, not by promise</h2>
               <p className="lp-body" style={{ marginTop: "1.1rem" }}>
-                Both halves of this system are hosted independently, and both can sit inside the EU.
-                Data residency is <strong>free on the Notion Enterprise plan</strong>, and an
+                The CRM lives in the Notion workspace your team share. Collaboration is
+                Notion's — that is the point. Both halves of the rest of this system are hosted
+                independently, and both can sit inside the EU. Data residency is{" "}
+                <strong>an option on the Notion Enterprise plan</strong>, free of charge; an
                 existing workspace can be migrated into the EU region on request.
               </p>
               <p className="lp-small" style={{ marginTop: "0.9rem" }}>
@@ -1129,8 +1159,9 @@ export default function Landing() {
             <h2 className="lp-h2">Deploy the CRM, then teach your assistant to run it</h2>
             <div className="lp-intro-copy">
               <p className="lp-lede">
-                Nothing to migrate, nothing to sign. The connection is your own Notion OAuth, and
-                the skills that know how to operate this CRM ship in the box.
+                Nothing to migrate, nothing to sign. Deploy writes the CRM into your Notion. Claude
+                then reaches those same pages through Notion's official MCP — a second OAuth, same
+                workspace — and the skills in this repo tell it how to run the pipeline.
               </p>
             </div>
           </div>
@@ -1180,8 +1211,10 @@ export default function Landing() {
                   <span className="lp-step-n">2</span> Connect Notion
                 </h4>
                 <p className="lp-small">
-                  Notion's official MCP server, over your own OAuth connection. Restart the
-                  assistant and the skills trigger on their own — paste an email and ask.
+                  Notion's hosted MCP, not the wizard's integration. Complete its OAuth once — it
+                  sees the pages you can see, including the CRM you just deployed. Restart the
+                  assistant and the skills trigger on their own.{" "}
+                  <a href={NOTION_MCP_DOCS}>Notion MCP setup</a>.
                 </p>
                 <pre className="lp-code">{MCP_SNIPPET}</pre>
               </div>
@@ -1223,6 +1256,14 @@ export default function Landing() {
           </span>
           <span>Self-hosted CRM automation for Notion · human-in-the-loop by default</span>
           <a href="/auth/notion?next=/cockpit">Sign in</a>
+          <p className="lp-scope">
+            <Icon name="shield" size={16} />
+            <span>
+              A CRM for teams working with <strong>French companies</strong> — every company
+              enriches automatically from open company data (SIRENE registry, financial filings).
+              Companies outside France are skipped, not enriched.
+            </span>
+          </p>
         </div>
       </footer>
     </div>

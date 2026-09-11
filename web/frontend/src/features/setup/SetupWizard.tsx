@@ -1,41 +1,82 @@
-import React, { useEffect, useRef, useState } from "react";
-import { runSetup } from "../../api/client";
-import type { SSEEvent } from "../../api/client";
+import { useEffect, useRef, useState } from "react";
+import { listSetupPages, runSetup } from "../../api/client";
+import type { SetupPage, SSEEvent } from "../../api/client";
+import "./setup-wizard.css";
 
 type DeployState = "idle" | "deploying" | "done" | "error";
+type ParentKind = "root" | "page";
 
 interface SetupWizardProps {
   onComplete?: (notionUrl: string | null) => void;
   onSkip?: () => void;
 }
 
+function logKind(line: string): "ok" | "bad" | "sub" | "step" {
+  if (line.startsWith("✓")) return "ok";
+  if (line.startsWith("✗")) return "bad";
+  if (line.startsWith("  →")) return "sub";
+  return "step";
+}
+
+function logText(line: string): string {
+  return line.replace(/^✓\s*/, "").replace(/^✗\s*/, "").replace(/^\s*→\s*/, "");
+}
+
 function LogLine({ line, isLast, deploying }: { line: string; isLast: boolean; deploying: boolean }) {
-  const isSuccess = line.startsWith("✓");
-  const isSubStep = line.startsWith("  →");
-  const isError = line.startsWith("✗");
+  const kind = logKind(line);
+  const pending = isLast && deploying && kind !== "ok" && kind !== "bad";
   return (
-    <div
-      style={{
-        color: isError ? "var(--bad)" : isSuccess ? "var(--ok)" : isSubStep ? "var(--muted)" : "var(--ink)",
-        fontWeight: isSuccess ? 700 : "normal",
-        paddingLeft: isSubStep ? "0.75rem" : undefined,
-        display: "flex",
-        alignItems: "center",
-        gap: "0.4rem",
-        fontSize: "0.78rem",
-        fontFamily: "monospace",
-        lineHeight: 1.5,
-      }}
-    >
-      {isLast && deploying && <span className="log-spinner" />}
-      {line}
+    <div className={`lp-setup-log-line is-${kind}`}>
+      <span className="lp-setup-log-mark" aria-hidden="true">
+        {pending ? <span className="lp-setup-tree-spin" /> : kind === "ok" ? "✓" : kind === "bad" ? "!" : kind === "sub" ? "→" : "·"}
+      </span>
+      <span>{logText(line)}</span>
+    </div>
+  );
+}
+
+function SetupLog({
+  logs,
+  deploying,
+  failed,
+  logRef,
+}: {
+  logs: string[];
+  deploying: boolean;
+  failed?: boolean;
+  logRef: React.RefObject<HTMLDivElement | null>;
+}): React.ReactElement {
+  return (
+    <div className={`lp-setup-log${failed ? " is-fail" : ""}`}>
+      <div className="lp-setup-log-head">
+        {deploying && <span className="lp-setup-tree-spin" aria-hidden="true" />}
+        {failed ? "Failed" : deploying ? "Deploying" : "Deployed"}
+      </div>
+      <div className="lp-setup-log-body" ref={logRef} role="log">
+        {logs.length === 0 ? (
+          <div className="lp-setup-log-line is-step">
+            <span className="lp-setup-log-mark" aria-hidden="true">
+              <span className="lp-setup-tree-spin" />
+            </span>
+            <span>Connecting to Notion…</span>
+          </div>
+        ) : (
+          logs.map((l, i) => (
+            <LogLine key={i} line={l} isLast={i === logs.length - 1} deploying={deploying} />
+          ))
+        )}
+      </div>
     </div>
   );
 }
 
 export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.ReactElement {
-  const [workspaceName, setWorkspaceName] = useState("My Notion Workspace");
-  const [scope, setScope] = useState<"crm" | "inbox" | "both">("both");
+  const [pageName, setPageName] = useState("");
+  const [parentKind, setParentKind] = useState<ParentKind>("root");
+  const [parentPage, setParentPage] = useState("");
+  const [pages, setPages] = useState<SetupPage[]>([]);
+  const [pagesState, setPagesState] = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [pagesTick, setPagesTick] = useState(0);
   const [deployState, setDeployState] = useState<DeployState>("idle");
   const [logs, setLogs] = useState<string[]>([]);
   const [notionUrl, setNotionUrl] = useState<string | null>(null);
@@ -45,12 +86,40 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [logs]);
 
+  useEffect(() => {
+    if (parentKind !== "page") return;
+    const ac = new AbortController();
+    const timer = window.setTimeout(() => ac.abort(), 25_000);
+    setPagesState("loading");
+    listSetupPages(ac.signal)
+      .then((r) => {
+        if (ac.signal.aborted) return;
+        setPages(r.pages);
+        setPagesState("ok");
+      })
+      .catch(() => {
+        if (!ac.signal.aborted) setPagesState("error");
+      })
+      .finally(() => window.clearTimeout(timer));
+    return () => {
+      ac.abort();
+      window.clearTimeout(timer);
+    };
+  }, [parentKind, pagesTick]);
+
   async function handleDeploy(): Promise<void> {
-    if (!workspaceName.trim() || deployState === "deploying") return;
+    const name = pageName.trim();
+    const parent = parentKind === "page" ? parentPage.trim() : "";
+    if (!name || deployState === "deploying") return;
+    if (parentKind === "page" && !parent) return;
     setDeployState("deploying");
     setLogs([]);
     try {
-      const stream = runSetup({ scope, workspace_name: workspaceName.trim() });
+      const stream = runSetup({
+        scope: "crm",
+        workspace_name: name,
+        parent_page: parent || undefined,
+      });
       for await (const event of stream as AsyncIterable<SSEEvent>) {
         if (event.type === "log") {
           setLogs((prev) => [...prev, String(event.message ?? "")]);
@@ -73,15 +142,13 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
 
   if (deployState === "done") {
     return (
-      <div style={s.card}>
-        <div style={s.successIcon}>✓</div>
-        <h2 style={s.title}>Workspace ready!</h2>
+      <div className="lp-setup">
+        <div className="lp-setup-ok">✓</div>
+        <h2 className="lp-setup-title">Your CRM is ready</h2>
         {logs.length > 0 && (
-          <div style={{ ...s.logBox, maxHeight: "200px" }} ref={logRef}>
-            {logs.map((l, i) => <LogLine key={i} line={l} isLast={false} deploying={false} />)}
-          </div>
+          <SetupLog logs={logs} deploying={false} logRef={logRef} />
         )}
-        <div style={s.actions}>
+        <div className="lp-setup-actions">
           {notionUrl && (
             <a className="btn-primary" href={notionUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
               Open in Notion ↗
@@ -96,57 +163,119 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
   }
 
   return (
-    <div style={s.card}>
-      <h2 style={s.title}>Set up your workspace</h2>
-      <p style={s.sub}>We'll create the Notion databases for you. Takes about 10 seconds.</p>
+    <div className="lp-setup">
+      <h2 className="lp-setup-title">Deploy the CRM to Notion</h2>
+      <p className="lp-setup-sub">
+        A ready-to-use CRM in the workspace you share — Companies, People, Leads, Activities,
+        Meetings, relations wired. You reshape it. The assistant follows.
+      </p>
 
-      <div style={s.field}>
-        <label style={s.label}>Workspace name</label>
+      <div className="lp-setup-field">
+        <label className="lp-setup-label" htmlFor="lp-setup-page">
+          CRM main page name
+        </label>
         <input
+          id="lp-setup-page"
           className="modal-param-input"
-          style={{ width: "100%", boxSizing: "border-box" }}
-          value={workspaceName}
-          onChange={(e) => setWorkspaceName(e.target.value)}
+          value={pageName}
+          onChange={(e) => setPageName(e.target.value)}
           disabled={deployState === "deploying"}
-          placeholder="My Notion Workspace"
+          placeholder="My awesome CRM"
         />
       </div>
 
-      <div style={s.field}>
-        <label style={s.label}>What do you need?</label>
-        <div style={s.scopeRow}>
-          {(["crm", "inbox", "both"] as const).map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              className={`deal-wizard-opt${scope === opt ? " selected" : ""}`}
-              onClick={() => setScope(opt)}
-              disabled={deployState === "deploying"}
-              style={{ flex: 1 }}
-            >
-              {opt === "crm" ? "CRM" : opt === "inbox" ? "Knowledge inbox" : "Both"}
-            </button>
-          ))}
+      <fieldset className="lp-setup-field" disabled={deployState === "deploying"}>
+        <legend className="lp-setup-label">Where should it be deployed?</legend>
+        <div className="lp-setup-tree" role="radiogroup" aria-label="Where should it be deployed?">
+          <div className="lp-setup-tree-host">Workspace</div>
+          <div className="lp-setup-tree-list">
+            <label className={`lp-setup-tree-opt${parentKind === "root" ? " is-on" : ""}`}>
+              <input
+                type="radio"
+                name="lp-setup-parent"
+                checked={parentKind === "root"}
+                onChange={() => setParentKind("root")}
+              />
+              <span className="lp-setup-tree-copy">
+                <span className="lp-setup-tree-title">Workspace root</span>
+                <span className="lp-setup-tree-hint">Top of the sidebar</span>
+              </span>
+            </label>
+            {parentKind === "root" && (
+              <div className="lp-setup-tree-leaf">{pageName.trim() || "My awesome CRM"}</div>
+            )}
+            <label className={`lp-setup-tree-opt${parentKind === "page" ? " is-on" : ""}`}>
+              <input
+                type="radio"
+                name="lp-setup-parent"
+                checked={parentKind === "page"}
+                onChange={() => setParentKind("page")}
+              />
+              <span className="lp-setup-tree-copy">
+                <span className="lp-setup-tree-title">Under an existing page</span>
+                <span className="lp-setup-tree-hint">Child of a page you pick</span>
+              </span>
+            </label>
+            {parentKind === "page" && (
+              <div className="lp-setup-tree-nest">
+                <div className="lp-setup-tree-pages">
+                  {pagesState === "loading" && (
+                    <div className="lp-setup-tree-status" role="status">
+                      <span className="lp-setup-tree-spin" aria-hidden="true" />
+                      Loading pages…
+                    </div>
+                  )}
+                  {pagesState === "error" && (
+                    <div className="lp-setup-tree-status">
+                      Could not load pages from Notion.{" "}
+                      <button
+                        type="button"
+                        className="lp-setup-tree-retry"
+                        onClick={() => setPagesTick((n) => n + 1)}
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
+                  {pagesState === "ok" && pages.length === 0 && (
+                    <div className="lp-setup-tree-status">
+                      No pages shared with this connection. Deploy at workspace root, or share a
+                      page in Notion.
+                    </div>
+                  )}
+                  {pages.map((p) => (
+                    <div key={p.id} className="lp-setup-tree-pagewrap">
+                      <button
+                        type="button"
+                        className={`lp-setup-tree-page${parentPage === p.id ? " is-on" : ""}`}
+                        onClick={() => setParentPage(p.id)}
+                      >
+                        {p.name}
+                      </button>
+                      {parentPage === p.id && (
+                        <div className="lp-setup-tree-leaf">
+                          {pageName.trim() || "My awesome CRM"}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-        <div style={s.scopeDesc}>
-          {scope === "crm" && "People, Companies, Leads — full CRM with demo data"}
-          {scope === "inbox" && "Notions, Ideas, Tools, Data & Tech databases"}
-          {scope === "both" && "CRM + Knowledge inbox — the full Notion Pilot suite"}
-        </div>
-      </div>
+      </fieldset>
 
       {(deployState === "deploying" || deployState === "error") && (
-        <div style={s.logBox} ref={logRef}>
-          {logs.length === 0
-            ? <div style={{ color: "var(--muted)", fontSize: "0.78rem", fontFamily: "monospace" }}>Connecting to Notion…</div>
-            : logs.map((l, i) => (
-                <LogLine key={i} line={l} isLast={i === logs.length - 1} deploying={deployState === "deploying"} />
-              ))
-          }
-        </div>
+        <SetupLog
+          logs={logs}
+          deploying={deployState === "deploying"}
+          failed={deployState === "error"}
+          logRef={logRef}
+        />
       )}
 
-      <div style={s.actions}>
+      <div className="lp-setup-actions">
         {onSkip && (
           <button type="button" className="modal-cancel-btn" onClick={onSkip} disabled={deployState === "deploying"}>
             Skip
@@ -156,43 +285,15 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
           type="button"
           className="btn-primary"
           onClick={() => void handleDeploy()}
-          disabled={deployState === "deploying" || !workspaceName.trim()}
+          disabled={
+            deployState === "deploying"
+            || !pageName.trim()
+            || (parentKind === "page" && !parentPage.trim())
+          }
         >
-          {deployState === "deploying" ? "Creating…" : deployState === "error" ? "Retry" : "Deploy"}
+          {deployState === "deploying" ? "Creating…" : deployState === "error" ? "Retry" : "Deploy the CRM"}
         </button>
       </div>
     </div>
   );
 }
-
-const s: Record<string, React.CSSProperties> = {
-  card: {
-    background: "var(--bg)",
-    borderRadius: "12px",
-    border: "1px solid var(--rule)",
-    padding: "2rem",
-    maxWidth: "480px",
-    width: "100%",
-    display: "flex",
-    flexDirection: "column",
-    gap: "1.25rem",
-  },
-  title: { fontSize: "1.4rem", fontWeight: 800, color: "var(--ink)", margin: 0 },
-  sub: { fontSize: "0.9rem", color: "var(--muted)", margin: 0, lineHeight: 1.5 },
-  field: { display: "flex", flexDirection: "column", gap: "0.5rem" },
-  label: { fontSize: "0.85rem", fontWeight: 600, color: "var(--ink-soft)" },
-  scopeRow: { display: "flex", gap: "0.5rem" },
-  scopeDesc: { fontSize: "0.8rem", color: "var(--muted)", minHeight: "1.2em" },
-  logBox: {
-    background: "var(--surface)",
-    borderRadius: "6px",
-    padding: "0.75rem",
-    maxHeight: "160px",
-    overflowY: "auto",
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.2rem",
-  },
-  actions: { display: "flex", gap: "0.75rem", justifyContent: "flex-end", marginTop: "0.25rem" },
-  successIcon: { fontSize: "2.5rem", textAlign: "center" },
-};

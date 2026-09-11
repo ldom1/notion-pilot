@@ -150,6 +150,8 @@ web/
 
 `develop` was published this session as the remote integration base (it had existed only locally, 60 commits behind `main` with zero unique commits, so refreshing it to `main` discarded nothing). CI already gates its integration-test job on that branch name.
 
+**Uncommitted on `feat/landing-and-cockpit-redesign` (2026-09-11):** the three landing-page films — `promotion/video/` (sources + briefs + shared design system), `web/frontend/public/film/` (3 MP4s + posters, 6.7 MB), the `#film` section in `Landing.tsx`, `.lp-film*` in `landing.css`, `.gitignore`, `README.md`, `CHANGELOG.md`. `hyperframes check` is 0 errors on all three; `tsc -b` and `npm run build` pass. Not committed, so PR #27 does not show them yet. See [[2026-09-11-landing-page-films]].
+
 ## Verified against the live Notion API (do not re-litigate)
 
 - A dual relation's reverse property is auto-named `Related to <db> (<prop>)`; `synced_property_name` is read-only on create. Renaming it afterwards works, and a rollup on the resolved name is accepted.
@@ -165,6 +167,7 @@ web/
 - **`.env.example` still lacks `NOTION_MEETINGS_DATABASE_ID`.** A permission rule blocks Bash on that file. The `Settings` field exists, so the variable works — this is a docs gap only.
 - **`.claude-plugin` manifests unverified.** Schema-correct but `/plugin` cannot be invoked non-interactively. Run `/plugin marketplace add ldom1/notion-pilot` once before advertising it.
 - **Cockpit is visually unverified.** It needs a live Notion session to render; only compilation and token resolution were checked. Wants eyes on selected-tab contrast and the dark log panel after `make dev`.
+- **`make dev` cannot be driven by an agent (2026-09-11).** `infisical` is `Permission denied` under the agent sandbox, so the FastAPI half never binds :8080 and every `/api/*` call 502s through the Vite proxy; the `make dev` wrapper then exits on its own a few minutes later, taking Vite with it. Anything needing the backend — the cockpit check above included — has to be run by a human shell (`! make dev`). Vite alone is enough for the landing page and the films, which are static.
 
 ## Resuming: the commands that matter
 

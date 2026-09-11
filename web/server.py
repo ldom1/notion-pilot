@@ -26,6 +26,7 @@ from starlette.responses import Response
 
 from notion_pilot.shared.config import Settings
 from notion_pilot.shared.llm.crm_chat import chat_crm, detect_data_source
+from notion_pilot.shared.utils.notion_urls import page_id_from_url
 from notion_pilot.shared.workspace import (
     create_crm_workspace,
     create_inbox_workspace,
@@ -171,6 +172,73 @@ def _oauth_error_page() -> str:
   </main>
 </body>
 </html>"""
+
+
+def _setup_parent_id(req: SetupRequest) -> str | None:
+    raw = (req.parent_page or "").strip()
+    return page_id_from_url(raw) if raw else None
+
+
+async def _setup_host(
+    client: httpx.AsyncClient, req: SetupRequest, parent_id: str | None
+) -> tuple[str, str]:
+    """Return (page to nest CRM under, CRM page title)."""
+    if parent_id:
+        return parent_id, req.workspace_name
+    return await create_workspace_root_page(client, req.workspace_name), "CRM"
+
+
+def _setup_notion_error(exc: httpx.HTTPStatusError, parent_id: str | None) -> str:
+    body = exc.response.text
+    msg = f"Notion API error: {body}"
+    if parent_id is None and "workspace" in body.lower():
+        msg += " Workspace root needs the public OAuth connection. Pick an existing page instead."
+    return msg
+
+
+_SETUP_SEARCH_PAGES = 50
+
+
+def _is_workspace_page(page: dict) -> bool:
+    if page.get("archived") or page.get("in_trash"):
+        return False
+    return (page.get("parent") or {}).get("type") == "workspace"
+
+
+async def _list_parent_pages(client: httpx.AsyncClient) -> list[dict[str, object]]:
+    """Sidebar pages only. Notion has no list-root endpoint — Search + parent filter."""
+    pages: list[dict[str, object]] = []
+    seen: set[str] = set()
+    cursor: str | None = None
+    for _ in range(_SETUP_SEARCH_PAGES):
+        payload: dict = {
+            "filter": {"property": "object", "value": "page"},
+            "page_size": 100,
+        }
+        if cursor:
+            payload["start_cursor"] = cursor
+        r = await client.post(f"{NOTION_API}/search", json=payload)
+        r.raise_for_status()
+        data = r.json()
+        results = data.get("results") or []
+        if not results:
+            break
+        for page in results:
+            if not _is_workspace_page(page):
+                continue
+            pid = str(page["id"])
+            if pid in seen:
+                continue
+            seen.add(pid)
+            title = extract_title_prop(page.get("properties") or {}) or "(Untitled)"
+            pages.append({"id": pid, "name": title, "root": True})
+        if not data.get("has_more"):
+            break
+        cursor = data.get("next_cursor")
+        if not cursor:
+            break
+    pages.sort(key=lambda p: str(p["name"]).casefold())
+    return pages
 
 
 def create_app(settings: Settings) -> FastAPI:
@@ -320,16 +388,19 @@ def create_app(settings: Settings) -> FastAPI:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Not connected to Notion"
             )
+        parent_id = _setup_parent_id(req)
         try:
             async with httpx.AsyncClient(headers=notion_headers(token), timeout=60) as client:
-                root_page_id = await create_workspace_root_page(client, req.workspace_name)
+                host_id, crm_title = await _setup_host(client, req, parent_id)
+                done_id = host_id
                 if req.scope in ("crm", "both"):
-                    await create_crm_workspace(client, root_page_id)
+                    crm = await create_crm_workspace(client, host_id, page_title=crm_title)
+                    done_id = crm.crm_page_id
                 if req.scope in ("inbox", "both"):
-                    await create_inbox_workspace(client, root_page_id)
+                    await create_inbox_workspace(client, host_id)
         except httpx.HTTPStatusError as exc:
-            raise HTTPException(status_code=400, detail=f"Notion API error: {exc.response.text}")
-        return SetupResponse(notion_page_url=notion_page_url(root_page_id))
+            raise HTTPException(status_code=400, detail=_setup_notion_error(exc, parent_id))
+        return SetupResponse(notion_page_url=notion_page_url(done_id))
 
     @app.post("/api/setup/stream")
     async def run_setup_stream(req: SetupRequest, request: Request) -> StreamingResponse:
@@ -345,20 +416,27 @@ def create_app(settings: Settings) -> FastAPI:
             def sse(msg_type: str, **kwargs: object) -> str:
                 return f"data: {_json.dumps({'type': msg_type, **kwargs})}\n\n"
 
+            parent_id = _setup_parent_id(req)
             try:
                 async with httpx.AsyncClient(headers=notion_headers(token), timeout=120) as client:
-                    yield sse("log", message="Creating root page…")
-                    root_page_id = await create_workspace_root_page(client, req.workspace_name)
-                    yield sse("log", message="✓ Root page created")
+                    if parent_id:
+                        yield sse("log", message="Creating CRM under your Notion page…")
+                    else:
+                        yield sse("log", message="Creating workspace root page…")
+                    host_id, crm_title = await _setup_host(client, req, parent_id)
+                    if not parent_id:
+                        yield sse("log", message="✓ Workspace root page created")
 
                     db_ids: dict[str, str] = {}
+                    done_id = host_id
 
                     if req.scope in ("crm", "both"):
                         yield sse("log", message="Creating CRM page…")
                         yield sse("log", message="  → Companies database")
                         yield sse("log", message="  → People database")
                         yield sse("log", message="  → Deals database")
-                        crm = await create_crm_workspace(client, root_page_id)
+                        crm = await create_crm_workspace(client, host_id, page_title=crm_title)
+                        done_id = crm.crm_page_id
                         db_ids["notion_companies_data_source_id"] = crm.companies_id
                         db_ids["notion_people_data_source_id"] = crm.people_id
                         db_ids["notion_deals_database_id"] = crm.deals_id
@@ -370,20 +448,20 @@ def create_app(settings: Settings) -> FastAPI:
                         yield sse("log", message="  → Ideas database")
                         yield sse("log", message="  → Tools database")
                         yield sse("log", message="  → Data & Technology database")
-                        inbox = await create_inbox_workspace(client, root_page_id)
+                        inbox = await create_inbox_workspace(client, host_id)
                         db_ids["notion_notions_database_id"] = inbox.notions_id
                         db_ids["notion_ideas_database_id"] = inbox.ideas_id
                         db_ids["notion_tools_database_id"] = inbox.tools_id
                         db_ids["notion_data_tech_database_id"] = inbox.data_tech_id
                         yield sse("log", message="✓ Knowledge ready (with demo data)")
 
-                    root_url = notion_page_url(root_page_id)
-                    save_cockpit_cfg(wid, {"databases": db_ids, "workspace_url": root_url})
+                    done_url = notion_page_url(done_id)
+                    save_cockpit_cfg(wid, {"databases": db_ids, "workspace_url": done_url})
                     yield sse("log", message="✓ Cockpit configured")
-                    yield sse("done", url=root_url)
+                    yield sse("done", url=done_url)
             except httpx.HTTPStatusError as exc:
                 logger.error("setup failed: {} {}", exc.response.status_code, exc.response.text)
-                yield sse("error", message=f"Notion API error: {exc.response.text}")
+                yield sse("error", message=_setup_notion_error(exc, parent_id))
             except Exception as exc:
                 logger.error("setup failed: {}", exc)
                 yield sse("error", message=str(exc))
@@ -393,6 +471,18 @@ def create_app(settings: Settings) -> FastAPI:
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    @app.get("/api/setup/pages")
+    async def setup_pages(request: Request) -> dict:
+        token = _require_token(request)
+        try:
+            async with httpx.AsyncClient(headers=notion_headers(token), timeout=30) as client:
+                pages = await _list_parent_pages(client)
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=504, detail="Notion search timed out")
+        except httpx.HTTPStatusError as exc:
+            raise HTTPException(status_code=400, detail=f"Notion API error: {exc.response.text}")
+        return {"pages": pages}
 
     # ── Cockpit ───────────────────────────────────────────────────────────────
 

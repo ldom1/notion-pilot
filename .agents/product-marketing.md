@@ -1,152 +1,120 @@
 # Product Marketing Context
 
-**Document version:** v1
-**Last updated:** 2026-09-10
+**Document version:** v3
+**Last updated:** 2026-09-11
 
 ## Product Overview
-**One-liner:** A CRM you actually own — five Notion databases kept current by AI, on a workspace you can host in Europe.
-
-**What it does:** Notion Pilot deploys a working B2B CRM into your own Notion workspace, then keeps it up to date without data entry. Sales updates arrive by Telegram message or straight from an AI assistant (Claude, Claude Code, Cursor) over MCP; the assistant searches the CRM, dedups against what exists, and proposes a diff you approve before anything is written.
-
-**Product category:** Self-hosted CRM automation for Notion. Adjacent shelves customers search: "Notion CRM template", "Notion CRM automation", "AI CRM data entry", "MCP CRM server".
-
-**Product type:** Open-source, self-hosted software (MIT). Python 3.12 · uv · Docker/systemd · FastAPI cockpit. Optional hosted deploy wizard.
-
-**Business model:** Free and open source; you run it. No per-seat licence. Costs are your own hosting plus whatever Notion plan you already pay for.
+**One-liner:** A self-hosted CRM you actually own — Notion as the system of record, AI doing the typing, every write waiting for your go.
+**What it does:** Deploys a relational CRM into the customer's Notion workspace (Companies, People, Leads, Activities, Meetings), then keeps it current from the team's existing AI assistant (Notion MCP). French companies enrich automatically from open data (SIRENE, filings); companies outside France are skipped. Nothing is written without a human preview. Telegram capture exists in the product; it is not the homepage story.
+**Product category:** CRM / Notion CRM / AI-assisted sales ops (customers search "CRM in Notion", "Salesforce alternative Europe", "AI update CRM").
+**Product type:** Self-hosted software + public Notion integration (OAuth deploy wizard), not multi-tenant SaaS.
+**Business model:** Open-source (MIT). No seat price. Customer brings Notion (Enterprise if they want EU data residency) and their own host.
 
 ## Target Audience
-**Target companies:** Small-to-mid B2B teams (roughly 3–30 people touching sales) who already live in Notion. Strong fit: European companies — especially French — where data residency is a procurement question. Engineering-adjacent businesses: consultancies, deep-tech, energy/industrial software, agencies.
-
-**Decision-makers:** Founder / commercial director (buys it), sales lead (uses it daily), and a technically-comfortable operator (runs it — often a founder or the one engineer who likes infra).
-
-**Primary use case:** Replace a spreadsheet CRM — or an abandoned Salesforce/HubSpot seat — with a Notion CRM that stays current because AI does the typing.
-
+**Target companies:** Small sales / BD teams (≈2–10) working with **French companies**, already in Notion or willing to put the CRM there, often EU-sensitive (data residency, no US CRM estate).
+**Decision-makers:** Head of sales / BD, founder-operator, IT or security on Enterprise Notion (residency, SSO). Champion is usually the person who already lives in Notion and hates the CRM.
+**Primary use case:** Keep the pipeline true without fifteen clicks between meetings.
 **Jobs to be done:**
-- "Give me a pipeline I can trust on Monday morning without nagging the team."
-- "Stop me retyping the same email thread into three databases."
-- "Keep our customer data in Europe, on infrastructure we control."
-
+- Hire it so one email becomes four correct records — I only approve
+- Hire it so the CRM I own in Notion does not rot the week I get busy
+- Hire it so my existing assistant (Claude, Cursor) can operate the pipeline without opening Notion
 **Use cases:**
-- After a call or a meeting: log the activity, move the stage, set the next step — from a phone, in 30 seconds.
-- Inbound email thread: create the contact, match the company, advance the deal, log the activity — one paste, one approval.
-- Company enrichment: SIREN, NAF/APE, BODACC, RNE financials pulled from French open data instead of typed.
-- Weekly pipeline review off shared Notion views rather than a rebuilt spreadsheet.
+- Paste a client email into Claude/Cursor; approve the diff
+- Enrich a French company from SIREN / RNE instead of typing firmographics
 
 ## Personas
 | Persona | Cares about | Challenge | Value we promise |
 |---------|-------------|-----------|------------------|
-| Sales lead (user) | Not doing admin | Updating the CRM costs 15 clicks nobody spends on a Friday | Dictate three sentences; the funnel moves |
-| Founder / commercial director (champion + decision maker) | A pipeline they can trust | Numbers are stale, so forecasting is guesswork | A pipeline view that is current without policing anyone |
-| Operator / engineer (technical influencer) | Not owning a fragile black box | Another SaaS to integrate and audit | Self-hosted, MIT, dry-run writes, no webhook |
-| Buyer in a regulated/EU-sensitive org (financial + risk) | Where the data sits | Vendor can't answer the residency question | Notion Enterprise EU region; automation layer on your own server |
+| User (AE / BD) | Speed, not opening the CRM | Fifteen clicks; Friday pipeline is a lie | Paste the thread; approve; done |
+| Champion (Notion-native ops) | Schema they can reshape | Notion is a database, not a CRM, and nobody feeds it | Deployed schema + automation that follows their properties |
+| Decision maker (sales lead) | A pipeline they can believe on Monday | Dashboards on stale rows | Formulas that stay fed |
+| Financial buyer | No new seat estate | Salesforce/HubSpot price + migration | Notion they already pay for; Pilot is self-hosted |
+| Technical / security | EU region, permissions, HITL | Shadow AI writing into the CRM | Self-hosted; assistant sees what you see; dry-run default; residency is Notion Enterprise — confirm with Notion |
 
 ## Problems & Pain Points
-**Core problem:** The CRM is not too simple or too complex — it is too tedious to keep current. So it goes stale, and once it is stale nobody trusts it, which removes the last reason to update it.
-
+**Core problem:** CRMs don't fail on missing features. They fail on data entry. The schema is built in an afternoon; keeping it true is every afternoon after that.
 **Why alternatives fall short:**
-- **Spreadsheet CRM:** no relations, one owner keeping it alive, copies emailed around, reports rebuilt by hand.
-- **Salesforce / HubSpot:** per-seat cost limits who can even see the pipeline; rigid workflows; still requires the same manual updates, so it stalls for the same reason.
-- **Notion CRM templates:** beautiful schema, zero maintenance story — the template is the easy afternoon.
-- **Zapier / Make:** fire-and-forget automations with no dedup and no human review, so they create duplicates and erode trust faster than manual entry.
-- **Claudeforce (Salesforce + Anthropic, Aug 2026):** validates the thesis exactly — but only if you already pay for Salesforce underneath.
-
-**What it costs them:** 5–10 minutes per customer interaction that nobody actually pays, so the cost lands instead as a pipeline leadership silently stops believing. Forecasts become anecdote; follow-ups get missed; deals rot in a stage nobody moved.
-
-**Emotional tension:** Quiet guilt about the CRM being behind. Low-grade dread before a pipeline review. The suspicion that the expensive tool was never the problem.
+- Salesforce + Claudeforce: the idea (chat over live pipeline) ships under a licence, a migration, and a seat price
+- Spreadsheets: no relations — rename a company, miss a tab
+- Notion alone: collaboration and databases exist; maintenance does not
+- Autopilot AI CRMs: write without a preview
+**What it costs them:** Stale stages, overdue next steps, Monday reviews on fiction, hours re-typing what was already in the email.
+**Emotional tension:** Shame that the CRM is a lie; fear of an agent writing the wrong thing; fatigue of being the person who "just update Salesforce".
 
 ## Competitive Landscape
-**Direct:** Notion CRM templates + manual upkeep — falls short because the schema was never the hard part.
-**Direct:** Salesforce / HubSpot / Pipedrive — fall short on per-seat visibility, rigidity, and the same unpaid data-entry tax.
-**Secondary:** Zapier / Make / n8n glue — falls short with no dedup, no matching, no human-in-the-loop, so data quality degrades.
-**Secondary:** Claudeforce / "Salesforce in Claude" — right idea, requires the Salesforce estate; no self-hosting, no EU-by-default story.
-**Indirect:** Excel / Google Sheets, or no CRM at all — falls short the moment more than one person needs the truth.
+**Direct:** Other Notion CRM templates / consultancies — schema without a feeder; no HITL agent loop.
+**Secondary:** Salesforce / HubSpot + AI plugins (Claudeforce) — same job, vendor estate underneath.
+**Indirect:** "We'll be better about updating the CRM" / a shared spreadsheet / an EA — discipline that decays at the speed of the busiest week.
 
 ## Differentiation
 **Key differentiators:**
-- **You own the system of record.** It is your Notion workspace, your schema, your data — not a vendor's database.
-- **EU hosting is real, not a promise.** Notion Enterprise pins data at rest to eu-central-1 (Frankfurt), free on that plan; the automation layer runs on your own server.
-- **Human-in-the-loop is enforced in the tools**, not in the docs: write tools return a dry-run preview unless `confirm=true`.
-- **Dedup before write** — email and LinkedIn exact match, then fuzzy name + company. Ambiguous matches escalate to a human.
-- **French open-data enrichment** built in (SIREN, NAF/APE, BODACC, RNE financials).
-- **Two capture surfaces nobody else pairs:** Telegram for the 30-second update, MCP for the AI assistant.
-- **The schema evolves with you.** Deploy a standard CRM, then reshape it in Notion; an agent with Notion MCP adapts to the structure you grew into.
-
-**How we do it differently:** We do not replace the CRM interface — we remove the need to open it. The assistant proposes, the human approves, Notion stays the source of truth.
-
-**Why that's better:** Adoption stops depending on discipline. The data stays clean because matching happens before the write, not after.
-
-**Why customers choose us:** They already trust Notion, they refuse another per-seat SaaS, and someone in the building cares where the data lives.
+- System of record is the customer's Notion, not ours
+- Human-in-the-loop by default (preview, then `go`)
+- Self-hosted automation; EU residency is a Notion Enterprise option (never a Pilot guarantee)
+- French open-data enrichment (SIRENE / filings); non-FR skipped
+**How we do it differently:** We deploy the schema, then the assistant reads *their* properties through Notion MCP — add a field Monday, it can fill it Tuesday.
+**Why that's better:** They keep governance, collaboration, and the workspace they already share. We only do the typing.
+**Why customers choose us:** They want Claudeforce's idea without Salesforce; they already live in Notion; they cannot send pipeline data to a US SaaS.
 
 ## Objections
 | Objection | Response |
 |-----------|----------|
-| "Notion isn't a CRM." | Correct, not out of the box. It is a relational database with views. The schema plus a maintenance layer is what makes it a CRM — that is the product. |
-| "Can the AI corrupt our data?" | Writes are dry-run by default and need an explicit confirmation. Ambiguous matches are escalated, never guessed. |
-| "Who maintains it?" | You do — it is self-hosted, and that is a real cost. Name the owner during the pilot. We say this on the page rather than hiding it. |
-| "Where does our data live?" | Your Notion workspace (EU region available on Enterprise) plus your own server. No third-party SaaS in the path. |
-| "How does this compare to Salesforce?" | Different philosophy, not feature parity. Need territory management or CPQ? Not this. CRM dying of neglect? This. |
-| "It's a one-person open-source project." | MIT licensed, CI-gated, and you host it — worst case you keep the databases and the code. Feedback shapes the roadmap directly. |
+| "Does our data stay in the EU?" | Records live in their Notion workspace. Region is a **Notion Enterprise option, to confirm with Notion**. Pilot runs on their infrastructure and keeps no copy beyond a runtime cache. Never certify or guarantee residency. |
+| "Will the AI write garbage into the CRM?" | Dry-run is the default. Every write is a preview until they say go. Ambiguous matches escalate. |
+| "We don't only sell to French companies." | FR firms enrich from open data. Others can be stored; they are not auto-enriched. Be explicit — this is a scoped CRM, not a global Dun & Bradstreet. |
+| "Isn't this just a Notion template?" | The template is the afternoon. The product is keeping it true. |
 
-**Anti-persona:** Teams needing CPQ, quote approval chains, territory management or a certified vendor of record. Non-technical solo users with nobody to run a container. Companies not already on Notion — the migration cost swamps the benefit.
+**Anti-persona:** Teams that need a global enrichment graph, a multi-tenant SaaS CRM, or an agent that writes without approval. Teams not on Notion and unwilling to move.
 
 ## Switching Dynamics
-**Push:** The spreadsheet is out of date and everyone knows it. A pipeline review went badly. An abandoned CRM seat is being paid for.
-**Pull:** "I can keep using Notion, and the updates just happen." Data stays in Europe. No per-seat cost to widen visibility.
-**Habit:** The spreadsheet works well enough for the one person maintaining it; the CRM tab is already open; nobody wants to re-teach a team.
-**Anxiety:** "Will the AI write nonsense into my pipeline?" "Am I signing up to run infrastructure?" "Is this abandoned in six months?"
+**Push:** CRM is stale; Claudeforce made the chat-shaped CRM feel inevitable; Salesforce quote landed.
+**Pull:** Own the database; approve every write; host in Europe; French companies fill themselves.
+**Habit:** Fifteen clicks they already skip; "we'll update it on Friday".
+**Anxiety:** Agent writes the wrong company; Notion isn't "a real CRM"; Enterprise residency is not automatic.
 
 ## Customer Language
 **How they describe the problem:**
-- "Nobody updates it."
-- "The CRM is always behind."
-- "I don't trust the pipeline numbers."
-- "It's 15 clicks to update one opportunity."
-- "Opening the tool was a chore, every day."
-
+- "Fifteen clicks to update an opportunity"
+- "Nobody updates the CRM"
+- "Which version is current?"
 **How they describe us:**
-- "The CRM updates itself."
-- "I just paste the email and say go."
-- "It's our Notion, not someone else's database."
-
-**Words to use:** own, current, up to date, approve, preview, your workspace, Europe, relations, self-hosted, no data entry, source of truth.
-**Words to avoid:** autonomous, fully automatic, set-and-forget, AI-powered (empty), enterprise-grade (unearned), guaranteed, GDPR-compliant (as a claim about us), replaces Salesforce, seamless, revolutionary.
-
+- (sparse — early) "CRM you actually own"
+- "Nothing reaches Notion that you haven't approved"
+**Words to use:** system of record, preview, go, pipeline, stale, self-hosted, approve, relations (not "spreadsheet tabs")
+**Words to avoid:** confirm=true / MCP jargon on the marketing page; residency **guarantees**; invented ROI; "Meetings is just an activity type" (it is a real database); claiming collaboration is a Pilot feature (it is native Notion)
 **Glossary:**
 | Term | Meaning |
 |------|---------|
-| Leads / Deals | Same database; the pipeline. Labelled "Leads" in the reference deployment |
-| Activities | Timeline entries — call, email, meeting, demo, proposal — linked to deal, person and company |
-| Meetings | Separate Notion database holding meeting notes; related from Activities and People. Human-maintained |
-| MCP | Model Context Protocol — how an AI assistant gets tools to read/write the CRM |
-| Dry run | A write tool returning a preview instead of writing; the default |
-| Cockpit | The self-hosted web UI for deploy, inspection and chat |
+| HITL | Human-in-the-loop — preview then approve |
+| Dry run | Write tools return a preview until confirmed |
+| Leads | The deals pipeline database |
+| Open data | French public registries (SIRENE, BODACC, RNE) |
 
 ## Brand Voice
-**Tone:** Candid and technical without jargon. Says the trade-off out loud before you find it.
-**Style:** Direct, concrete, specific. Short sentences. Real property names and real numbers over adjectives. Never hypes.
-**Personality:** Honest, precise, unfussy, quietly opinionated, engineer-to-engineer.
+**Tone:** Direct, adult, slightly dry. No hype, no exclamation marks.
+**Style:** Specific scenes (Friday 17:42, Voltaris) over adjectives. Show the record, don't claim "powerful AI".
+**Personality:** Precise, sceptical of CRM theatre, respectful of Notion, honest about scope (France, Enterprise residency to confirm).
 
 ## Proof Points
-**Metrics:** None published — and none should be invented. Do not cite ROI, adoption or time-saved figures until measured.
-**Customers:** One real reference deployment (Artelys — B2B energy/optimisation consultancy): 1,281 companies, 1,859 people, 30 open leads, 47 logged activities. Naming approval required before external use.
-**Testimonials:** None yet. Collect from the first three pilot users.
+**Metrics:** None invented. Film timings (21s pipeline) and schema facts only.
+**Customers:** Not for public use yet. Artelys exists in internal deck appendix — do not put on the site without approval.
+**Testimonials:** None on the marketing site yet.
 **Value themes:**
 | Theme | Proof |
 |-------|-------|
-| Human-in-the-loop is real | `confirm=false` is the default in every write tool (`notion_pilot/mcp/tools.py`) |
-| Dedup before write | Email/LinkedIn exact match, then fuzzy name + company; duplicate scans surfaced for review |
-| EU hosting | Notion data residency eu-central-1, free on Enterprise; automation layer self-hosted |
-| No third-party SaaS | No webhook, no relay; Notion API called directly from your server |
-| Open source | MIT, CI-gated, public repo |
+| HITL | Assistant preview / go; dry-run default |
+| Own the DB | OAuth deploy into *their* Notion |
+| France | SIRENE/RNE enrichment; non-FR skipped (footer) |
+| EU | Notion Enterprise region — confirm with Notion; Pilot self-hosted |
+| Collaboration | Native Notion workspace, not a Pilot feature |
 
 ## Goals
-**Business goal:** Move from single-operator dogfooding to a handful of real external users who deploy the CRM and connect an assistant.
-**Conversion action:** Click **Deploy to Notion** and complete the OAuth deploy; secondary action is connecting an AI assistant over MCP.
-**Current metrics:** Unknown — no analytics on the landing page yet. Worth adding before any launch push.
-
-## Known gaps to fix before a launch push
-Documented in `docs/notion-pilot-crm-readiness-audit.md`: the deploy creates 3 of 5 databases (no Activities, so activity logging fails on a fresh workspace), `Companies.Activities` is a multi-select rather than a relation, the bootstrapped schema lacks the pipeline formula properties, and OAuth tokens are not persisted so background automation cannot serve a connected workspace. The homepage should not promise past these.
+**Business goal:** Qualified deploys by EU/FR sales teams who will run a real deal through it for a week.
+**Conversion action:** Deploy the CRM to Notion (`/auth/notion`).
+**Current metrics:** Not instrumented on the landing page.
 
 ## Changelog
 *Newest first. One line per revision: what changed and why.*
-- v1 (2026-09-10) — Initial context, auto-drafted from the codebase, README, executive deck and the readiness audit; positioning centred on "a CRM you actually own, kept current by AI, hostable in Europe".
+- v3 (2026-09-11) — Wizard public-integration OAuth ≠ Notion official MCP OAuth; Claude reaches the deployed CRM via a second connection to the same workspace.
+- v2 (2026-09-11) — Homepage capture is the AI assistant only; Telegram is a product capability, not the landing story.
+- v1 (2026-09-11) — Initial context, auto-drafted from landing, README, talk-track "never say" list, and CRM objectives (FR enrichment, HITL, Notion-as-SoR).

@@ -11,6 +11,7 @@ class SetupRequest(BaseModel):
     scope: Literal["crm", "inbox", "both"]
     workspace_name: str
     notion_token: str | None = None
+    parent_page: str | None = None  # Notion URL or ID; omit = workspace root
 
 
 class SetupResponse(BaseModel):

@@ -1,0 +1,570 @@
+/* Notion Pilot — shared video design system.
+ *
+ * Mirrors web/frontend/src/styles/tokens.css: monochrome instrument, pure white
+ * stock, a true achromatic grey ramp, near-black as the only "brand colour".
+ * Colour appears ONLY inside CRM data (won / stale / lost) — never decoration.
+ *
+ * Authored for a 1920x1080 frame. Sizes are absolute px on purpose: a rendered
+ * frame has one size, so there is nothing to make responsive.
+ */
+
+/* ── type ─────────────────────────────────────────────────────────────────── */
+
+@font-face {
+  font-family: Archivo;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+  src: url(fonts/Archivo-var-latin-ext.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: Archivo;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+  src: url(fonts/Archivo-var-latin.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url(fonts/IBMPlexMono-400-latin-ext.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url(fonts/IBMPlexMono-400-latin.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url(fonts/IBMPlexMono-500-latin-ext.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url(fonts/IBMPlexMono-500-latin.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url(fonts/IBMPlexMono-600-latin-ext.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url(fonts/IBMPlexMono-600-latin.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ── tokens ───────────────────────────────────────────────────────────────── */
+
+:root {
+  --bg: oklch(1 0 0);
+  --surface: oklch(0.978 0 0);
+  --surface-2: oklch(0.956 0 0);
+  --ink: oklch(0.17 0 0);
+  --ink-soft: oklch(0.36 0 0);
+  --muted: oklch(0.52 0 0);
+  --rule: oklch(0.915 0 0);
+  --rule-strong: oklch(0.845 0 0);
+
+  --primary: oklch(0.22 0 0);
+  --primary-deep: oklch(0.12 0 0);
+  --primary-wash: oklch(0.965 0 0);
+
+  --ok: oklch(0.55 0.11 162);
+  --warn: oklch(0.64 0.13 72);
+  --bad: oklch(0.57 0.15 20);
+
+  --dark: oklch(0.17 0 0);
+  --dark-ink: oklch(0.93 0 0);
+  --dark-rule: oklch(0.32 0 0);
+  --dark-muted: oklch(0.68 0 0);
+
+  --font: Archivo, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --r: 10px;
+  --r-lg: 16px;
+
+  --shadow-2: 0 3px 12px -3px oklch(0 0 0 / 0.12);
+  --shadow-3: 0 28px 64px -40px oklch(0 0 0 / 0.34);
+
+  /* Notion select colours — pale fill, darker text of the same hue */
+  --n-gray-bg: oklch(0.945 0 0);
+  --n-gray-fg: oklch(0.42 0 0);
+  --n-orange-bg: oklch(0.95 0.052 65);
+  --n-orange-fg: oklch(0.5 0.13 55);
+  --n-yellow-bg: oklch(0.958 0.062 95);
+  --n-yellow-fg: oklch(0.48 0.1 85);
+  --n-green-bg: oklch(0.952 0.042 160);
+  --n-green-fg: oklch(0.44 0.11 162);
+  --n-blue-bg: oklch(0.948 0.038 250);
+  --n-blue-fg: oklch(0.45 0.13 253);
+  --n-purple-bg: oklch(0.948 0.036 300);
+  --n-purple-fg: oklch(0.46 0.14 300);
+  --n-red-bg: oklch(0.952 0.038 22);
+  --n-red-fg: oklch(0.5 0.15 22);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  font-size: 30px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+#root {
+  position: relative;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* ── frame furniture ─────────────────────────────────────────────────────── */
+
+.np-clip {
+  position: absolute;
+  inset: 0;
+  padding: 104px 116px 120px;
+}
+
+.np-chrome {
+  position: absolute;
+  top: 50px;
+  left: 116px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 40;
+}
+
+.np-chrome .np-mark {
+  width: 36px;
+  height: 36px;
+  display: block;
+}
+
+.np-chrome span {
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.np-stage {
+  position: absolute;
+  bottom: 48px;
+  left: 116px;
+  font-family: var(--font-mono);
+  font-size: 21px;
+  font-weight: 500;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+  color: var(--muted);
+  z-index: 40;
+}
+
+.np-tick-rail {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 1920px;
+  height: 3px;
+  background: var(--rule);
+  z-index: 40;
+}
+
+.np-tick {
+  display: block;
+  width: 1920px;
+  height: 3px;
+  background: var(--ink);
+  transform-origin: 0 50%;
+}
+
+/* ── display type ────────────────────────────────────────────────────────── */
+
+.np-display {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: center;
+}
+
+.np-kicker {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 40px;
+}
+
+.np-h1 {
+  font-size: 118px;
+  font-weight: 600;
+  line-height: 1.02;
+  letter-spacing: -0.033em;
+  max-width: 1560px;
+}
+
+/* the line box clips its own reveal, so it needs room for descenders */
+.np-h1 .np-line {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.09em;
+  margin-bottom: -0.09em;
+}
+
+.np-h1 .np-line > b {
+  display: block;
+  font-weight: inherit;
+}
+
+.np-h2 {
+  font-size: 66px;
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.024em;
+  max-width: 1200px;
+}
+
+.np-lede {
+  font-size: 39px;
+  line-height: 1.4;
+  color: var(--ink-soft);
+  max-width: 1080px;
+  margin-top: 40px;
+}
+
+.np-quiet {
+  color: var(--muted);
+}
+
+/* ── cards, tables, tags ─────────────────────────────────────────────────── */
+
+.np-card {
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+}
+
+.np-card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 28px 40px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.np-card-head .np-meta {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.np-row {
+  display: grid;
+  align-items: center;
+  gap: 28px;
+  padding: 28px 40px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 30px;
+}
+
+.np-row:last-child {
+  border-bottom: 0;
+}
+
+.np-row-name {
+  font-weight: 500;
+  letter-spacing: -0.008em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.np-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 28px;
+  letter-spacing: 0.01em;
+}
+
+.np-tag {
+  display: inline-block;
+  padding: 8px 18px 9px;
+  border-radius: 999px;
+  font-size: 23px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+  background: var(--n-gray-bg);
+  color: var(--n-gray-fg);
+}
+
+.np-tag.gray { background: var(--n-gray-bg); color: var(--n-gray-fg); }
+.np-tag.orange { background: var(--n-orange-bg); color: var(--n-orange-fg); }
+.np-tag.yellow { background: var(--n-yellow-bg); color: var(--n-yellow-fg); }
+.np-tag.green { background: var(--n-green-bg); color: var(--n-green-fg); }
+.np-tag.blue { background: var(--n-blue-bg); color: var(--n-blue-fg); }
+.np-tag.purple { background: var(--n-purple-bg); color: var(--n-purple-fg); }
+.np-tag.red { background: var(--n-red-bg); color: var(--n-red-fg); }
+
+.np-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--rule-strong);
+}
+
+.np-dot.ok { background: var(--ok); }
+.np-dot.warn { background: var(--warn); }
+.np-dot.bad { background: var(--bad); }
+
+/* ── inverted panel (agent transcript) ──────────────────────────────────── */
+
+.np-dark-panel {
+  background: var(--dark);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+  color: var(--dark-ink);
+}
+
+.np-dark-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 26px 38px;
+  border-bottom: 1px solid var(--dark-rule);
+  font-family: var(--font-mono);
+  font-size: 21px;
+  font-weight: 500;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: var(--dark-muted);
+}
+
+.np-log {
+  padding: 32px 38px;
+  font-family: var(--font-mono);
+  font-size: 24px;
+  line-height: 1.8;
+}
+
+/* call on the left, result flush right — a tool log, not a paragraph */
+.np-log-line {
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  gap: 16px;
+  align-items: baseline;
+  color: var(--dark-ink);
+  white-space: nowrap;
+}
+
+.np-log-line > .np-call {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.np-log-line .np-arrow {
+  color: var(--dark-muted);
+}
+
+.np-log-line em {
+  font-style: normal;
+  color: var(--dark-muted);
+}
+
+.np-log-line .np-hit {
+  color: oklch(0.78 0.11 162);
+}
+
+.np-log-line .np-hold {
+  color: oklch(0.82 0.12 82);
+}
+
+.np-log-line .np-hit,
+.np-log-line .np-hold {
+  font-weight: 500;
+}
+
+/* ── the approval mark ───────────────────────────────────────────────────── */
+
+.np-approve {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 38px 22px 30px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.008em;
+}
+
+.np-approve svg {
+  width: 32px;
+  height: 32px;
+  display: block;
+}
+
+/* ── KPI strip ───────────────────────────────────────────────────────────── */
+
+.np-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--bg);
+  box-shadow: var(--shadow-3);
+}
+
+.np-kpi {
+  padding: 42px 44px 46px;
+  border-right: 1px solid var(--rule);
+}
+
+.np-kpi:last-child {
+  border-right: 0;
+}
+
+.np-kpi-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 18px;
+}
+
+.np-kpi-value {
+  display: block;
+  font-size: 78px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.032em;
+  font-variant-numeric: tabular-nums;
+}
+
+.np-kpi-delta {
+  display: inline-block;
+  margin-top: 18px;
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.np-kpi-delta.up { color: var(--ok); }
+.np-kpi-delta.down { color: var(--ok); }
+
+/* ── end lockup ──────────────────────────────────────────────────────────── */
+
+.np-lockup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 34px;
+  text-align: center;
+}
+
+.np-lockup .np-mark-lg {
+  width: 118px;
+  height: 118px;
+  display: block;
+}
+
+.np-wordmark {
+  font-size: 84px;
+  font-weight: 600;
+  letter-spacing: -0.028em;
+}
+
+.np-cta {
+  font-family: var(--font-mono);
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.np-rule-sweep {
+  display: block;
+  width: 320px;
+  height: 2px;
+  background: var(--rule-strong);
+  transform-origin: 50% 50%;
+}

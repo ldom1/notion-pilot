@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en" data-resolution="landscape">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Notion Pilot — one email, four records, KPIs current</title>
+    <link rel="stylesheet" href="assets/np.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      /* ── scene 2: the email and the agent reading it ─────────────────── */
+      #s-email .np-split {
+        display: grid;
+        grid-template-columns: 900px 1fr;
+        gap: 68px;
+        align-items: start;
+        height: 100%;
+        align-content: center;
+      }
+
+      .np-mailhead {
+        display: flex;
+        align-items: baseline;
+        gap: 18px;
+        padding: 28px 40px;
+        border-bottom: 1px solid var(--rule);
+        background: var(--surface);
+      }
+
+      .np-mailhead strong {
+        font-size: 27px;
+        font-weight: 600;
+      }
+
+      .np-mailhead .np-when {
+        margin-left: auto;
+        font-family: var(--font-mono);
+        font-size: 22px;
+        color: var(--muted);
+      }
+
+      .np-mailsubject {
+        padding: 24px 40px 26px;
+        border-bottom: 1px solid var(--rule);
+        font-size: 29px;
+        font-weight: 600;
+        letter-spacing: -0.012em;
+      }
+
+      .np-mailbody {
+        padding: 38px 40px 42px;
+        font-size: 30px;
+        line-height: 1.6;
+        color: var(--ink-soft);
+      }
+
+      .np-mailbody p {
+        margin-bottom: 26px;
+      }
+
+      .np-mailbody p:last-child {
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: 27px;
+      }
+
+      /* a fact the agent lifted out of the prose */
+      .np-fact {
+        display: inline-block;
+        padding: 2px 8px 4px;
+        margin: -2px -8px;
+        border-radius: 7px;
+        background: var(--surface-2);
+        color: var(--ink);
+        font-weight: 500;
+      }
+
+      #s-email .np-lede {
+        margin-top: 28px;
+        font-size: 32px;
+        max-width: 860px;
+      }
+
+      #s-email .np-dark-panel {
+        margin-top: 40px;
+      }
+
+      /* ── scene 3: the diff the agent asks you to approve ─────────────── */
+      #s-diff .np-card {
+        width: 1650px;
+        margin: 0 auto;
+      }
+
+      #s-diff .np-row {
+        grid-template-columns: 250px 160px 430px 1fr;
+        padding: 30px 44px;
+      }
+
+      .np-db {
+        font-family: var(--font-mono);
+        font-size: 23px;
+        font-weight: 500;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .np-detail {
+        font-size: 26px;
+        color: var(--ink-soft);
+      }
+
+      #s-diff .np-gate {
+        display: flex;
+        align-items: center;
+        gap: 32px;
+        width: 1650px;
+        margin: 48px auto 0;
+      }
+
+      #s-diff .np-gate .np-note {
+        font-size: 30px;
+        color: var(--ink-soft);
+      }
+
+      /* ── scene 4: the Notion tables that moved ───────────────────────── */
+      #s-notion .np-stack {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 48px;
+        height: 100%;
+      }
+
+      #s-notion .np-card {
+        width: 1688px;
+        margin: 0 auto;
+      }
+
+      #s-notion .np-row {
+        grid-template-columns: 1fr 340px 210px 150px 210px;
+      }
+
+      #s-notion .np-row .np-num,
+      #s-notion .np-row .np-when {
+        text-align: right;
+      }
+
+      .np-when {
+        font-family: var(--font-mono);
+        font-size: 24px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .np-when.fresh {
+        color: var(--ok);
+      }
+
+      /* the stage cell swaps one tag for another in place */
+      .np-swap {
+        position: relative;
+        display: block;
+        height: 42px;
+      }
+
+      .np-swap > .np-tag {
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+
+      /* ── scene 5: the numbers nobody had to refresh ──────────────────── */
+      #s-kpi .np-holder {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 64px;
+        height: 100%;
+      }
+
+      #s-kpi .np-h2 {
+        max-width: 1420px;
+      }
+
+      /* ── closing lockup ──────────────────────────────────────────────── */
+      #s-end .np-lockup .np-h2 {
+        max-width: 1240px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="21"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- ── scene 1 · 0–3.6s — the moment nobody handles ───────────────── -->
+      <section id="s-open" class="clip np-clip" data-start="0" data-duration="3.8" data-track-index="1">
+        <div class="np-display">
+          <span class="np-kicker" id="open-kicker">17:42 · Friday</span>
+          <h1 class="np-h1">
+            <span class="np-line"><b id="open-l1">An email lands.</b></span>
+            <span class="np-line"><b id="open-l2" class="np-quiet">Nobody opens the CRM.</b></span>
+          </h1>
+        </div>
+      </section>
+
+      <!-- ── scene 2 · 3.8–9.2s — the agent reads it ────────────────────── -->
+      <section
+        id="s-email"
+        class="clip np-clip"
+        data-start="3.8"
+        data-duration="5.6"
+        data-track-index="1"
+      >
+        <div class="np-split">
+          <div class="np-card" id="mail">
+            <div class="np-mailhead">
+              <strong>Camille Dubois</strong>
+              <span class="np-tag gray">Voltaris Énergie</span>
+              <span class="np-when">17:42</span>
+            </div>
+            <div class="np-mailsubject">RE: optimisation platform — next steps</div>
+            <div class="np-mailbody">
+              <p id="mail-p1">
+                Thanks for Tuesday's demo. The team is convinced on the solver side. We need a
+                <span class="np-fact" id="f-security">security review</span> before signing, and our
+                budget window closes <span class="np-fact" id="f-date">15 December</span>.
+              </p>
+              <p id="mail-p2">
+                Can you send a proposal for
+                <span class="np-fact" id="f-licences">12 licences</span>?
+              </p>
+              <p id="mail-p3">— Head of Grid Analytics, Voltaris Énergie</p>
+            </div>
+          </div>
+
+          <div>
+            <h2 class="np-h2" id="email-h2">It reads the email you forwarded.</h2>
+            <p class="np-lede" id="email-lede">
+              Then it looks before it writes — email, then LinkedIn, then the company name. An
+              existing record gets updated, never duplicated.
+            </p>
+            <div class="np-dark-panel" id="email-log">
+              <div class="np-dark-head">notion-crm-ops · via Notion MCP</div>
+              <div class="np-log">
+                <div class="np-log-line" data-log="1">
+                  <span class="np-arrow">→</span>
+                  <span class="np-call">search_company <em>"Voltaris Énergie"</em></span>
+                  <span class="np-hit">1 match</span>
+                </div>
+                <div class="np-log-line" data-log="2">
+                  <span class="np-arrow">→</span>
+                  <span class="np-call">search_person <em>email → LinkedIn</em></span>
+                  <span class="np-hold">0 match</span>
+                </div>
+                <div class="np-log-line" data-log="3">
+                  <span class="np-arrow">→</span>
+                  <span class="np-call">search_lead <em>company + product</em></span>
+                  <span class="np-hit">1 match</span>
+                </div>
+                <div class="np-log-line" data-log="4">
+                  <span class="np-arrow">→</span>
+                  <span class="np-call">update_lead <em>confirm=false</em></span>
+                  <span class="np-hold">dry run</span>
+                </div>
+                <div class="np-log-line" data-log="5">
+                  <span class="np-arrow">→</span>
+                  <span class="np-call">create_activity <em>confirm=false</em></span>
+                  <span class="np-hold">dry run</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── scene 3 · 9.2–13.6s — you approve the diff ─────────────────── -->
+      <section
+        id="s-diff"
+        class="clip np-clip"
+        data-start="9.4"
+        data-duration="4.4"
+        data-track-index="1"
+      >
+        <div class="np-display">
+          <div class="np-card" id="diff-card">
+            <div class="np-card-head">
+              Proposed writes
+              <span class="np-meta">4 records · nothing written yet</span>
+            </div>
+            <div class="np-row" data-layout-allow-overflow data-diff="1">
+              <span class="np-db">Companies</span>
+              <span class="np-tag gray">matched</span>
+              <span class="np-row-name">Voltaris Énergie</span>
+              <span class="np-detail np-quiet">no change</span>
+            </div>
+            <div class="np-row" data-layout-allow-overflow data-diff="2">
+              <span class="np-db">People</span>
+              <span class="np-tag green">create</span>
+              <span class="np-row-name">Camille Dubois</span>
+              <span class="np-detail">Head of Grid Analytics · director</span>
+            </div>
+            <div class="np-row" data-layout-allow-overflow data-diff="3">
+              <span class="np-db">Leads</span>
+              <span class="np-tag orange">update</span>
+              <span class="np-row-name">Voltaris — Platform licence</span>
+              <span class="np-detail">Discovery → Proposal Sent · 60 % · close 15 Dec</span>
+            </div>
+            <div class="np-row" data-layout-allow-overflow data-diff="4">
+              <span class="np-db">Activities</span>
+              <span class="np-tag green">create</span>
+              <span class="np-row-name">Demo follow-up</span>
+              <span class="np-detail">Email · Follow-up Needed · proposal due 20 Nov</span>
+            </div>
+          </div>
+
+          <div class="np-gate">
+            <span class="np-approve" id="approve">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m4 12.5 5 5L20 6.5" />
+              </svg>
+              Approved
+            </span>
+            <span class="np-note" id="gate-note">One read. Four records. Zero typing.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── scene 4 · 13.8–17.4s — the workspace moves ─────────────────── -->
+      <section
+        id="s-notion"
+        class="clip np-clip"
+        data-start="13.8"
+        data-duration="3.8"
+        data-track-index="1"
+      >
+        <div class="np-stack">
+          <div class="np-card" id="leads-card">
+            <div class="np-card-head">
+              Leads
+              <span class="np-meta">Notion · your workspace</span>
+            </div>
+            <div class="np-row" data-lead="1">
+              <span class="np-row-name">Voltaris — Platform licence</span>
+              <span class="np-swap">
+                <span class="np-tag blue" id="stage-was">Discovery</span>
+                <span class="np-tag orange" id="stage-now">Proposal Sent</span>
+              </span>
+              <span class="np-num" id="lead-value">120 000</span>
+              <span class="np-num" id="lead-prob">60 %</span>
+              <span class="np-when fresh" id="lead-when">today</span>
+            </div>
+            <div class="np-row" data-lead="2">
+              <span class="np-row-name np-quiet">Astria — Optimisation</span>
+              <span class="np-swap"><span class="np-tag purple">Negotiation</span></span>
+              <span class="np-num np-quiet">80 000</span>
+              <span class="np-num np-quiet">75 %</span>
+              <span class="np-when">3d</span>
+            </div>
+          </div>
+
+          <div class="np-card" id="acts-card">
+            <div class="np-card-head">
+              Activities
+              <span class="np-meta">related to the same deal</span>
+            </div>
+            <div class="np-row" data-act="1">
+              <span class="np-row-name">Demo follow-up</span>
+              <span class="np-swap"><span class="np-tag yellow">Follow-up Needed</span></span>
+              <span class="np-detail">Send proposal, 12 licences</span>
+              <span class="np-num"></span>
+              <span class="np-when fresh">logged by AI</span>
+            </div>
+            <div class="np-row" data-act="2">
+              <span class="np-row-name np-quiet">Technical demo</span>
+              <span class="np-swap"><span class="np-tag green">Positive</span></span>
+              <span class="np-detail np-quiet">Loop in security</span>
+              <span class="np-num"></span>
+              <span class="np-when">4d</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── scene 5 · 17.4–19.6s — the numbers follow ──────────────────── -->
+      <section
+        id="s-kpi"
+        class="clip np-clip"
+        data-start="17.6"
+        data-duration="2.4"
+        data-track-index="1"
+      >
+        <div class="np-holder">
+          <h2 class="np-h2" id="kpi-h2">
+            The formulas recomputed the second the record changed.
+          </h2>
+          <div class="np-kpis" id="kpi-strip">
+            <div class="np-kpi">
+              <span class="np-kpi-label">Weighted pipeline</span>
+              <span class="np-kpi-value" data-count="72" data-to="144" data-prefix="€" data-thousands="1">€72 000</span>
+              <span class="np-kpi-delta up">+ 72 000</span>
+            </div>
+            <div class="np-kpi">
+              <span class="np-kpi-label">Stale deals</span>
+              <span class="np-kpi-value" data-count="5" data-to="4">5</span>
+              <span class="np-kpi-delta down">− 1</span>
+            </div>
+            <div class="np-kpi">
+              <span class="np-kpi-label">Next step set</span>
+              <span class="np-kpi-value" data-count="9" data-to="12" data-suffix="/12">9/12</span>
+              <span class="np-kpi-delta up">+ 3</span>
+            </div>
+            <div class="np-kpi">
+              <span class="np-kpi-label">Last activity</span>
+              <span class="np-kpi-value" id="kpi-now">now</span>
+              <span class="np-kpi-delta">was 34d</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── scene 6 · 19.6–21s — lockup ────────────────────────────────── -->
+      <section id="s-end" class="clip np-clip" data-start="19.6" data-duration="1.4" data-track-index="1">
+        <div class="np-lockup">
+          <svg class="np-mark-lg" id="end-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <rect x="3.3" y="3.3" width="20.4" height="25.4" rx="4" stroke="currentColor" stroke-width="1.7" />
+            <path d="M8.4 11h8.2M8.4 15.6h5.2M8.4 20.2h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+            <path id="end-check" d="m12.6 21.4 5.2 5.4L30.2 9.6" stroke="var(--primary)" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span class="np-wordmark" id="end-word">Notion Pilot</span>
+          <span class="np-rule-sweep" id="end-rule"></span>
+          <span class="np-cta" id="end-cta">Your CRM, kept current</span>
+        </div>
+      </section>
+
+      <!-- ── persistent frame furniture ─────────────────────────────────── -->
+      <div class="np-chrome" id="chrome">
+        <svg class="np-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <rect x="3.3" y="3.3" width="20.4" height="25.4" rx="4" stroke="currentColor" stroke-width="1.7" />
+          <path d="M8.4 11h8.2M8.4 15.6h5.2M8.4 20.2h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+          <path d="m12.6 21.4 5.2 5.4L30.2 9.6" stroke="var(--primary)" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span>Notion Pilot</span>
+      </div>
+
+      <div class="np-stage" id="stage-label">The pipeline</div>
+
+      <div class="np-tick-rail">
+        <span class="np-tick" id="tick"></span>
+      </div>
+    </div>
+
+    <script>
+      const DUR = 21;
+
+      /* Count a tabular number up without a render-time clock: the tween owns a
+       * plain object and writes the formatted string on every update, so any
+       * frame is reproducible from its time alone. */
+      function countUp(tl, el, at, dur) {
+        const from = parseFloat(el.dataset.count);
+        const to = parseFloat(el.dataset.to);
+        const prefix = el.dataset.prefix || "";
+        const suffix = el.dataset.suffix || "";
+        const thousands = el.dataset.thousands === "1";
+        const box = { n: from };
+        tl.to(
+          box,
+          {
+            n: to,
+            duration: dur,
+            ease: "power2.out",
+            onUpdate() {
+              const v = Math.round(box.n);
+              const shown = thousands ? v.toLocaleString("fr-FR").replace(/ /g, " ") + " 000" : String(v);
+              el.textContent = prefix + shown + suffix;
+            },
+          },
+          at
+        );
+      }
+
+      function build() {
+        const tl = gsap.timeline({ paused: true });
+
+        /* ── frame furniture: one continuous sweep, so the loop has a pulse ── */
+        tl.fromTo("#tick", { scaleX: 0 }, { scaleX: 1, duration: DUR, ease: "none" }, 0);
+        tl.fromTo("#chrome", { autoAlpha: 0, y: -10 }, { autoAlpha: 1, y: 0, duration: 0.7, ease: "power2.out" }, 0.15);
+        tl.fromTo("#stage-label", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.7, ease: "power2.out" }, 0.35);
+        tl.to("#chrome", { autoAlpha: 0, duration: 0.45, ease: "power2.in" }, 19.5);
+        tl.to("#stage-label", { autoAlpha: 0, duration: 0.45, ease: "power2.in" }, 19.5);
+
+        /* ── scene 1 — the setup, two lines, the second one late ─────────── */
+        tl.fromTo("#open-kicker", { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.3);
+        tl.fromTo("#open-l1", { yPercent: 108 }, { yPercent: 0, duration: 0.82, ease: "power4.out" }, 0.5);
+        tl.fromTo("#open-l2", { yPercent: 108 }, { yPercent: 0, duration: 0.82, ease: "power4.out" }, 0.78);
+        tl.to("#s-open .np-display", { autoAlpha: 0, y: -26, duration: 0.5, ease: "power2.in" }, 3.2);
+        tl.set("#s-open .np-display", { autoAlpha: 0 }, 3.7);
+
+        /* ── scene 2 — the mail, then the facts, then the tool calls ────── */
+        tl.fromTo("#mail", { autoAlpha: 0, x: -44 }, { autoAlpha: 1, x: 0, duration: 0.7, ease: "power3.out" }, 3.9);
+        tl.fromTo("#email-h2", { autoAlpha: 0, y: 22 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, 4.1);
+
+        /* each fact lights up as the agent lifts it out of the prose */
+        ["#f-security", "#f-date", "#f-licences"].forEach((sel, i) => {
+          tl.fromTo(
+            sel,
+            { backgroundColor: "oklch(1 0 0 / 0)", color: "oklch(0.36 0 0)" },
+            { backgroundColor: "oklch(0.956 0 0)", color: "oklch(0.17 0 0)", duration: 0.34, ease: "power2.out" },
+            4.5 + i * 0.26
+          );
+        });
+
+        tl.fromTo("#email-lede", { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 4.35);
+        tl.fromTo("#email-log", { autoAlpha: 0, y: 30 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, 5.3);
+        gsap.utils.toArray("#email-log .np-log-line").forEach((line, i) => {
+          tl.fromTo(line, { autoAlpha: 0, x: -18 }, { autoAlpha: 1, x: 0, duration: 0.38, ease: "power2.out" }, 5.7 + i * 0.4);
+        });
+        tl.to("#s-email .np-split", { autoAlpha: 0, y: -24, duration: 0.5, ease: "power2.in" }, 8.8);
+        tl.set("#s-email .np-split", { autoAlpha: 0 }, 9.3);
+
+        /* ── scene 3 — the diff, row by row, then the approval mark ─────── */
+        tl.fromTo("#diff-card", { autoAlpha: 0, y: 40, scale: 0.985 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.66, ease: "power3.out" }, 9.5);
+        gsap.utils.toArray("#s-diff .np-row").forEach((row, i) => {
+          tl.fromTo(row, { autoAlpha: 0, x: -22 }, { autoAlpha: 1, x: 0, duration: 0.36, ease: "power2.out" }, 9.85 + i * 0.3);
+        });
+        tl.fromTo("#approve", { autoAlpha: 0, scale: 0.9 }, { autoAlpha: 1, scale: 1, duration: 0.42, ease: "back.out(2.2)" }, 11.5);
+        tl.fromTo("#gate-note", { autoAlpha: 0, x: -14 }, { autoAlpha: 1, x: 0, duration: 0.45, ease: "power2.out" }, 11.75);
+        tl.to("#s-diff .np-display", { autoAlpha: 0, y: -24, duration: 0.5, ease: "power2.in" }, 13.2);
+        tl.set("#s-diff .np-display", { autoAlpha: 0 }, 13.7);
+
+        /* ── scene 4 — the record actually changes, in place ─────────────── */
+        tl.fromTo("#leads-card", { autoAlpha: 0, y: 34 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 13.9);
+        tl.fromTo("#acts-card", { autoAlpha: 0, y: 34 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 14.05);
+
+        /* the stage tag swaps: the old one leaves, the new one takes its place */
+        tl.set("#stage-now", { autoAlpha: 0, y: 14 }, 0);
+        tl.to("#stage-was", { autoAlpha: 0, y: -14, duration: 0.32, ease: "power2.in" }, 14.7);
+        tl.to("#stage-now", { autoAlpha: 1, y: 0, duration: 0.36, ease: "power3.out" }, 14.9);
+
+        /* the probability and the freshness follow the stage */
+        tl.fromTo("#lead-prob", { autoAlpha: 0.25, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.34, ease: "power2.out" }, 15.15);
+        tl.fromTo("#lead-when", { autoAlpha: 0.25 }, { autoAlpha: 1, duration: 0.34, ease: "power2.out" }, 15.3);
+
+        /* the new activity row arrives last — it is the thing that was typed */
+        tl.fromTo('#acts-card [data-act="1"]', { autoAlpha: 0, x: -26 }, { autoAlpha: 1, x: 0, duration: 0.42, ease: "power3.out" }, 15.6);
+        tl.to("#s-notion .np-stack", { autoAlpha: 0, y: -24, duration: 0.5, ease: "power2.in" }, 17.0);
+        tl.set("#s-notion .np-stack", { autoAlpha: 0 }, 17.5);
+
+        /* ── scene 5 — the numbers, counted up ───────────────────────────── */
+        tl.fromTo("#kpi-h2", { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power3.out" }, 17.7);
+        tl.fromTo("#kpi-strip", { autoAlpha: 0, y: 34 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power3.out" }, 17.85);
+        gsap.utils.toArray("#kpi-strip [data-count]").forEach((el, i) => {
+          countUp(tl, el, 18.1 + i * 0.08, 0.9);
+        });
+        tl.fromTo("#kpi-now", { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.4, ease: "power3.out" }, 18.3);
+        tl.to("#s-kpi .np-holder", { autoAlpha: 0, y: -20, duration: 0.4, ease: "power2.in" }, 19.2);
+        tl.set("#s-kpi .np-holder", { autoAlpha: 0 }, 19.6);
+
+        /* ── scene 6 — lockup, the check drawing itself ──────────────────── */
+        tl.fromTo("#end-mark", { autoAlpha: 0, scale: 0.86 }, { autoAlpha: 1, scale: 1, duration: 0.5, ease: "back.out(2)" }, 19.7);
+        tl.fromTo("#end-check", { strokeDasharray: 34, strokeDashoffset: 34 }, { strokeDashoffset: 0, duration: 0.42, ease: "power2.out" }, 19.95);
+        tl.fromTo("#end-word", { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.44, ease: "power3.out" }, 19.95);
+        tl.fromTo("#end-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power2.out" }, 20.1);
+        tl.fromTo("#end-cta", { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.44, ease: "power3.out" }, 20.2);
+
+        window.__timelines["main"] = tl;
+        if (window.__hfForceTimelineRebind) window.__hfForceTimelineRebind();
+      }
+
+      document.fonts.ready.then(build);
+    </script>
+  </body>
+</html>

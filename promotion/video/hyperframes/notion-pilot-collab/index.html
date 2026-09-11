@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="en" data-resolution="landscape">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Notion Pilot — three people, one pipeline</title>
+    <link rel="stylesheet" href="assets/np.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      /* ── scene 2: the chat on the left, the CRM on the right ─────────── */
+      #s-chat .np-split {
+        display: grid;
+        grid-template-columns: 700px 1fr;
+        gap: 72px;
+        align-content: center;
+        height: 100%;
+      }
+
+      .np-thread {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .np-thread-head {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-family: var(--font-mono);
+        font-size: 20px;
+        font-weight: 500;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+
+      .np-thread-head svg {
+        width: 26px;
+        height: 26px;
+        display: block;
+      }
+
+      .np-msg {
+        display: grid;
+        grid-template-columns: 62px 1fr;
+        gap: 20px;
+        align-items: start;
+      }
+
+      .np-who {
+        display: grid;
+        place-items: center;
+        width: 62px;
+        height: 62px;
+        border-radius: 999px;
+        background: var(--surface-2);
+        border: 1px solid var(--rule);
+        font-size: 24px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        color: var(--ink-soft);
+      }
+
+      .np-bubble {
+        padding: 22px 28px 24px;
+        border: 1px solid var(--rule);
+        border-radius: 4px var(--r-lg) var(--r-lg) var(--r-lg);
+        background: var(--surface);
+        box-shadow: var(--shadow-2);
+      }
+
+      .np-bubble .np-name {
+        display: block;
+        font-size: 21px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        color: var(--muted);
+        margin-bottom: 8px;
+      }
+
+      .np-bubble p {
+        font-size: 27px;
+        line-height: 1.42;
+        color: var(--ink);
+      }
+
+      /* the CRM side: one activity row per message, in the same order */
+      #s-chat .np-h2 {
+        max-width: 900px;
+      }
+
+      #s-chat .np-card {
+        margin-top: 40px;
+      }
+
+      #s-chat .np-row {
+        grid-template-columns: 1fr 220px 130px;
+        padding: 24px 36px;
+      }
+
+      #s-chat .np-row .np-when {
+        text-align: right;
+      }
+
+      .np-when {
+        font-family: var(--font-mono);
+        font-size: 22px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .np-when.fresh {
+        color: var(--ok);
+      }
+
+      .np-byline {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 23px;
+        color: var(--ink-soft);
+      }
+
+      .np-byline .np-who {
+        width: 38px;
+        height: 38px;
+        font-size: 16px;
+      }
+
+      /* ── scene 3: one board, everybody's deals on it ─────────────────── */
+      #s-board .np-holder {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 48px;
+        height: 100%;
+      }
+
+      .np-board {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 20px;
+      }
+
+      .np-col {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 24px 22px 26px;
+        border: 1px solid var(--rule);
+        border-radius: var(--r);
+        background: var(--surface);
+      }
+
+      .np-col-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 20px;
+        font-weight: 600;
+        letter-spacing: -0.006em;
+      }
+
+      .np-col-head .np-n {
+        margin-left: auto;
+        font-family: var(--font-mono);
+        font-size: 18px;
+        font-weight: 500;
+        color: var(--muted);
+      }
+
+      .np-cardlet {
+        padding: 18px 18px 20px;
+        border: 1px solid var(--rule);
+        border-radius: var(--r-sm, 6px);
+        background: var(--bg);
+        box-shadow: var(--shadow-1, 0 1px 2px oklch(0 0 0 / 0.05));
+      }
+
+      /* the owner sits beside the name; value and tag get a line of their own,
+       * which is the only way six columns fit at this width without wrapping */
+      .np-cardlet-top {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      .np-cardlet-name {
+        flex: 1;
+        font-size: 22px;
+        font-weight: 500;
+        line-height: 1.28;
+        letter-spacing: -0.008em;
+      }
+
+      .np-cardlet-foot {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        white-space: nowrap;
+      }
+
+      /* the second card in a column is context, not the subject */
+      .np-cardlet-quiet {
+        box-shadow: none;
+      }
+
+      .np-cardlet-quiet .np-cardlet-name,
+      .np-cardlet-quiet .np-num {
+        color: var(--muted);
+      }
+
+      .np-cardlet-foot .np-num {
+        font-size: 21px;
+        color: var(--ink-soft);
+      }
+
+      .np-cardlet-foot .np-tag {
+        margin-left: auto;
+        font-size: 18px;
+        padding: 5px 12px 6px;
+      }
+
+      .np-cardlet .np-who {
+        width: 34px;
+        height: 34px;
+        font-size: 15px;
+      }
+
+      /* ── scene 4: the permission model, then the lockup ─────────────── */
+      #s-perm .np-holder {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 52px;
+        height: 100%;
+      }
+
+      .np-marks {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1px;
+        background: var(--rule);
+        border: 1px solid var(--rule);
+        border-radius: var(--r-lg);
+        overflow: hidden;
+      }
+
+      .np-mark-cell {
+        padding: 44px 44px 48px;
+        background: var(--bg);
+      }
+
+      .np-mark-cell svg {
+        width: 46px;
+        height: 46px;
+        display: block;
+        margin-bottom: 24px;
+        color: var(--ink);
+      }
+
+      .np-mark-cell h3 {
+        font-size: 32px;
+        font-weight: 600;
+        letter-spacing: -0.016em;
+        margin-bottom: 12px;
+      }
+
+      .np-mark-cell p {
+        font-size: 26px;
+        line-height: 1.46;
+        color: var(--ink-soft);
+      }
+
+      #s-end .np-lockup .np-h2 {
+        max-width: 1240px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="19"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- ── scene 1 · 0–3.6s — where the team already is ────────────────── -->
+      <section
+        id="s-open"
+        class="clip np-clip"
+        data-start="0"
+        data-duration="3.6"
+        data-track-index="1"
+      >
+        <div class="np-display">
+          <span class="np-kicker" id="open-kicker">Three people · one pipeline</span>
+          <h1 class="np-h1">
+            <span class="np-line"><b id="open-l1">Your team talks in chat.</b></span>
+            <span class="np-line"><b id="open-l2" class="np-quiet">Now the CRM listens.</b></span>
+          </h1>
+        </div>
+      </section>
+
+      <!-- ── scene 2 · 3.6–10.6s — three messages, three records ────────── -->
+      <section
+        id="s-chat"
+        class="clip np-clip"
+        data-start="3.6"
+        data-duration="7"
+        data-track-index="1"
+      >
+        <div class="np-split">
+          <div class="np-thread" id="thread">
+            <div class="np-thread-head" id="thread-head">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 4 3 11l5.5 2.2L11 20l3.2-4.4L20 6" />
+                <path d="M8.5 13.2 20 6" />
+              </svg>
+              Telegram · sales
+            </div>
+
+            <div class="np-msg" data-msg="1">
+              <span class="np-who">LM</span>
+              <div class="np-bubble">
+                <span class="np-name">Léa · 14:05</span>
+                <p>Call with Cerena done. They want a consulting scope by Friday.</p>
+              </div>
+            </div>
+
+            <div class="np-msg" data-msg="2">
+              <span class="np-who">MB</span>
+              <div class="np-bubble">
+                <span class="np-name">Marc · 14:12</span>
+                <p>Voltaris security review booked for the 3rd. Proposal is out.</p>
+              </div>
+            </div>
+
+            <div class="np-msg" data-msg="3">
+              <span class="np-who">SD</span>
+              <div class="np-bubble">
+                <span class="np-name">Sofia · 14:20</span>
+                <p>Hexalis went quiet after the demo. Worth one more nudge?</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h2 class="np-h2" id="chat-h2">Everyone dictates. One database records.</h2>
+            <div class="np-card" id="acts-card">
+              <div class="np-card-head">
+                Activities
+                <span class="np-meta">Notion · shared workspace</span>
+              </div>
+              <div class="np-row" data-act="1">
+                <span class="np-row-name">Consulting scope · Cerena</span>
+                <span class="np-byline"><span class="np-who">LM</span> Léa</span>
+                <span class="np-when fresh">14:05</span>
+              </div>
+              <div class="np-row" data-act="2">
+                <span class="np-row-name">Security review · Voltaris</span>
+                <span class="np-byline"><span class="np-who">MB</span> Marc</span>
+                <span class="np-when fresh">14:12</span>
+              </div>
+              <div class="np-row" data-act="3">
+                <span class="np-row-name">Follow-up nudge · Hexalis</span>
+                <span class="np-byline"><span class="np-who">SD</span> Sofia</span>
+                <span class="np-when fresh">14:20</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── scene 3 · 10.6–15s — one board everybody reads ─────────────── -->
+      <section
+        id="s-board"
+        class="clip np-clip"
+        data-start="10.8"
+        data-duration="4.2"
+        data-track-index="1"
+      >
+        <div class="np-holder">
+          <h2 class="np-h2" id="board-h2">By 14:21 the board is already right.</h2>
+          <div class="np-board" id="board">
+            <div class="np-col" data-col="1">
+              <div class="np-col-head"><span class="np-dot"></span> Prospect <span class="np-n">3</span></div>
+              <div class="np-cardlet">
+                <div class="np-cardlet-top">
+                  <span class="np-cardlet-name">Néorégie — Study</span>
+                  <span class="np-who">SD</span>
+                </div>
+                <div class="np-cardlet-foot">
+                  <span class="np-num">18 000</span>
+                  <span class="np-tag gray">Cold</span>
+                </div>
+              </div>
+              <div class="np-cardlet np-cardlet-quiet">
+                <div class="np-cardlet-top">
+                  <span class="np-cardlet-name">Aurea — Audit</span>
+                  <span class="np-who">SD</span>
+                </div>
+                <div class="np-cardlet-foot">
+                  <span class="np-num">12 000</span>
+                  <span class="np-tag gray">Cold</span>
+                </div>
+              </div>
+            </div>
+            <div class="np-col" data-col="2">
+              <div class="np-col-head"><span class="np-dot ok"></span> Qualified <span class="np-n">2</span></div>
+              <div class="np-cardlet">
+                <div class="np-cardlet-top">
+                  <span class="np-cardlet-name">Cerena — Consulting</span>
+                  <span class="np-who">LM</span>
+                </div>
+                <div class="np-cardlet-foot">
+                  <span class="np-num">45 000</span>
+                  <span class="np-tag blue">40 %</span>
+                </div>
+              </div>
+              <div class="np-cardlet np-cardlet-quiet">
+                <div class="np-cardlet-top">
+                  <span class="np-cardlet-name">Nordvent — Study</span>
+                  <span class="np-who">MB</span>
+                </div>
+                <div class="np-cardlet-foot">
+                  <span class="np-num">30 000</span>
+                  <span class="np-tag blue">35 %</span>
+                </div>
+              </div>
+            </div>
+            <div class="np-col" data-col="3">
+              <div class="np-col-head"><span class="np-dot ok"></span> Discovery <span class="np-n">3</span></div>
+              <div class="np-cardlet">
+                <div class="np-cardlet-top">
+                  <span class="np-cardlet-name">Vireo — Renewal</span>
+                  <span class="np-who">MB</span>
+                </div>
+                <div class="np-cardlet-foot">
+                  <span class="np-num">64 000</span>
+                  <span class="np-tag orange">Warm</span>
+                </div>
+              </div>
+              <div class="np-cardlet np-cardlet-quiet">
+                <div class="np-cardlet-top">
+                  <span class="np-cardlet-name">Solira — Pilot</span>
+                  <span class="np-who">LM</span>
+                </div>
+                <div class="np-cardlet-foot">
+                  <span class="np-num">28 000</span>
+                  <span class="np-tag orange">Warm</span>
+                </div>
+              </div>
+            </div>
+            <div class="np-col" data-col="4">
+              <div class="np-col-head"><span class="np-dot ok"></span> Proposal <span class="np-n">1</span></div>
+              <div class="np-cardlet" id="card-voltaris">
+                <div class="np-cardlet-top">
+                  <span class="np-cardlet-name">Voltaris — Platform</span>
+                  <span class="np-who">MB</span>
+                </div>
+                <div class="np-cardlet-foot">
+                  <span class="np-num">120 000</span>
+                  <span class="np-tag orange">60 %</span>
+                </div>
+              </div>
+            </div>
+            <div class="np-col" data-col="5">
+              <div class="np-col-head"><span class="np-dot bad"></span> Waiting <span class="np-n">5</span></div>
+              <div class="np-cardlet" id="card-hexalis">
+                <div class="np-cardlet-top">
+                  <span class="np-cardlet-name">Hexalis — Platform</span>
+                  <span class="np-who">SD</span>
+                </div>
+                <div class="np-cardlet-foot">
+                  <span class="np-num">—</span>
+                  <span class="np-tag red">Stale 34d</span>
+                </div>
+              </div>
+              <div class="np-cardlet np-cardlet-quiet">
+                <div class="np-cardlet-top">
+                  <span class="np-cardlet-name">Brevia — Renewal</span>
+                  <span class="np-who">MB</span>
+                </div>
+                <div class="np-cardlet-foot">
+                  <span class="np-num">—</span>
+                  <span class="np-tag red">Stale 21d</span>
+                </div>
+              </div>
+            </div>
+            <div class="np-col" data-col="6">
+              <div class="np-col-head"><span class="np-dot ok"></span> Closed Won <span class="np-n">1</span></div>
+              <div class="np-cardlet">
+                <div class="np-cardlet-top">
+                  <span class="np-cardlet-name">Kaleo — Licence</span>
+                  <span class="np-who">LM</span>
+                </div>
+                <div class="np-cardlet-foot">
+                  <span class="np-num">52 000</span>
+                  <span class="np-tag green">Won</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── scene 4 · 15–17.6s — whose permissions the agent uses ──────── -->
+      <section
+        id="s-perm"
+        class="clip np-clip"
+        data-start="15.2"
+        data-duration="2.6"
+        data-track-index="1"
+      >
+        <div class="np-holder">
+          <h2 class="np-h2" id="perm-h2">Shared board. Separate permissions.</h2>
+          <div class="np-marks" id="marks">
+            <div class="np-mark-cell" data-layout-allow-overflow data-mark="1">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 3 5 5.6v6c0 4.2 2.9 7.6 7 9.4 4.1-1.8 7-5.2 7-9.4v-6L12 3Z" />
+                <path d="m9 12 2.3 2.3L15.5 10" />
+              </svg>
+              <h3>It connects as you</h3>
+              <p>The assistant sees exactly what your Notion account sees. No record access, no agent access.</p>
+            </div>
+            <div class="np-mark-cell" data-layout-allow-overflow data-mark="2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-4A3.5 3.5 0 0 0 5 18.5V20" />
+                <circle cx="10.5" cy="8" r="3.2" />
+                <path d="M17 11.2a3 3 0 0 0 0-5.9M19 20v-1.6a3.4 3.4 0 0 0-2-3" />
+              </svg>
+              <h3>Every write is signed</h3>
+              <p>Each activity keeps the person who dictated it, so a pipeline review reads like a team, not a mailbox.</p>
+            </div>
+            <div class="np-mark-cell" data-layout-allow-overflow data-mark="3">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+                <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5M12 14.5v2" />
+              </svg>
+              <h3>You revoke it in Notion</h3>
+              <p>Not in a support ticket. The workspace stays the system of record and the place you govern.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── scene 5 · 17.6–19s — lockup ────────────────────────────────── -->
+      <section id="s-end" class="clip np-clip" data-start="17.6" data-duration="1.4" data-track-index="1">
+        <div class="np-lockup">
+          <svg class="np-mark-lg" id="end-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <rect x="3.3" y="3.3" width="20.4" height="25.4" rx="4" stroke="currentColor" stroke-width="1.7" />
+            <path d="M8.4 11h8.2M8.4 15.6h5.2M8.4 20.2h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+            <path id="end-check" d="m12.6 21.4 5.2 5.4L30.2 9.6" stroke="var(--primary)" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span class="np-wordmark" id="end-word">Notion Pilot</span>
+          <span class="np-rule-sweep" id="end-rule"></span>
+          <span class="np-cta" id="end-cta">One brain, the whole team</span>
+        </div>
+      </section>
+
+      <!-- ── persistent frame furniture ─────────────────────────────────── -->
+      <div class="np-chrome" id="chrome">
+        <svg class="np-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <rect x="3.3" y="3.3" width="20.4" height="25.4" rx="4" stroke="currentColor" stroke-width="1.7" />
+          <path d="M8.4 11h8.2M8.4 15.6h5.2M8.4 20.2h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+          <path d="m12.6 21.4 5.2 5.4L30.2 9.6" stroke="var(--primary)" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span>Notion Pilot</span>
+      </div>
+
+      <div class="np-stage" id="stage-label">The team</div>
+
+      <div class="np-tick-rail">
+        <span class="np-tick" id="tick"></span>
+      </div>
+    </div>
+
+    <script>
+      const DUR = 19;
+
+      function build() {
+        const tl = gsap.timeline({ paused: true });
+
+        /* ── frame furniture ─────────────────────────────────────────────── */
+        tl.fromTo("#tick", { scaleX: 0 }, { scaleX: 1, duration: DUR, ease: "none" }, 0);
+        tl.fromTo("#chrome", { autoAlpha: 0, y: -10 }, { autoAlpha: 1, y: 0, duration: 0.7, ease: "power2.out" }, 0.15);
+        tl.fromTo("#stage-label", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.7, ease: "power2.out" }, 0.35);
+        tl.to("#chrome", { autoAlpha: 0, duration: 0.45, ease: "power2.in" }, 17.5);
+        tl.to("#stage-label", { autoAlpha: 0, duration: 0.45, ease: "power2.in" }, 17.5);
+
+        /* ── scene 1 ─────────────────────────────────────────────────────── */
+        tl.fromTo("#open-kicker", { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.3);
+        tl.fromTo("#open-l1", { yPercent: 108 }, { yPercent: 0, duration: 0.82, ease: "power4.out" }, 0.5);
+        tl.fromTo("#open-l2", { yPercent: 108 }, { yPercent: 0, duration: 0.82, ease: "power4.out" }, 0.78);
+        tl.to("#s-open .np-display", { autoAlpha: 0, y: -26, duration: 0.5, ease: "power2.in" }, 3.0);
+        tl.set("#s-open .np-display", { autoAlpha: 0 }, 3.5);
+
+        /* ── scene 2 — a message, then the row it produced, three times ─── */
+        tl.fromTo("#thread-head", { autoAlpha: 0, x: -18 }, { autoAlpha: 1, x: 0, duration: 0.5, ease: "power2.out" }, 3.8);
+        tl.fromTo("#chat-h2", { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, 3.95);
+        tl.fromTo("#acts-card", { autoAlpha: 0, y: 34 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, 4.15);
+
+        /* the rows start hidden: each one arrives with its own message */
+        gsap.utils.toArray("#acts-card .np-row").forEach((row) => {
+          tl.set(row, { autoAlpha: 0 }, 0);
+        });
+
+        [1, 2, 3].forEach((n, i) => {
+          const at = 4.7 + i * 1.5;
+          tl.fromTo(
+            '#thread [data-msg="' + n + '"]',
+            { autoAlpha: 0, x: -30 },
+            { autoAlpha: 1, x: 0, duration: 0.5, ease: "power3.out" },
+            at
+          );
+          tl.fromTo(
+            '#acts-card [data-act="' + n + '"]',
+            { autoAlpha: 0, x: 26 },
+            { autoAlpha: 1, x: 0, duration: 0.44, ease: "power3.out" },
+            at + 0.55
+          );
+        });
+
+        tl.to("#s-chat .np-split", { autoAlpha: 0, y: -24, duration: 0.5, ease: "power2.in" }, 10.0);
+        tl.set("#s-chat .np-split", { autoAlpha: 0 }, 10.5);
+
+        /* ── scene 3 — the board fills column by column ─────────────────── */
+        tl.fromTo("#board-h2", { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 10.9);
+        gsap.utils.toArray("#board .np-col").forEach((col, i) => {
+          tl.fromTo(col, { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.42, ease: "power3.out" }, 11.1 + i * 0.16);
+        });
+
+        /* the two cards the chat just moved get the last beat */
+        tl.fromTo("#card-voltaris", { boxShadow: "0 1px 2px oklch(0 0 0 / 0.05)" }, { boxShadow: "0 0 0 2px oklch(0.17 0 0)", duration: 0.4, ease: "power2.out" }, 12.5);
+        tl.fromTo("#card-hexalis", { boxShadow: "0 1px 2px oklch(0 0 0 / 0.05)" }, { boxShadow: "0 0 0 2px oklch(0.17 0 0)", duration: 0.4, ease: "power2.out" }, 12.8);
+        tl.to("#s-board .np-holder", { autoAlpha: 0, y: -22, duration: 0.5, ease: "power2.in" }, 14.4);
+        tl.set("#s-board .np-holder", { autoAlpha: 0 }, 14.9);
+
+        /* ── scene 4 — the governance that survives ─────────────────────── */
+        tl.fromTo("#perm-h2", { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power3.out" }, 15.3);
+        gsap.utils.toArray("#marks .np-mark-cell").forEach((cell, i) => {
+          tl.fromTo(cell, { autoAlpha: 0, y: 22 }, { autoAlpha: 1, y: 0, duration: 0.42, ease: "power3.out" }, 15.5 + i * 0.22);
+        });
+        tl.to("#s-perm .np-holder", { autoAlpha: 0, y: -20, duration: 0.4, ease: "power2.in" }, 17.2);
+        tl.set("#s-perm .np-holder", { autoAlpha: 0 }, 17.6);
+
+        /* ── scene 5 — lockup ───────────────────────────────────────────── */
+        tl.fromTo("#end-mark", { autoAlpha: 0, scale: 0.86 }, { autoAlpha: 1, scale: 1, duration: 0.5, ease: "back.out(2)" }, 17.7);
+        tl.fromTo("#end-check", { strokeDasharray: 34, strokeDashoffset: 34 }, { strokeDashoffset: 0, duration: 0.42, ease: "power2.out" }, 17.95);
+        tl.fromTo("#end-word", { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.44, ease: "power3.out" }, 17.95);
+        tl.fromTo("#end-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power2.out" }, 18.1);
+        tl.fromTo("#end-cta", { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.44, ease: "power3.out" }, 18.2);
+
+        window.__timelines["main"] = tl;
+        if (window.__hfForceTimelineRebind) window.__hfForceTimelineRebind();
+      }
+
+      document.fonts.ready.then(build);
+    </script>
+  </body>
+</html>

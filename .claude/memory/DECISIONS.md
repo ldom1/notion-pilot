@@ -230,5 +230,31 @@ updated:
 **Rationale:** The chrome must not compete with the data it displays — the page is mostly table and board mockups, so monochrome chrome makes those the focal point. Publishing `develop` was safe because it held nothing `main` did not, and CI already gates its integration-test job on that branch name.
 **Affects:** `web/frontend/src/styles/{tokens,landing,globals}.css`; branch model; PRs #27 and #28.
 
+### 2026-09-11 — Landing-page films are authored on the site's token layer, and run the full measure
+
+**Decision:** The three promotional films (`promotion/video/hyperframes/`) are HyperFrames HTML
+compositions whose design system, `_shared/np.css`, is a deliberate copy of
+`web/frontend/src/styles/tokens.css` — same achromatic ramp, same near-black brand colour, same
+rule that colour only ever lands on CRM data. Every record, stage, figure and name in a film also
+exists in `Landing.tsx`. A film on the page runs the full 1180px measure, never a half-width
+column. **Only `notion-pilot-pipeline` is on the page**, after the pipeline-decay beat and at
+`rate: 0.85`; the other two stay in the catalog because agent HITL and collaboration are already
+told by the surfaces and EU/Enterprise sections.
+**Rejected:** A lead film plus a 2-up pair (built first, then undone); all three films embedded
+below the Claudeforce section (built and integrated, then cut to one by a later editorial pass);
+and "brand-inspired" film styling authored independently of the token layer.
+**Rationale:** Two separate failures. (1) These frames are tables and tool logs — halving the
+column halves the type inside the rendered frame too, so at ~540px the thing the film exists to
+show stops being readable. Layout width is therefore a content decision here, not a rhythm
+decision. (2) A HyperFrames project must be self-contained (the renderer serves the project dir as
+its web root and may not fetch at frame time), so the duplication of `np.css` is forced — which
+makes it all the more important that it is a mirror with a stated provenance rather than a second
+design system that will drift. The same reasoning binds the figures: a mock that contradicts the
+prose beside it is worse than no mock. (3) Three autoplaying films turn an argument into a
+showreel; one film that answers the beat directly above it does the work. Extends the 2026-09-10
+one-design-system decision above.
+**Affects:** `promotion/video/`; `web/frontend/public/film/`; `Landing.tsx` `#film` section;
+`landing.css` `.lp-film*`. See [[2026-09-11-landing-page-films]].
+
 ## Template
 <!-- added by ai-dotfiles upgrade -->

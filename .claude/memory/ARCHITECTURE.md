@@ -33,8 +33,18 @@ notion-pilot/            ← repo name (rename from notion-pilot)
 ├── scripts/
 │   ├── crm/             ← crm_setup_workspace.py, crm_enrich.py, crm_dedup.py, etc.
 │   └── inbox/           ← (future) inbox_setup.py for Knowledge DBs
-└── web/                 ← (future) landing + deploy wizard + chatbot
+├── promotion/video/     ← HyperFrames sources for the landing-page films
+│   ├── notion-pilot.json        ← brand profile
+│   └── hyperframes/
+│       ├── _shared/np.css       ← mirror of web/frontend/src/styles/tokens.css
+│       └── notion-pilot-*/      ← one project per film (BRIEF.md + index.html)
+└── web/                 ← landing + deploy wizard + cockpit
+    └── frontend/public/film/    ← rendered MP4s + posters, served at /film/
 ```
+
+The films are a **build input, not a runtime component**: `hyperframes render` produces the MP4s
+offline, they are committed under `web/frontend/public/film/`, and `vite build` copies them into
+`web/static/` like any other static asset. Nothing in the Python package knows they exist.
 
 ## Stack
 
