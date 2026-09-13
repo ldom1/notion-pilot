@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 import httpx
 from loguru import logger
+
+from notion_pilot.shared.doc_links import DOC_GROUPS, SOURCES_LEDE
+from notion_pilot.shared.notion_views import ViewSpec
 
 NOTION_VERSION = "2022-06-28"
 NOTION_API = "https://api.notion.com/v1"
@@ -16,9 +20,24 @@ type JsonDict = dict[str, Any]
 
 # --- block helpers ---
 
+RichText = str | list[JsonDict]
+
 
 def _rt(content: str) -> list[JsonDict]:
     return [{"type": "text", "text": {"content": content}}]
+
+
+def _rich(content: RichText) -> list[JsonDict]:
+    return _rt(content) if isinstance(content, str) else content
+
+
+def _text(content: str, *, url: str | None = None, bold: bool = False) -> JsonDict:
+    item: JsonDict = {"type": "text", "text": {"content": content}}
+    if url:
+        item["text"]["link"] = {"url": url}
+    if bold:
+        item["annotations"] = {"bold": True}
+    return item
 
 
 def _paragraph(content: str) -> JsonDict:
@@ -29,22 +48,20 @@ def _h2(content: str) -> JsonDict:
     return {"object": "block", "type": "heading_2", "heading_2": {"rich_text": _rt(content)}}
 
 
-def _callout(content: str, emoji: str = "💡") -> JsonDict:
-    return {
-        "object": "block",
-        "type": "callout",
-        "callout": {
-            "rich_text": _rt(content),
-            "icon": {"type": "emoji", "emoji": emoji},
-        },
-    }
+def _callout(
+    content: RichText, emoji: str = "💡", children: list[JsonDict] | None = None
+) -> JsonDict:
+    callout: JsonDict = {"rich_text": _rich(content), "icon": {"type": "emoji", "emoji": emoji}}
+    if children:
+        callout["children"] = children
+    return {"object": "block", "type": "callout", "callout": callout}
 
 
-def _bullet(content: str) -> JsonDict:
+def _bullet(content: RichText) -> JsonDict:
     return {
         "object": "block",
         "type": "bulleted_list_item",
-        "bulleted_list_item": {"rich_text": _rt(content)},
+        "bulleted_list_item": {"rich_text": _rich(content)},
     }
 
 
@@ -54,6 +71,39 @@ def _numbered(content: str) -> JsonDict:
         "type": "numbered_list_item",
         "numbered_list_item": {"rich_text": _rt(content)},
     }
+
+
+def _h3(content: str) -> JsonDict:
+    return {"object": "block", "type": "heading_3", "heading_3": {"rich_text": _rt(content)}}
+
+
+def _toggle(title: str, children: list[JsonDict]) -> JsonDict:
+    return {
+        "object": "block",
+        "type": "toggle",
+        "toggle": {"rich_text": _rt(title), "children": children},
+    }
+
+
+def _code(content: str, language: str = "plain text") -> JsonDict:
+    return {
+        "object": "block",
+        "type": "code",
+        "code": {"rich_text": _rt(content), "language": language},
+    }
+
+
+def _plain_text(block: JsonDict) -> str:
+    """Plain text of a block as we wrote it or as Notion returns it."""
+    payload = block.get(block.get("type", ""), {})
+    return "".join(
+        item.get("plain_text") or item.get("text", {}).get("content", "")
+        for item in payload.get("rich_text", [])
+    )
+
+
+def find_block(blocks: list[JsonDict], block_type: str, text: str) -> str:
+    return str(next(b["id"] for b in blocks if b["type"] == block_type and _plain_text(b) == text))
 
 
 # --- page content blocks ---
@@ -74,20 +124,145 @@ _ROOT_CHILDREN: list[JsonDict] = [
     _bullet("/knowledge — Search your knowledge base"),
 ]
 
-_CRM_CHILDREN: list[JsonDict] = [
-    _callout(
+# --- CRM home page (spec rev 6 §1) ---
+
+THIS_WEEK = "This week"
+SOURCES_TITLE = "📚 Sources & documentation"
+MANUAL_VIEWS_TITLE = "Some views need a minute in Notion"
+
+_ASSISTANT_PROMPT = (
+    "Here is an email from Alice Martin at TechCorp.\n"
+    "Update the CRM: log the activity and move the deal forward.\n"
+    "\n"
+    "<paste the email>"
+)
+_ASSISTANT_SETUP = (
+    "claude mcp add --transport http notion https://mcp.notion.com/mcp\n"
+    "/plugin marketplace add ldom1/notion-pilot\n"
+    "/plugin install notion-crm@notion-pilot"
+)
+_KPI_BULLETS: tuple[tuple[str, str], ...] = (
+    (
+        "Days Since Last Activity",
+        "Days since the latest activity linked to the lead. 999 means none yet; closed leads show 0.",
+    ),
+    (
+        "Deal Temperature",
+        "🔥 Hot within 7 days of an activity, 🌡 Warm within 21, ❄️ Cold after that or with none.",
+    ),
+    (
+        "Stale Deal",
+        "An open lead with no Next Step and no activity for 14 days. “Needs attention” lists these.",
+    ),
+    ("Weighted Value (€)", "Value × Probability."),
+)
+
+# The Telegram-era template, verbatim, so an upgrade can remove it. When the
+# current template's copy changes, move the old strings here in the same change.
+LEGACY_TEMPLATE_TEXTS = frozenset(
+    {
         "Start with a Company → add People → track Deals.",
-        "🏢",
-    ),
-    _h2("Getting started"),
-    _numbered("Add a company: /lead TechCorp"),
-    _numbered("Add contacts: /people Alice Martin, CTO @ TechCorp"),
-    _numbered("Track a deal: /deal ERP Integration — TechCorp, €45k"),
-    _paragraph(
+        "Getting started",
+        "Add a company: /lead TechCorp",
+        "Add contacts: /people Alice Martin, CTO @ TechCorp",
+        "Track a deal: /deal ERP Integration — TechCorp, €45k",
         "💡 Tip: switch the Deals view to Board (group by Stage) for a Kanban pipeline."
-        " In Notion: ··· → Add a view → Board."
-    ),
-]
+        " In Notion: ··· → Add a view → Board.",
+    }
+)
+
+
+def _sources_toggle() -> JsonDict:
+    children: list[JsonDict] = [_paragraph(SOURCES_LEDE)]
+    for group in DOC_GROUPS:
+        children.append(_h3(group.title))
+        children.extend(
+            _bullet([_text(link.title, url=link.url, bold=True), _text(f" — {link.blurb}")])
+            for link in group.links
+        )
+    return _toggle(SOURCES_TITLE, children)
+
+
+def crm_home_blocks(leads_props: Collection[str] | None = None) -> list[JsonDict]:
+    """The CRM home template, top to bottom, above the five databases.
+
+    `leads_props` limits "How the numbers work" to properties Leads really has
+    (an older CRM on upgrade). None means a fresh deploy, where all exist.
+    """
+    kpis = [
+        _bullet([_text(name, bold=True), _text(f" — {meaning}")])
+        for name, meaning in _KPI_BULLETS
+        if leads_props is None or name in leads_props
+    ]
+    return [
+        _callout(
+            [
+                _text("Your CRM is ready. Your pipeline is below.", bold=True),
+                _text("\nFive related databases, filled with demo data so nothing starts empty."),
+            ],
+            "✅",
+        ),
+        _h2(THIS_WEEK),
+        _h2("Update it without the fifteen clicks"),
+        _paragraph("Paste this into Claude, then the email under it:"),
+        _code(_ASSISTANT_PROMPT),
+        _paragraph("You see every change first. Nothing is written until you reply go."),
+        _toggle(
+            "🔌 Connect your assistant (2 minutes)",
+            [
+                _paragraph(
+                    "Claude desktop or claude.ai: add the Notion connector "
+                    "(Settings → Connectors), authorise it, then restart the app."
+                ),
+                _paragraph("Claude Code:"),
+                _code(_ASSISTANT_SETUP, "shell"),
+                _paragraph(
+                    "These run in your assistant, not in Notion. Notion MCP gives it access "
+                    "to your workspace; the skills add the CRM workflow and the "
+                    "preview-then-go check."
+                ),
+            ],
+        ),
+        _toggle(
+            "📐 How the numbers work",
+            kpis or [_paragraph("The pipeline formulas are not on this Leads database yet.")],
+        ),
+        _toggle(
+            "🧪 About the demo data",
+            [
+                _paragraph(
+                    "TechCorp, Optima Solutions, DataBridge, NovaSys Energy and ClearPath "
+                    "Analytics are examples, with their people, leads, one meeting and one "
+                    "activity. Delete them once your first real lead is in."
+                )
+            ],
+        ),
+        _sources_toggle(),
+        _h2("Databases"),
+    ]
+
+
+def manual_views_callout(skipped: Sequence[ViewSpec]) -> JsonDict:
+    children: list[JsonDict] = []
+    for spec in skipped:
+        children.append(
+            {
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {"rich_text": [_text(spec.name, bold=True)]},
+            }
+        )
+        children.extend(_numbered(step) for step in spec.manual_steps)
+    return _callout(MANUAL_VIEWS_TITLE, "⚠️", children)
+
+
+def owned_template_texts() -> frozenset[str]:
+    """Top-level block texts Notion Pilot wrote — the only ones an upgrade removes."""
+    current = {_plain_text(block) for block in crm_home_blocks()}
+    return frozenset(current | {MANUAL_VIEWS_TITLE}) | LEGACY_TEMPLATE_TEXTS
+
+
+_CRM_CHILDREN: list[JsonDict] = crm_home_blocks()
 
 _KNOWLEDGE_CHILDREN: list[JsonDict] = [
     _callout(
@@ -585,6 +760,38 @@ async def _create_page(
     r = await client.post(f"{NOTION_API}/pages", json=body)
     r.raise_for_status()
     return str(r.json()["id"])
+
+
+async def _append_blocks(
+    client: httpx.AsyncClient,
+    parent_id: str,
+    blocks: list[JsonDict],
+    *,
+    after: str | None = None,
+) -> list[JsonDict]:
+    """Append blocks (after `after` when given) and return the new blocks with ids."""
+    body: JsonDict = {"children": blocks}
+    if after:
+        body["after"] = after
+    r = await client.patch(f"{NOTION_API}/blocks/{parent_id}/children", json=body)
+    r.raise_for_status()
+    return list(r.json()["results"])
+
+
+async def _list_children(client: httpx.AsyncClient, block_id: str) -> list[JsonDict]:
+    blocks: list[JsonDict] = []
+    cursor: str | None = None
+    while True:
+        params: dict[str, Any] = {"page_size": 100}
+        if cursor:
+            params["start_cursor"] = cursor
+        r = await client.get(f"{NOTION_API}/blocks/{block_id}/children", params=params)
+        r.raise_for_status()
+        body = r.json()
+        blocks.extend(body["results"])
+        if not body.get("has_more"):
+            return blocks
+        cursor = body["next_cursor"]
 
 
 async def _create_db(
