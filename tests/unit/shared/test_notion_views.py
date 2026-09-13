@@ -224,3 +224,34 @@ async def test_refused_views_become_warnings_in_page_order():
     assert [s.key for s in outcome.skipped] == [s.key for s in VIEW_SPECS]
     assert outcome.warnings[0] == "📊 Pipeline was not created: Notion refused it (400: Invalid filter)."
     assert len(api.posts) == 4  # no retry on 400
+
+
+class EmptyDataSourcesClient:
+    """Returns empty data_sources for Leads; Activities resolve normally."""
+
+    def __init__(self, props: dict = PROPS):
+        self.props = props
+        self.database_gets: list[str] = []
+
+    async def request(self, method, url, json=None, headers=None):
+        path = url.removeprefix(NOTION_API)
+        if method == "GET" and path.startswith("/databases/"):
+            db_id = path.rsplit("/", 1)[-1]
+            self.database_gets.append(db_id)
+            if db_id == "leads":
+                return _resp(200, {"data_sources": []})
+            return _resp(200, {"data_sources": [{"id": f"ds-{db_id}"}]})
+        if method == "GET" and path.startswith("/data_sources/"):
+            return _resp(200, {"properties": self.props})
+        return _resp(200, {"id": "view-1", "parent": {"type": "database_id", "database_id": "linked-1"}})
+
+
+async def test_empty_data_sources_does_not_raise_and_warns():
+    client = EmptyDataSourcesClient()
+    outcome = await create_home_views(
+        client, page_id="page", after_block_id="heading", databases={"Leads": "leads", "Activities": "acts"}
+    )
+    assert set(outcome.views) == {"recent_activity"}
+    assert [s.key for s in outcome.skipped] == ["pipeline", "needs_attention", "closing_soon"]
+    assert all("malformed API response (IndexError)" in w for w in outcome.warnings[:3])
+    assert client.database_gets.count("leads") == 1

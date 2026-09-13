@@ -8,6 +8,7 @@ call here is optional: callers turn failures into warnings, never exceptions.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import time
 from collections.abc import Awaitable, Callable
@@ -241,47 +242,59 @@ async def create_home_views(
     budget = budget or Budget()
     outcome = ViewsOutcome()
     sources: dict[str, tuple[str, dict[str, JsonDict]]] = {}
+    failed_sources: dict[str, str] = {}
     for spec in reversed(VIEW_SPECS):
         reason: str | None = None
-        try:
-            database_id = databases.get(spec.source)
-            if database_id is None:
-                reason = f"the {spec.source} database was not found"
-            else:
-                if spec.source not in sources:
-                    sources[spec.source] = await resolve_data_source(
-                        client, database_id, budget=budget
-                    )
-                data_source_id, props = sources[spec.source]
-                missing = [name for name in spec.requires if name not in props]
-                if missing:
-                    reason = f"the {', '.join(missing)} property is missing"
+        if spec.source in failed_sources:
+            reason = failed_sources[spec.source]
+        else:
+            try:
+                database_id = databases.get(spec.source)
+                if database_id is None:
+                    reason = f"the {spec.source} database was not found"
                 else:
-                    r = await views_request(
-                        client,
-                        "POST",
-                        "/views",
-                        budget=budget,
-                        json=view_body(
-                            spec,
-                            data_source_id=data_source_id,
-                            page_id=page_id,
-                            after_block_id=after_block_id,
-                            props=props,
-                        ),
-                    )
-                    if r.status_code == 200:
-                        created = r.json()
-                        outcome.views[spec.key] = {
-                            "view_id": str(created["id"]),
-                            "block_id": str(created["parent"]["database_id"]),
-                        }
+                    if spec.source not in sources:
+                        sources[spec.source] = await resolve_data_source(
+                            client, database_id, budget=budget
+                        )
+                    data_source_id, props = sources[spec.source]
+                    missing = [name for name in spec.requires if name not in props]
+                    if missing:
+                        reason = f"the {', '.join(missing)} property is missing"
                     else:
-                        reason = _refusal(r)
-        except BudgetExhausted:
-            reason = "the 20-second setup budget ran out"
-        except httpx.HTTPError as exc:
-            reason = f"the request failed ({exc})"
+                        r = await views_request(
+                            client,
+                            "POST",
+                            "/views",
+                            budget=budget,
+                            json=view_body(
+                                spec,
+                                data_source_id=data_source_id,
+                                page_id=page_id,
+                                after_block_id=after_block_id,
+                                props=props,
+                            ),
+                        )
+                        if r.status_code == 200:
+                            created = r.json()
+                            outcome.views[spec.key] = {
+                                "view_id": str(created["id"]),
+                                "block_id": str(created["parent"]["database_id"]),
+                            }
+                        else:
+                            reason = _refusal(r)
+            except BudgetExhausted:
+                reason = "the 20-second setup budget ran out"
+            except httpx.HTTPError as exc:
+                reason = f"the request failed ({exc})"
+            except (IndexError, KeyError, json.JSONDecodeError) as exc:
+                reason = f"malformed API response ({type(exc).__name__})"
+            if (
+                reason
+                and databases.get(spec.source) is not None
+                and spec.source not in sources
+            ):
+                failed_sources[spec.source] = reason
         if reason:
             outcome.warnings.append(f"{spec.name} was not created: {reason}.")
             outcome.skipped.append(spec)
