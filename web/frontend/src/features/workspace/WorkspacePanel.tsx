@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { deleteWorkspace } from "../../api/client";
+import { deleteWorkspace, refreshCrmTemplate } from "../../api/client";
 
 export interface DatabaseEntry {
   count: number | null;
@@ -33,6 +33,8 @@ interface WorkspacePanelProps {
   onSaveDb: (key: string, newId: string) => void;
   onCancelEdit: () => void;
   onRedeploy: () => void;
+  /** Notion page id of the deployed CRM home, or null if none is linked yet. */
+  crmPageId: string | null;
 }
 
 export function WorkspacePanel({
@@ -45,6 +47,7 @@ export function WorkspacePanel({
   onSaveDb,
   onCancelEdit,
   onRedeploy,
+  crmPageId,
 }: WorkspacePanelProps) {
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [availableDbs, setAvailableDbs] = useState<NotionDb[]>([]);
@@ -54,6 +57,10 @@ export function WorkspacePanel({
   const [telegramPingResult, setTelegramPingResult] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [tgInfoOpen, setTgInfoOpen] = useState(false);
+  const [refreshingCrm, setRefreshingCrm] = useState(false);
+  const [crmRefreshError, setCrmRefreshError] = useState<string | null>(null);
+  const [crmWarnings, setCrmWarnings] = useState<string[] | null>(null);
 
   const fetchTelegramStatus = useCallback(async () => {
     try {
@@ -107,6 +114,21 @@ export function WorkspacePanel({
     onSaveDb(key, selections[key] ?? "");
   }
 
+  async function handleRefreshCrm(): Promise<void> {
+    setRefreshingCrm(true);
+    setCrmRefreshError(null);
+    setCrmWarnings(null);
+    try {
+      const result = await refreshCrmTemplate();
+      setCrmWarnings(result.warnings);
+      onRefresh();
+    } catch (err) {
+      setCrmRefreshError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRefreshingCrm(false);
+    }
+  }
+
   async function handleDelete(): Promise<void> {
     setDeleting(true);
     try {
@@ -142,7 +164,9 @@ export function WorkspacePanel({
       </div>
 
       <div className="db-grid">
-        {Object.entries(databases).map(([key, db]) => {
+        {Object.entries(databases)
+          .filter(([, db]) => db.category !== "inbox")
+          .map(([key, db]) => {
           const isEditing = editingDbId === key;
           const isSaving = savingDbId === key || isRefreshing;
           const countIsNull = db.count === null;
@@ -214,12 +238,43 @@ export function WorkspacePanel({
         <div className="tg-bot-header">
           <span className="db-icon">🤖</span>
           <span className="tg-bot-label">Telegram Bot</span>
+          <button
+            type="button"
+            className="tg-info-btn"
+            aria-label="About the Telegram bot"
+            aria-expanded={tgInfoOpen}
+            aria-controls="tg-bot-info"
+            onClick={() => setTgInfoOpen((open) => !open)}
+          >
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+              <circle cx="12" cy="6.1" r="2.2" fill="currentColor" />
+              <rect x="9.95" y="10.15" width="4.1" height="9.55" rx="2.05" fill="currentColor" />
+            </svg>
+          </button>
           <span
             className="tg-bot-dot"
-            style={{ color: telegramStatus?.connected ? "#22c55e" : "#ef4444" }}
+            style={{ color: telegramStatus?.connected ? "var(--ok)" : "var(--bad)" }}
             title={telegramStatus?.connected ? "Connected" : "Disconnected"}
           >●</span>
         </div>
+        {tgInfoOpen && (
+          <div id="tg-bot-info" className="tg-bot-info" role="region" aria-label="About the Telegram bot">
+            <b>CRM from Telegram</b>
+            <p>
+              Create and update People, Companies, and Leads without opening Notion.
+              The bot asks for any field you skip.
+            </p>
+            <ul className="tg-bot-cmds">
+              <li><code>/lead</code></li>
+              <li><code>/people</code></li>
+              <li><code>/company</code></li>
+              <li><code>/deal</code></li>
+            </ul>
+            <p className="tg-bot-info-note">
+              The dot is whether the bot process is polling. Test connection pings it.
+            </p>
+          </div>
+        )}
         {telegramStatus && (
           <div className="tg-bot-meta">
             {telegramStatus.bot_name && <span>@{telegramStatus.bot_name}</span>}
@@ -246,25 +301,35 @@ export function WorkspacePanel({
           <span className="tg-bot-label">Workspace actions</span>
         </div>
         <div className="tg-bot-actions" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
+          {crmPageId && (
+            <button
+              className="btn-ghost btn-sm"
+              onClick={() => { void handleRefreshCrm(); }}
+              disabled={refreshingCrm}
+              title="Rewrite the CRM home template and pipeline views in place — databases and rows are kept."
+            >
+              {refreshingCrm ? "Refreshing CRM…" : "⟳ Refresh CRM template"}
+            </button>
+          )}
           <button className="btn-ghost btn-sm" onClick={onRedeploy}>
             ↺ Redeploy workspace
           </button>
           {!confirmDelete ? (
             <button
               className="btn-ghost btn-sm"
-              style={{ color: "#c0392b", borderColor: "#f5c6cb" }}
+              style={{ color: "var(--bad)", borderColor: "var(--bad-wash)" }}
               onClick={() => setConfirmDelete(true)}
             >
               🗑 Delete workspace config
             </button>
           ) : (
             <span style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "0.78rem", color: "#c0392b" }}>
+              <span style={{ fontSize: "0.78rem", color: "var(--bad)" }}>
                 This clears all DB links. Are you sure?
               </span>
               <button
                 className="btn-ghost btn-sm"
-                style={{ color: "#c0392b", borderColor: "#f5c6cb" }}
+                style={{ color: "var(--bad)", borderColor: "var(--bad-wash)" }}
                 onClick={() => void handleDelete()}
                 disabled={deleting}
               >
@@ -276,6 +341,23 @@ export function WorkspacePanel({
             </span>
           )}
         </div>
+        {crmRefreshError && (
+          <p style={{ margin: "0.6rem 0 0", fontSize: "0.78rem", color: "var(--bad)" }}>
+            {crmRefreshError}
+          </p>
+        )}
+        {crmWarnings && crmWarnings.length === 0 && (
+          <p style={{ margin: "0.6rem 0 0", fontSize: "0.78rem", color: "var(--muted)" }}>
+            CRM home refreshed — all four pipeline views are up to date.
+          </p>
+        )}
+        {crmWarnings && crmWarnings.length > 0 && (
+          <ul className="lp-setup-warnings" style={{ margin: "0.6rem 0 0" }}>
+            {crmWarnings.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+        )}
       </div>
     </section>
   );

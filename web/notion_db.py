@@ -7,6 +7,22 @@ import httpx
 from web.config import NOTION_API
 
 
+def page_title(page: dict) -> str:
+    """Title of a page returned by /v1/search.
+
+    Databases carry their title at `title` (a rich-text array), but a page keeps
+    it in `properties`, under whichever property has type "title". That key is
+    "title" for a standalone page and the database's title-column name for a row
+    — so find it by type, never by key.
+    """
+    for prop in (page.get("properties") or {}).values():
+        if prop.get("type") == "title":
+            text = "".join(t.get("plain_text", "") for t in (prop.get("title") or []))
+            if text.strip():
+                return text
+    return "(Untitled)"
+
+
 def _title_from_db(data: dict) -> str | None:
     parts = data.get("title") or []
     name = "".join(t.get("plain_text", "") for t in parts)

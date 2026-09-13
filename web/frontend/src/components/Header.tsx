@@ -1,5 +1,7 @@
 import React from "react";
 
+import { Logo } from "./Logo";
+
 interface HeaderProps {
   workspaceName: string;
   userName: string;
@@ -9,7 +11,8 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ workspaceName, userName, notionUrl }) => {
   return (
     <div className="hdr">
-      <a className="hdr-logo" href="#">
+      <a className="hdr-logo" href="/">
+        <Logo />
         Notion Pilot
       </a>
       <span className="hdr-badge">COCKPIT</span>

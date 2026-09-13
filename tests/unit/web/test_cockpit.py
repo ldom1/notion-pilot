@@ -193,6 +193,75 @@ def test_cockpit_status_with_configured_db():
     assert people_db["notion_name"] == "People"
 
 
+def test_cockpit_status_reports_the_linked_crm_page():
+    with patch(
+        "web.server.load_cockpit_cfg",
+        return_value={"databases": {}, "crm_page_id": "crm-page-1"},
+    ):
+        client = _authed_client()
+        r = client.get("/api/cockpit/status")
+
+    assert r.status_code == 200
+    assert r.json()["crm_page_id"] == "crm-page-1"
+
+
+def test_cockpit_status_has_no_crm_page_before_a_crm_is_deployed():
+    with patch("web.server.load_cockpit_cfg", return_value={"databases": {}}):
+        client = _authed_client()
+        r = client.get("/api/cockpit/status")
+
+    assert r.json()["crm_page_id"] is None
+
+
+# ── /api/crm/refresh ──────────────────────────────────────────────────────────
+
+
+def test_refresh_crm_without_a_deployed_crm_returns_400():
+    with patch("web.server.load_cockpit_cfg", return_value={"databases": {}}):
+        client = _authed_client()
+        r = client.post("/api/crm/refresh")
+
+    assert r.status_code == 400
+    assert "deploy one first" in r.json()["detail"]
+
+
+def test_refresh_crm_refreshes_the_linked_page_and_persists_its_views():
+    mock_result = MagicMock(
+        views={"pipeline": {"view_id": "v2", "block_id": "b2"}},
+        warnings=["🕘 Recent activity was not created: the Activities database was not found."],
+    )
+    with (
+        patch(
+            "web.server.load_cockpit_cfg",
+            return_value={
+                "databases": {},
+                "crm_page_id": "crm-page-1",
+                "crm_views": {"pipeline": {"view_id": "v1", "block_id": "b1"}},
+            },
+        ),
+        patch(
+            "web.server.upgrade_crm_home", new_callable=AsyncMock, return_value=mock_result
+        ) as upgrade,
+        patch("web.server.save_cockpit_cfg") as save,
+    ):
+        client = _authed_client()
+        r = client.post("/api/crm/refresh")
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["notion_page_url"] == "https://notion.so/crmpage1"
+    assert body["warnings"] == mock_result.warnings
+    assert body["views"] == mock_result.views
+
+    assert upgrade.call_args.args[1] == "crm-page-1"
+    assert upgrade.call_args.kwargs["previous_views"] == {
+        "pipeline": {"view_id": "v1", "block_id": "b1"}
+    }
+    saved_cfg = save.call_args.args[1]
+    assert saved_cfg["crm_views"] == mock_result.views
+    assert saved_cfg["crm_page_id"] == "crm-page-1"  # unrelated cfg fields survive the merge
+
+
 # ── /api/cockpit/config ───────────────────────────────────────────────────────
 
 
@@ -405,6 +474,68 @@ def test_deals_properties_no_db_configured():
 
 
 @respx.mock
+def test_log_activity_uses_session_token_and_persisted_activities_id():
+    """The first-time-user path for logging an activity.
+
+    MCP log_activity binds the operator's static NOTION_TOKEN at import, so it
+    cannot serve a workspace someone connected through the wizard. This endpoint
+    is the OAuth-session equivalent.
+    """
+    settings = _make_settings()
+    new_page_id = str(uuid.uuid4())
+    respx.post("https://api.notion.com/v1/pages").mock(
+        return_value=Response(201, json={"id": new_page_id})
+    )
+
+    with patch(
+        "web.config.load_cockpit_cfg",
+        return_value={"databases": {"notion_activities_database_id": "db-activities"}},
+    ):
+        client = _authed_client(settings=settings)
+        r = client.post(
+            "/api/cockpit/log-activity",
+            json={
+                "title": "Discovery call",
+                "type": "📞 Call",
+                "outcome": "➡️ Follow-up Needed",
+                "deal_page_id": "deal-1",
+                "person_page_id": "person-1",
+                "company_page_id": "company-1",
+                "next_step": "Send recap",
+            },
+        )
+
+    assert r.status_code == 200, r.text
+    assert r.json()["page_id"] == new_page_id
+
+    calls = [c for c in respx.calls if "api.notion.com" in str(c.request.url)]
+    assert len(calls) == 1
+    body = json.loads(calls[0].request.content)
+    assert body["parent"]["database_id"] == "db-activities"
+    props = body["properties"]
+    assert props["Name"]["title"][0]["text"]["content"] == "Discovery call"
+    assert props["Type"]["select"]["name"] == "📞 Call"
+    assert props["Outcome"]["select"]["name"] == "➡️ Follow-up Needed"
+    # the People relation is "Person", per ActivityRecord._to_properties
+    assert props["Person"]["relation"][0]["id"] == "person-1"
+    assert props["Deal"]["relation"][0]["id"] == "deal-1"
+    assert props["Company"]["relation"][0]["id"] == "company-1"
+    assert "Contact" not in props
+    assert props["Date"]["date"]["start"]  # defaults to today
+
+
+@respx.mock
+def test_log_activity_without_activities_db_returns_400():
+    """A workspace deployed before this change has no Activities id persisted."""
+    settings = _make_settings()
+    with patch("web.config.load_cockpit_cfg", return_value={"databases": {}}):
+        client = _authed_client(settings=settings)
+        r = client.post("/api/cockpit/log-activity", json={"title": "Call"})
+    assert r.status_code == 400
+    assert "Activities" in r.json()["detail"]
+
+
+@respx.mock
 def test_create_deal_existing_contact():
     """Links deal to an existing People page — no new person created in Notion."""
     settings = _make_settings()
@@ -510,8 +641,8 @@ def test_create_deal_with_extra_fields():
                 "deal_name": "HPC Deal",
                 "notion_id": "person-id",
                 "extra_fields": {
-                    "Product": ["HPC-as-a-service"],
-                    "Lead Source": "Prospection chaude",
+                    "Product": ["Consulting"],
+                    "Lead Source": "Referral",
                     "Value (euros)": 45000,
                     "Notes": "Strategic account",
                 },
@@ -520,8 +651,8 @@ def test_create_deal_with_extra_fields():
 
     assert r.status_code == 200
     body = json.loads(respx.calls[0].request.content)
-    assert body["properties"]["Product"]["multi_select"][0]["name"] == "HPC-as-a-service"
-    assert body["properties"]["Lead Source"]["select"]["name"] == "Prospection chaude"
+    assert body["properties"]["Product"]["multi_select"][0]["name"] == "Consulting"
+    assert body["properties"]["Lead Source"]["select"]["name"] == "Referral"
     assert body["properties"]["Value (euros)"]["number"] == 45000
     assert body["properties"]["Notes"]["rich_text"][0]["text"]["content"] == "Strategic account"
 

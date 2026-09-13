@@ -7,6 +7,11 @@ updated:
 
 <!-- Append-only ADR log. Never delete entries. -->
 
+### 2026-09-13 — CRM home *is* the dashboard (spec rev 6); linked views via Views API
+**Decision:** One CRM page opens on **This week** with four linked views created through `POST /v1/views` (`notion_pilot/shared/notion_views.py`, version allowlist `2025-09-03` / `2026-03-11`). No separate Dashboard page; no native charts. Sources live in one list (`doc_links.py`) for the Notion toggle and the cockpit panel. Refresh deletes only blocks whose plain text matches known templates (current + legacy Telegram), never databases/rows/user blocks.
+**Rejected:** Separate Dashboard child page; Notion native dashboards/charts; wiping the whole page on upgrade; inventing a `"this_month"` close-date filter (Notion has none — use `next_month`).
+**Rationale:** Spec rev 6 after dogfood: the home page *is* the operating surface. Live gate proved board/`formula.checkbox`/`next_month`/`past_month` and that linked blocks list as `child_database` titled `Untitled` on `2022-06-28` (title-based DB discovery stays safe). Spec: [[2026-09-13-crm-home-dashboard-design]], plan: [[2026-09-13-crm-home-dashboard-plan]], PR #30.
+
 ### 2026-07-24 — Companies Finance section writes via Notion MCP directly, not `upsert_companies`/`enrich_companies`
 **Decision:** `company-open-data-enrichment` writes the 4 new Finance properties (`CA`, `Résultat net`, `Marge nette %`, `Année financière`) directly via Notion MCP page-update, always overwriting with the freshest RNE year (guarded against stale years and mismatched existing property types)
 **Rejected:** Extending `enrich_companies`' fill-empty-only semantics to cover financials
@@ -215,6 +220,46 @@ updated:
 **Rejected:** Continuing to treat "MCP not connected" as a hard stop requiring the user to fix MCP before any CRM work can proceed.
 **Rationale:** `notion-crm` MCP failed to connect across three independent sessions, including one confirmed by the user to be a genuine fresh terminal + direct `claude` launch, with the on-disk config verified correct every time — the root cause is environmental and outside what's fixable from inside a session. The direct-API path was proven twice this session (RTE, LCH, then a 22-company batch) using the exact same underlying Notion client code, so it's a safe, non-duplicative fallback rather than a new write path. Two gotchas to check before using it: the Infisical `dev` environment holds an invalid placeholder Notion token (use `prod`, with a local-only `NOTION_OAUTH_REDIRECT_URI` override to dodge an OAuth-localhost Pydantic guard); the real Companies data source is on the legacy `data_sources` API, not `databases`.
 **Affects:** `skills/company-open-data-enrichment/SKILL.md` prerequisite #1. See [[2026-07-24-companies-finance-section]].
+
+### 2026-09-10 — Resolve Notion back-relation names at runtime rather than hardcoding them
+
+**Decision:** `create_crm_workspace` creates dual relations, then reads the reverse property back from the API, renames it for readability, and keys the rollups on whatever name is actually live (`_resolve_back_relation`). Because the name is then known rather than guessed, a rollup failure is raised instead of warned about.
+**Rejected:** The v1 spec's literal instruction — request `Activities` as the reverse name via dual-property relations, and treat a rollup 400 as a hard failure.
+**Rationale:** Those two cannot both hold. Notion names the reverse property itself and `synced_property_name` is read-only on create. The repo already showed the consequence: `crm_create_activities_db.py` used `single_property` (no reverse property at all) while `crm_add_activity_rollups.py` hardcoded `"Activities"` with a "verified by probe" comment and `allow_400=True`. Nothing in `scripts/` or `NOTION_UI_STEPS.md` ever created those back-relations — they were made by hand in the UI. Implementing the spec literally would have hard-failed the deploy on the step it called highest-leverage. **Still unproven against the live API** — all tests are mocked; one real deploy is needed.
+**Affects:** `notion_pilot/shared/workspace.py`; PR #28. See [[2026-09-10-landing-cockpit-redesign]].
+
+### 2026-09-10 — One monochrome design system for both web surfaces, and `develop` as the integration base
+
+**Decision:** Landing and cockpit share `tokens.css`: a true achromatic ramp (every grey `chroma 0`), near-black as the only brand colour, and colour reserved for CRM data (Notion select palette + status dots). `develop` — which existed only locally, 60 commits behind `main` with zero unique commits — was refreshed to `main` and published as the remote integration base.
+**Rejected:** The purple-on-white palette (named as a saturated "AI attractor zone" by the palette tooling, and what the cockpit still used); also rejected adding Tailwind, which would have added a build step without changing a pixel given the design lives in the token layer.
+**Rationale:** The chrome must not compete with the data it displays — the page is mostly table and board mockups, so monochrome chrome makes those the focal point. Publishing `develop` was safe because it held nothing `main` did not, and CI already gates its integration-test job on that branch name.
+**Affects:** `web/frontend/src/styles/{tokens,landing,globals}.css`; branch model; PRs #27 and #28.
+
+### 2026-09-11 — Landing-page films are authored on the site's token layer, and run the full measure
+
+**Decision:** The three promotional films (`promotion/video/hyperframes/`) are HyperFrames HTML
+compositions whose design system, `_shared/np.css`, is a deliberate copy of
+`web/frontend/src/styles/tokens.css` — same achromatic ramp, same near-black brand colour, same
+rule that colour only ever lands on CRM data. Every record, stage, figure and name in a film also
+exists in `Landing.tsx`. A film on the page runs the full 1180px measure, never a half-width
+column. **Only `notion-pilot-pipeline` is on the page**, after the pipeline-decay beat and at
+`rate: 0.85`; the other two stay in the catalog because agent HITL and collaboration are already
+told by the surfaces and EU/Enterprise sections.
+**Rejected:** A lead film plus a 2-up pair (built first, then undone); all three films embedded
+below the Claudeforce section (built and integrated, then cut to one by a later editorial pass);
+and "brand-inspired" film styling authored independently of the token layer.
+**Rationale:** Two separate failures. (1) These frames are tables and tool logs — halving the
+column halves the type inside the rendered frame too, so at ~540px the thing the film exists to
+show stops being readable. Layout width is therefore a content decision here, not a rhythm
+decision. (2) A HyperFrames project must be self-contained (the renderer serves the project dir as
+its web root and may not fetch at frame time), so the duplication of `np.css` is forced — which
+makes it all the more important that it is a mirror with a stated provenance rather than a second
+design system that will drift. The same reasoning binds the figures: a mock that contradicts the
+prose beside it is worse than no mock. (3) Three autoplaying films turn an argument into a
+showreel; one film that answers the beat directly above it does the work. Extends the 2026-09-10
+one-design-system decision above.
+**Affects:** `promotion/video/`; `web/frontend/public/film/`; `Landing.tsx` `#film` section;
+`landing.css` `.lp-film*`. See [[2026-09-11-landing-page-films]].
 
 ## Template
 <!-- added by ai-dotfiles upgrade -->

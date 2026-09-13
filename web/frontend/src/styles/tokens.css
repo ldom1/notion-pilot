@@ -1,0 +1,82 @@
+/* Notion Pilot — one design system, both surfaces.
+ *
+ * The landing page (Persuade) and the cockpit (Operate) share this layer so
+ * they cannot drift apart again. Everything below is achromatic on purpose:
+ * every grey is chroma 0, and near-black is the only "brand" colour. Colour is
+ * reserved for meaning — CRM data, status, and Notion's own select palette.
+ *
+ * Surface-specific expression belongs in landing.css / globals.css, not here.
+ */
+
+:root {
+  /* achromatic ramp — no hidden tint */
+  --bg: oklch(1 0 0);
+  --surface: oklch(0.978 0 0);
+  --surface-2: oklch(0.956 0 0);
+  --ink: oklch(0.17 0 0);
+  --ink-soft: oklch(0.36 0 0);
+  --muted: oklch(0.52 0 0);
+  --rule: oklch(0.915 0 0);
+  --rule-strong: oklch(0.845 0 0);
+
+  /* action / emphasis */
+  --primary: oklch(0.22 0 0);
+  --primary-deep: oklch(0.12 0 0);
+  --primary-wash: oklch(0.965 0 0);
+  --accent: oklch(0.3 0 0);
+
+  /* the approval mark */
+  --mark: oklch(0.17 0 0);
+  --mark-ink: oklch(1 0 0);
+
+  /* status — only ever on data */
+  --ok: oklch(0.55 0.11 162);
+  --ok-wash: oklch(0.962 0.03 162);
+  --warn: oklch(0.64 0.13 72);
+  --warn-wash: oklch(0.965 0.045 72);
+  --bad: oklch(0.57 0.15 20);
+  --bad-wash: oklch(0.962 0.03 20);
+
+  /* inverted surfaces (logs, code) */
+  --dark: oklch(0.17 0 0);
+  --dark-ink: oklch(0.93 0 0);
+  --dark-rule: oklch(0.32 0 0);
+  --dark-muted: oklch(0.68 0 0);
+
+  /* type */
+  --font: Archivo, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* geometry */
+  --r-sm: 5px;
+  --r: 8px;
+  --r-lg: 12px;
+
+  --shadow-1: 0 1px 2px oklch(0 0 0 / 0.05);
+  --shadow-2: 0 2px 8px -2px oklch(0 0 0 / 0.12);
+  --shadow-3: 0 18px 44px -28px oklch(0 0 0 / 0.3);
+}
+
+/* Notion select colours — pale fill, darker text of the same hue, exactly how
+ * Notion renders a select option. Shared so a stage tag looks identical on the
+ * marketing page and in the cockpit. */
+:root {
+  --n-gray-bg: oklch(0.945 0 0);
+  --n-gray-fg: oklch(0.42 0 0);
+  --n-brown-bg: oklch(0.945 0.022 60);
+  --n-brown-fg: oklch(0.44 0.06 60);
+  --n-orange-bg: oklch(0.95 0.052 65);
+  --n-orange-fg: oklch(0.5 0.13 55);
+  --n-yellow-bg: oklch(0.958 0.062 95);
+  --n-yellow-fg: oklch(0.48 0.1 85);
+  --n-green-bg: oklch(0.952 0.042 160);
+  --n-green-fg: oklch(0.44 0.11 162);
+  --n-blue-bg: oklch(0.948 0.038 250);
+  --n-blue-fg: oklch(0.45 0.13 253);
+  --n-purple-bg: oklch(0.948 0.036 300);
+  --n-purple-fg: oklch(0.46 0.14 300);
+  --n-pink-bg: oklch(0.95 0.036 350);
+  --n-pink-fg: oklch(0.49 0.14 350);
+  --n-red-bg: oklch(0.952 0.038 22);
+  --n-red-fg: oklch(0.5 0.15 22);
+}

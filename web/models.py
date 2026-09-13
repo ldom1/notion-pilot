@@ -11,6 +11,9 @@ class SetupRequest(BaseModel):
     scope: Literal["crm", "inbox", "both"]
     workspace_name: str
     notion_token: str | None = None
+    # Where to put the deploy. None means the top level of the workspace, which
+    # Notion only permits for public-integration OAuth tokens.
+    parent_page_id: str | None = None
 
 
 class SetupResponse(BaseModel):
@@ -55,6 +58,27 @@ class CreateDealRequest(BaseModel):
     extra_fields: dict | None = None  # wizard-collected property values
     summary: str | None = None  # chat analysis that led to this deal
     company_name: str | None = None  # company to link as relation
+
+
+class LogActivityRequest(BaseModel):
+    """Log one CRM activity through the browser's own OAuth session.
+
+    The MCP `log_activity` tool acts on the operator's static NOTION_TOKEN, so a
+    first-time user who deployed through the wizard cannot reach their own
+    Activities database with it. This request is the session-token path.
+    """
+
+    title: str
+    type: str = "📞 Call"
+    outcome: str | None = None
+    date: str | None = None  # ISO date; defaults to today
+    duration_min: int | None = None
+    deal_page_id: str | None = None
+    person_page_id: str | None = None
+    company_page_id: str | None = None
+    next_step: str | None = None
+    next_step_date: str | None = None
+    notes: str | None = None
 
 
 # ── Workflow composition ──────────────────────────────────────────────────────

@@ -39,6 +39,14 @@ The wizard walks you through token validation, scope selection, and parent page 
 
 ### Option C — Web UI (deploy wizard)
 
+The wizard asks where to put the workspace: the top level of your Notion, or
+inside a page you pick. **With an internal integration token, a parent page is
+required** — Notion rejects workspace-level page creation for integrations that
+aren't owned by a single user ("Internal integrations aren't owned by a single
+user, so creating workspace-level private pages is not supported"). The wizard
+detects this and only offers placements your token can actually use. Share the
+page with your integration first: open it in Notion → `···` → **Connections**.
+
 Register a public Notion integration at [notion.so/my-integrations](https://www.notion.so/profile/integrations), then add to your `.env`:
 
 ```env
@@ -55,7 +63,13 @@ uv sync --group web
 ./launch_webserver.sh
 ```
 
-Open `http://localhost:8080`, click **Deploy to Notion**, authorize with your Notion account, choose your scope, and name your workspace. Done.
+Open `http://localhost:8080`, click **Deploy the CRM to Notion**, authorize with your Notion account, name the CRM page, and choose workspace root or a page from the workspace. Done.
+
+The CRM page opens on your pipeline: four views under **This week**, a prompt to paste into your assistant, and **Sources & documentation**. To refresh an older CRM page in place:
+
+```bash
+uv run python scripts/crm/crm_upgrade_home.py --crm-page-id <page id or URL>
+```
 
 **Advanced / self-hosted without OAuth:** Click "Have an integration token?" in the wizard and paste a `secret_...` token from [notion.so/my-integrations](https://www.notion.so/profile/integrations). The integration must have workspace-level create permissions.
 
@@ -142,6 +156,26 @@ uv run pytest tests/unit -v              # fast, no network
 uv run pytest tests/integration -v       # hits real Notion + OpenRouter + Whisper
 uv run ruff check . && uv run mypy notion_pilot
 ```
+
+## Homepage films
+
+The landing page embeds one silent clip — the email → approved diff → Notion → KPI loop —
+after the “who keeps this up to date?” beat. The other two HyperFrames compositions
+(HITL gate, team dictation) stay in `promotion/video/` and `/film/`; on the page those
+jobs are the assistant preview and the EU/Enterprise band (collaboration is
+native Notion). All three are HTML compositions on the site's own design tokens, rendered
+to MP4.
+
+```bash
+cd promotion/video && npm install                 # once — installs the hyperframes CLI
+./hyperframes/sync-shared.sh                      # after editing _shared/np.css
+cd hyperframes/notion-pilot-pipeline
+../../node_modules/.bin/hyperframes check         # must be 0 errors before rendering
+../../node_modules/.bin/hyperframes render --quality high --output out.mp4
+```
+
+Delivered files live in `web/frontend/public/film/` (served at `/film/<slug>.mp4`).
+Sources, briefs and the publishing loop: [`promotion/video/README.md`](promotion/video/README.md).
 
 ## Under the hood
 

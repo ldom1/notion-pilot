@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "notion-pilot",
+  "description": "Run a relational CRM out of Notion from your AI assistant — operate leads, activities, people and companies with dedup, French open-data enrichment, and a hard stop until you approve.",
+  "owner": {
+    "name": "Louis Giron",
+    "github": "ldom1"
+  },
+  "plugins": [
+    {
+      "name": "notion-crm",
+      "description": "Operate a Notion CRM from Claude: create and update leads, log activities, enrich people and companies from French open data. Always shows a validation table and waits for an explicit go before writing.",
+      "source": ".",
+      "category": "productivity",
+      "homepage": "https://github.com/ldom1/notion-pilot"
+    }
+  ]
+}

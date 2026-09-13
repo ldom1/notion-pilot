@@ -3,7 +3,8 @@ import React, { useEffect, useState, useCallback } from "react";
 import Header from "../components/Header";
 import { Spinner } from "../components/Spinner";
 import { McpPanel } from "../features/mcp/McpPanel";
-import { ChatPanel } from "../features/chat/ChatPanel";
+import { AssistantSetupPanel } from "../features/mcp/AssistantSetupPanel";
+import { SourcesPanel } from "../features/docs/SourcesPanel";
 import { SetupWizard } from "../features/setup/SetupWizard";
 import { WorkspacePanel, DatabaseEntry } from "../features/workspace/WorkspacePanel";
 
@@ -114,7 +115,7 @@ const Cockpit: React.FC = () => {
       <>
         <Header workspaceName="" userName="" notionUrl="" />
         <div className="main">
-          <p style={{ color: '#dc2626', padding: '2rem 0', fontSize: '0.88rem' }}>{error}</p>
+          <p style={{ color: 'var(--bad)', padding: '2rem 0', fontSize: '0.88rem' }}>{error}</p>
         </div>
       </>
     );
@@ -133,7 +134,7 @@ const Cockpit: React.FC = () => {
         notionUrl={notionUrl}
       />
       <div className="main">
-        <ChatPanel />
+        <AssistantSetupPanel />
         <WorkspacePanel
           databases={databases}
           onRefresh={() => { void loadStatus(); }}
@@ -144,8 +145,10 @@ const Cockpit: React.FC = () => {
           onSaveDb={handleSaveDb}
           onCancelEdit={handleCancelEdit}
           onRedeploy={() => setShowRedeploy(true)}
+          crmPageId={status?.crm_page_id ?? null}
         />
         <McpPanel />
+        <SourcesPanel />
       </div>
 
       {showRedeploy && (

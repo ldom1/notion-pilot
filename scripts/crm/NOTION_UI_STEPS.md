@@ -1,5 +1,7 @@
 # Manual Notion UI Steps — CRM Migration
 
+> **Wizard deploys:** the CRM home already has 📊 Pipeline, ⚠️ Needs attention, 📅 Closing in the next 30 days and 🕘 Recent activity. If Notion refused one, its steps are on the CRM page. The steps below are for the legacy workspace and the extra Leads/Activities/People views.
+
 These steps **cannot be performed via the Notion API** and must be done by hand in the Notion web or desktop app.
 Complete them after all migration scripts have run successfully.
 
@@ -10,7 +12,7 @@ Complete them after all migration scripts have run successfully.
 | Deals (Commercial) | `https://www.notion.so/4890e1d6178d4a42af067bbe0cef09fe` |
 | People | `https://www.notion.so/11b5f43ca19a4bec94897c6897ed30fb` |
 | Companies | `https://www.notion.so/cfc2119896844ef798aefc5657511998` |
-| Meetings | `https://www.notion.so/e94cc98f2f664c53acd662b9d8f7d5aa` |
+| Meetings | `https://www.notion.so/e94cc98f2f664c53ac6d62b9d8f7d5aa` |
 | Activities | `https://www.notion.so/38f6c45194658166a862e531d15f467f` |
 | CRM parent page | `https://www.notion.so/36d6c451946580b7af00d80250f0974c` |
 

@@ -31,6 +31,13 @@ DB_DEFS: list[dict] = [
     },
     {"key": "notion_deals_database_id", "label": "Leads", "icon": "💼", "category": "crm"},
     {
+        "key": "notion_activities_database_id",
+        "label": "Activities",
+        "icon": "⚡",
+        "category": "crm",
+    },
+    {"key": "notion_meetings_database_id", "label": "Meetings", "icon": "🤝", "category": "crm"},
+    {
         "key": "notion_telegram_msg_database_id",
         "label": "Messages",
         "icon": "💬",
@@ -91,6 +98,11 @@ def resolve_db_ids(
         "notion_ideas_database_id": settings.notion_ideas_database_id,
         "notion_tools_database_id": settings.notion_tools_database_id,
         "notion_data_tech_database_id": settings.notion_data_tech_database_id,
+        # Both are created by the deploy wizard. Without them here, the ids the
+        # wizard persists resolve to nothing and log-activity cannot find its
+        # database — cockpit_only returns exactly the keys of this dict.
+        "notion_activities_database_id": settings.notion_activities_database_id,
+        "notion_meetings_database_id": settings.notion_meetings_database_id,
     }
     overrides = load_cockpit_cfg(workspace_id).get("databases", {})
     if cockpit_only:

@@ -103,6 +103,7 @@ export interface CockpitStatus {
   workspace_name: string;
   user_name: string;
   workspace_url: string;
+  crm_page_id: string | null;
 }
 
 export interface ScriptParam {
@@ -170,6 +171,7 @@ export type SSEEventType =
   | "status"
   | "done"
   | "error"
+  | "warning"
   | "result"
   | "token"
   | "step_start"
@@ -222,8 +224,8 @@ async function _json<T>(
 }
 
 /** GET helper — returns parsed JSON. */
-async function _get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { credentials: "include" });
+async function _get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, { credentials: "include", signal });
   await _throwIfNotOk(res);
   return res.json() as Promise<T>;
 }
@@ -436,12 +438,60 @@ export async function deleteWorkspace(): Promise<void> {
   await _json<{ ok: boolean }>("DELETE", "/api/workspace");
 }
 
+/** POST /api/crm/refresh — rewrite the CRM home template + views in place. */
+export interface RefreshCrmResult {
+  notion_page_url: string;
+  warnings: string[];
+  views: Record<string, { view_id: string; block_id: string }>;
+}
+
+export async function refreshCrmTemplate(): Promise<RefreshCrmResult> {
+  return _json<RefreshCrmResult>("POST", "/api/crm/refresh");
+}
+
+/** GET /api/setup/pages — Notion pages the integration can parent a CRM under */
+export interface SetupPage {
+  id: string;
+  name: string;
+  root: boolean;
+}
+
+export function listSetupPages(signal?: AbortSignal): Promise<{ pages: SetupPage[] }> {
+  return _get("/api/setup/pages", signal);
+}
+
 /** POST /api/setup/stream — SSE stream for workspace deployment */
 export interface SetupRequest {
   scope: "crm" | "inbox" | "both";
   workspace_name: string;
+  /** Omit to create at the top level of the workspace (OAuth tokens only). */
+  parent_page_id?: string | null;
 }
 
 export function runSetup(req: SetupRequest): AsyncGenerator<SSEEvent> {
   return _sse("POST", "/api/setup/stream", req);
+}
+
+export interface SetupCapabilities {
+  can_create_top_level: boolean;
+  owner_type: string | null;
+  workspace_name: string;
+}
+
+/** GET /api/setup/capabilities — which placements this token allows */
+export async function fetchSetupCapabilities(): Promise<SetupCapabilities> {
+  return _get<SetupCapabilities>("/api/setup/capabilities");
+}
+
+export interface NotionPage {
+  id: string;
+  name: string;
+}
+
+/** GET /api/cockpit/notion-pages — pages usable as a deploy parent */
+export async function fetchNotionPages(
+  q = "",
+): Promise<{ pages: NotionPage[]; truncated: boolean }> {
+  const path = q ? `/api/cockpit/notion-pages?q=${encodeURIComponent(q)}` : "/api/cockpit/notion-pages";
+  return _get<{ pages: NotionPage[]; truncated: boolean }>(path);
 }
