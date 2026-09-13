@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en" data-resolution="landscape">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Notion Pilot — the agent looks before it writes</title>
+    <link rel="stylesheet" href="assets/np.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      /* ── scene 2: the dry run is the default answer ──────────────────── */
+      #s-gate .np-split {
+        display: grid;
+        grid-template-columns: 1fr 860px;
+        gap: 72px;
+        align-content: center;
+        height: 100%;
+      }
+
+      #s-gate .np-lede {
+        margin-top: 28px;
+        font-size: 32px;
+        max-width: 720px;
+      }
+
+      .np-call-block {
+        padding: 28px 36px 30px;
+        font-family: var(--font-mono);
+        font-size: 24px;
+        line-height: 1.62;
+        white-space: nowrap;
+      }
+
+      .np-call-block .np-key {
+        color: var(--dark-muted);
+      }
+
+      .np-call-block .np-flag {
+        color: oklch(0.82 0.12 82);
+      }
+
+      .np-call-block .np-flag-on {
+        color: oklch(0.78 0.11 162);
+      }
+
+      .np-call-block .np-fn {
+        font-weight: 500;
+      }
+
+      .np-returns {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 20px 36px 22px;
+        border-top: 1px solid var(--dark-rule);
+        font-family: var(--font-mono);
+        font-size: 22px;
+        color: var(--dark-muted);
+      }
+
+      .np-returns b {
+        font-weight: 500;
+        color: oklch(0.82 0.12 82);
+      }
+
+      /* a write that actually landed reads as "won", not as "held" */
+      #returns-live b {
+        color: oklch(0.78 0.11 162);
+      }
+
+      /* the second panel is the same call, answered — so it reads as a gate */
+      #s-gate .np-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+      }
+
+      /* the panels are dense, so their headers stay slim */
+      #s-gate .np-dark-head {
+        padding: 20px 36px 21px;
+        font-size: 19px;
+      }
+
+      #s-gate .np-verdict {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        margin-top: 44px;
+        font-size: 30px;
+        color: var(--ink-soft);
+      }
+
+      #s-gate .np-verdict .np-tag {
+        font-family: var(--font-mono);
+      }
+
+      /* ── scene 3: the four rules ─────────────────────────────────────── */
+      #s-rules .np-holder {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 56px;
+        height: 100%;
+      }
+
+      .np-rules {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1px;
+        background: var(--rule);
+        border: 1px solid var(--rule);
+        border-radius: var(--r-lg);
+        overflow: hidden;
+      }
+
+      .np-rule {
+        display: grid;
+        grid-template-columns: 68px 1fr;
+        gap: 30px;
+        padding: 50px 54px 54px;
+        background: var(--bg);
+      }
+
+      .np-rule svg {
+        width: 52px;
+        height: 52px;
+        display: block;
+        margin-top: 4px;
+        color: var(--ink);
+      }
+
+      .np-rule h3 {
+        font-size: 38px;
+        font-weight: 600;
+        letter-spacing: -0.018em;
+        margin-bottom: 14px;
+      }
+
+      .np-rule p {
+        font-size: 28px;
+        line-height: 1.46;
+        color: var(--ink-soft);
+      }
+
+      /* ── closing lockup ─────────────────────────────────────────────── */
+      #s-end .np-lockup .np-h2 {
+        max-width: 1260px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="16"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- ── scene 1 · 0–3.6s — the one rule ────────────────────────────── -->
+      <section
+        id="s-open"
+        class="clip np-clip"
+        data-start="0"
+        data-duration="3.6"
+        data-track-index="1"
+      >
+        <div class="np-display">
+          <span class="np-kicker" id="open-kicker">The agent has one rule</span>
+          <h1 class="np-h1">
+            <span class="np-line"><b id="open-l1">Nothing is written</b></span>
+            <span class="np-line"><b id="open-l2" class="np-quiet">until you say so.</b></span>
+          </h1>
+        </div>
+      </section>
+
+      <!-- ── scene 2 · 3.6–9.4s — the dry run is the default ────────────── -->
+      <section
+        id="s-gate"
+        class="clip np-clip"
+        data-start="3.6"
+        data-duration="5.8"
+        data-track-index="1"
+      >
+        <div class="np-split">
+          <div>
+            <h2 class="np-h2" id="gate-h2">Dry run is the default.</h2>
+            <p class="np-lede" id="gate-lede">
+              Every write tool returns a preview unless you pass
+              <code>confirm=true</code>. The default answer to “should I write this?” is no.
+            </p>
+            <div class="np-verdict" id="gate-verdict">
+              <span class="np-tag gray">0 records written</span>
+              <span>until the diff comes back approved</span>
+            </div>
+          </div>
+
+          <div class="np-stack">
+            <div class="np-dark-panel" id="panel-dry">
+              <div class="np-dark-head">what the agent asks for</div>
+              <div class="np-call-block">
+                <div><span class="np-fn">update_lead</span>(</div>
+                <div>
+                  &nbsp;&nbsp;<span class="np-key">lead</span>: "Voltaris — Platform licence",
+                </div>
+                <div>&nbsp;&nbsp;<span class="np-key">stage</span>: "Proposal Sent",</div>
+                <div>
+                  &nbsp;&nbsp;<span class="np-key">confirm</span>:
+                  <span class="np-flag" id="flag-off">false</span>
+                </div>
+                <div>)</div>
+              </div>
+              <div class="np-returns" id="returns-dry">
+                <span>→</span>
+                <span><b>preview</b> · 3 fields · nothing saved</span>
+              </div>
+            </div>
+
+            <div class="np-dark-panel" id="panel-live">
+              <div class="np-dark-head">what you send back</div>
+              <div class="np-call-block">
+                <div><span class="np-fn">update_lead</span>(</div>
+                <div>&nbsp;&nbsp;… <span class="np-key">same three fields</span>,</div>
+                <div>
+                  &nbsp;&nbsp;<span class="np-key">confirm</span>:
+                  <span class="np-flag-on" id="flag-on">true</span>
+                </div>
+                <div>)</div>
+              </div>
+              <div class="np-returns" id="returns-live">
+                <span>→</span>
+                <span><b id="returns-live-b">written</b> · 1 record · audit trail kept</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── scene 3 · 9.4–13.6s — the four rules ───────────────────────── -->
+      <section
+        id="s-rules"
+        class="clip np-clip"
+        data-start="9.6"
+        data-duration="4.4"
+        data-track-index="1"
+      >
+        <div class="np-holder">
+          <h2 class="np-h2" id="rules-h2">Four rules, every single time.</h2>
+          <div class="np-rules" id="rules-grid">
+            <div class="np-rule" data-rule="1">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="6.5" />
+                <path d="m16 16 4.5 4.5" />
+              </svg>
+              <div>
+                <h3>It looks before it writes</h3>
+                <p>Email, then LinkedIn, then fuzzy name plus company. An existing record gets updated, not duplicated.</p>
+              </div>
+            </div>
+            <div class="np-rule" data-rule="2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12S18 18.5 12 18.5 2.5 12 2.5 12Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              <div>
+                <h3>Dry run is the default</h3>
+                <p>Write tools return a preview unless confirm=true. Nothing reaches Notion on a guess.</p>
+              </div>
+            </div>
+            <div class="np-rule" data-rule="3">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m4 12.5 5 5L20 6.5" />
+              </svg>
+              <div>
+                <h3>You approve the diff</h3>
+                <p>Exactly what changes, per database. Ambiguous matches are escalated, never guessed.</p>
+              </div>
+            </div>
+            <div class="np-rule" data-rule="4">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 4 3 11l5.5 2.2L11 20l3.2-4.4L20 6" />
+                <path d="M8.5 13.2 20 6" />
+              </svg>
+              <div>
+                <h3>Calls work the same way</h3>
+                <p>Dictate your notes walking back to the office. Type, outcome, next step with a date.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── scene 4 · 14–16s — lockup ──────────────────────────────────── -->
+      <section id="s-end" class="clip np-clip" data-start="14" data-duration="2" data-track-index="1">
+        <div class="np-lockup">
+          <svg class="np-mark-lg" id="end-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <rect x="3.3" y="3.3" width="20.4" height="25.4" rx="4" stroke="currentColor" stroke-width="1.7" />
+            <path d="M8.4 11h8.2M8.4 15.6h5.2M8.4 20.2h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+            <path id="end-check" d="m12.6 21.4 5.2 5.4L30.2 9.6" stroke="var(--primary)" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <h2 class="np-h2" id="end-h2">Notion Pilot does the typing.</h2>
+          <span class="np-rule-sweep" id="end-rule"></span>
+          <span class="np-cta" id="end-cta">You keep the judgement</span>
+        </div>
+      </section>
+
+      <!-- ── persistent frame furniture ─────────────────────────────────── -->
+      <div class="np-chrome" id="chrome">
+        <svg class="np-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <rect x="3.3" y="3.3" width="20.4" height="25.4" rx="4" stroke="currentColor" stroke-width="1.7" />
+          <path d="M8.4 11h8.2M8.4 15.6h5.2M8.4 20.2h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+          <path d="m12.6 21.4 5.2 5.4L30.2 9.6" stroke="var(--primary)" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span>Notion Pilot</span>
+      </div>
+
+      <div class="np-stage" id="stage-label">The AI agent</div>
+
+      <div class="np-tick-rail">
+        <span class="np-tick" id="tick"></span>
+      </div>
+    </div>
+
+    <script>
+      const DUR = 16;
+
+      function build() {
+        const tl = gsap.timeline({ paused: true });
+
+        /* ── frame furniture ─────────────────────────────────────────────── */
+        tl.fromTo("#tick", { scaleX: 0 }, { scaleX: 1, duration: DUR, ease: "none" }, 0);
+        tl.fromTo("#chrome", { autoAlpha: 0, y: -10 }, { autoAlpha: 1, y: 0, duration: 0.7, ease: "power2.out" }, 0.15);
+        tl.fromTo("#stage-label", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.7, ease: "power2.out" }, 0.35);
+        tl.to("#chrome", { autoAlpha: 0, duration: 0.45, ease: "power2.in" }, 13.9);
+        tl.to("#stage-label", { autoAlpha: 0, duration: 0.45, ease: "power2.in" }, 13.9);
+
+        /* ── scene 1 ─────────────────────────────────────────────────────── */
+        tl.fromTo("#open-kicker", { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.3);
+        tl.fromTo("#open-l1", { yPercent: 108 }, { yPercent: 0, duration: 0.82, ease: "power4.out" }, 0.5);
+        tl.fromTo("#open-l2", { yPercent: 108 }, { yPercent: 0, duration: 0.82, ease: "power4.out" }, 0.78);
+        tl.to("#s-open .np-display", { autoAlpha: 0, y: -26, duration: 0.5, ease: "power2.in" }, 3.0);
+        tl.set("#s-open .np-display", { autoAlpha: 0 }, 3.5);
+
+        /* ── scene 2 — the ask, the refusal, then the go-ahead ──────────── */
+        tl.fromTo("#gate-h2", { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, 3.75);
+        tl.fromTo("#gate-lede", { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 3.95);
+        tl.fromTo("#panel-dry", { autoAlpha: 0, x: 44 }, { autoAlpha: 1, x: 0, duration: 0.65, ease: "power3.out" }, 4.05);
+
+        /* the call lines land one after the other, the way a tool call arrives */
+        gsap.utils.toArray("#panel-dry .np-call-block > div").forEach((line, i) => {
+          tl.fromTo(line, { autoAlpha: 0, x: -14 }, { autoAlpha: 1, x: 0, duration: 0.3, ease: "power2.out" }, 4.4 + i * 0.2);
+        });
+
+        /* confirm=false is the whole point, so it gets its own beat */
+        tl.fromTo("#flag-off", { scale: 1 }, { scale: 1.14, duration: 0.24, yoyo: true, repeat: 1, ease: "power2.inOut", transformOrigin: "0 50%" }, 5.5);
+        tl.fromTo("#returns-dry", { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.4, ease: "power3.out" }, 5.85);
+
+        /* then the human answers */
+        tl.fromTo("#panel-live", { autoAlpha: 0, y: 36 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 6.4);
+        tl.fromTo("#flag-on", { scale: 1 }, { scale: 1.14, duration: 0.24, yoyo: true, repeat: 1, ease: "power2.inOut", transformOrigin: "0 50%" }, 7.0);
+        tl.fromTo("#returns-live", { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.4, ease: "power3.out" }, 7.3);
+        tl.fromTo("#gate-verdict", { autoAlpha: 0, x: -16 }, { autoAlpha: 1, x: 0, duration: 0.5, ease: "power3.out" }, 7.6);
+        tl.to("#s-gate .np-split", { autoAlpha: 0, y: -24, duration: 0.5, ease: "power2.in" }, 8.8);
+        tl.set("#s-gate .np-split", { autoAlpha: 0 }, 9.3);
+
+        /* ── scene 3 — four rules, read left to right, top to bottom ────── */
+        tl.fromTo("#rules-h2", { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 9.7);
+        tl.fromTo("#rules-grid", { autoAlpha: 0, y: 34 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 9.85);
+        gsap.utils.toArray("#rules-grid .np-rule").forEach((rule, i) => {
+          tl.fromTo(rule, { autoAlpha: 0, y: 22 }, { autoAlpha: 1, y: 0, duration: 0.42, ease: "power3.out" }, 10.2 + i * 0.34);
+        });
+        tl.to("#s-rules .np-holder", { autoAlpha: 0, y: -22, duration: 0.5, ease: "power2.in" }, 13.4);
+        tl.set("#s-rules .np-holder", { autoAlpha: 0 }, 13.9);
+
+        /* ── scene 4 — lockup ───────────────────────────────────────────── */
+        tl.fromTo("#end-mark", { autoAlpha: 0, scale: 0.86 }, { autoAlpha: 1, scale: 1, duration: 0.5, ease: "back.out(2)" }, 14.05);
+        tl.fromTo("#end-check", { strokeDasharray: 34, strokeDashoffset: 34 }, { strokeDashoffset: 0, duration: 0.42, ease: "power2.out" }, 14.3);
+        tl.fromTo("#end-h2", { autoAlpha: 0, y: 22 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power3.out" }, 14.25);
+        tl.fromTo("#end-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power2.out" }, 14.5);
+        tl.fromTo("#end-cta", { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.44, ease: "power3.out" }, 14.62);
+
+        window.__timelines["main"] = tl;
+        if (window.__hfForceTimelineRebind) window.__hfForceTimelineRebind();
+      }
+
+      document.fonts.ready.then(build);
+    </script>
+  </body>
+</html>

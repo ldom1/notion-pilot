@@ -77,7 +77,7 @@ data/
 
 # --- Claude ---
 .claude/worktrees/
-.superpowers
+.superpowers/
 # Per-workspace data (DB pointers, workflows — not committed)
 web/workspaces/
 
@@ -90,3 +90,30 @@ web/frontend/e2e/.auth/
 web/frontend/test-results/
 web/frontend/playwright-report/
 web/frontend/blob-report/
+
+# Real CRM export used only as design reference — never commit (contains client names)
+docs/notion_export/
+
+# --- Promotional videos (promotion/video) ---
+# Sources are committed: the compositions, their BRIEF.md, the brand profile and
+# _shared/ (design system + localised fonts). Everything below is generated —
+# `./hyperframes/sync-shared.sh` recreates each project's assets/, and
+# `hyperframes render` recreates out.mp4. The delivered MP4s live in
+# web/frontend/public/film/ and ARE committed, since the app serves them.
+promotion/video/node_modules/
+promotion/video/hyperframes/*/assets/
+promotion/video/hyperframes/*/out.mp4
+promotion/video/hyperframes/*/snapshots/
+
+# --- HyperFrames skill pack (vendored by `npx skills add heygen-com/hyperframes`) ---
+# ~20 upstream skills installed into .agents/skills/ and symlinked into skills/
+# and .claude/skills/. skills-lock.json pins them, so reinstall rather than
+# commit a vendored copy. This project's own skills stay tracked.
+.agents/*
+!.agents/product-marketing.md
+skills/*
+!skills/company-open-data-enrichment/
+!skills/notion-crm-ops/
+.claude/skills/*
+!.claude/skills/company-open-data-enrichment
+!.claude/skills/notion-crm-ops

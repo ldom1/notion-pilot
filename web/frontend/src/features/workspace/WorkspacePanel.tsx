@@ -216,7 +216,7 @@ export function WorkspacePanel({
           <span className="tg-bot-label">Telegram Bot</span>
           <span
             className="tg-bot-dot"
-            style={{ color: telegramStatus?.connected ? "#22c55e" : "#ef4444" }}
+            style={{ color: telegramStatus?.connected ? "var(--ok)" : "var(--bad)" }}
             title={telegramStatus?.connected ? "Connected" : "Disconnected"}
           >●</span>
         </div>
@@ -252,19 +252,19 @@ export function WorkspacePanel({
           {!confirmDelete ? (
             <button
               className="btn-ghost btn-sm"
-              style={{ color: "#c0392b", borderColor: "#f5c6cb" }}
+              style={{ color: "var(--bad)", borderColor: "var(--bad-wash)" }}
               onClick={() => setConfirmDelete(true)}
             >
               🗑 Delete workspace config
             </button>
           ) : (
             <span style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "0.78rem", color: "#c0392b" }}>
+              <span style={{ fontSize: "0.78rem", color: "var(--bad)" }}>
                 This clears all DB links. Are you sure?
               </span>
               <button
                 className="btn-ghost btn-sm"
-                style={{ color: "#c0392b", borderColor: "#f5c6cb" }}
+                style={{ color: "var(--bad)", borderColor: "var(--bad-wash)" }}
                 onClick={() => void handleDelete()}
                 disabled={deleting}
               >

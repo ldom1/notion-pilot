@@ -222,8 +222,8 @@ async function _json<T>(
 }
 
 /** GET helper — returns parsed JSON. */
-async function _get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { credentials: "include" });
+async function _get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, { credentials: "include", signal });
   await _throwIfNotOk(res);
   return res.json() as Promise<T>;
 }
@@ -434,6 +434,17 @@ export async function saveCockpitConfig(
 /** DELETE /api/workspace — clear cockpit config (DB links) for this workspace */
 export async function deleteWorkspace(): Promise<void> {
   await _json<{ ok: boolean }>("DELETE", "/api/workspace");
+}
+
+/** GET /api/setup/pages — Notion pages the integration can parent a CRM under */
+export interface SetupPage {
+  id: string;
+  name: string;
+  root: boolean;
+}
+
+export function listSetupPages(signal?: AbortSignal): Promise<{ pages: SetupPage[] }> {
+  return _get("/api/setup/pages", signal);
 }
 
 /** POST /api/setup/stream — SSE stream for workspace deployment */

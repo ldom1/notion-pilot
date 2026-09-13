@@ -1,0 +1,17 @@
+{
+  "name": "Notion Pilot",
+  "tagline": "Capture anywhere → Structure in Notion → Maintain with AI assistants under human control",
+  "palette": {
+    "primary": "#6E56CF",
+    "accent": "#0D9488",
+    "bg": "#FFFFFF",
+    "text": "#1A1A2E"
+  },
+  "typography": {
+    "heading": "DM Sans",
+    "body": "DM Sans"
+  },
+  "tone": "editorial",
+  "cta": "Start with one real CRM workflow",
+  "duration": 15
+}

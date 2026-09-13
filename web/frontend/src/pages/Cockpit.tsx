@@ -114,7 +114,7 @@ const Cockpit: React.FC = () => {
       <>
         <Header workspaceName="" userName="" notionUrl="" />
         <div className="main">
-          <p style={{ color: '#dc2626', padding: '2rem 0', fontSize: '0.88rem' }}>{error}</p>
+          <p style={{ color: 'var(--bad)', padding: '2rem 0', fontSize: '0.88rem' }}>{error}</p>
         </div>
       </>
     );

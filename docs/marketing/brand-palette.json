@@ -1,0 +1,26 @@
+{
+  "name": "Notion Pilot",
+  "mode": "persuade",
+  "tagline": "Capture anywhere → Structure in Notion → Maintain with AI assistants under human control",
+  "palette": {
+    "bg": "#FFFFFF",
+    "ink": "#1A1A2E",
+    "muted": "#64748B",
+    "primary": "#6E56CF",
+    "primaryDark": "#5A45B0",
+    "primaryLight": "#F0EEFF",
+    "surface": "#F8F7FF",
+    "border": "#ECE8FF",
+    "phaseFoundation": "#6E56CF",
+    "phaseAcceleration": "#0D9488",
+    "rowAlt": "#FAF9FF",
+    "positive": "#0D9488",
+    "negative": "#B4415A"
+  },
+  "typography": {
+    "heading": "Segoe UI",
+    "body": "Segoe UI"
+  },
+  "tone": "editorial",
+  "cta": "Start with one real CRM workflow"
+}

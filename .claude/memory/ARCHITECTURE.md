@@ -33,8 +33,18 @@ notion-pilot/            ← repo name (rename from notion-pilot)
 ├── scripts/
 │   ├── crm/             ← crm_setup_workspace.py, crm_enrich.py, crm_dedup.py, etc.
 │   └── inbox/           ← (future) inbox_setup.py for Knowledge DBs
-└── web/                 ← (future) landing + deploy wizard + chatbot
+├── promotion/video/     ← HyperFrames sources for the landing-page films
+│   ├── notion-pilot.json        ← brand profile
+│   └── hyperframes/
+│       ├── _shared/np.css       ← mirror of web/frontend/src/styles/tokens.css
+│       └── notion-pilot-*/      ← one project per film (BRIEF.md + index.html)
+└── web/                 ← landing + deploy wizard + cockpit
+    └── frontend/public/film/    ← rendered MP4s + posters, served at /film/
 ```
+
+The films are a **build input, not a runtime component**: `hyperframes render` produces the MP4s
+offline, they are committed under `web/frontend/public/film/`, and `vite build` copies them into
+`web/static/` like any other static asset. Nothing in the Python package knows they exist.
 
 ## Stack
 
@@ -108,6 +118,9 @@ Layer 5 (later):  Website                 → landing + Notion OAuth deploy wiza
 - **Company dedup fuzzy matching does not catch legal-suffix variants** (e.g. "EDF" vs "EDF S.A." scores ~55, well under the 85 threshold) — the existing `token_sort_ratio`-based algorithm in `shared/utils/dedup.py` has no legal-suffix-stripping. Confirmed while implementing the MCP `find_duplicates`/`upsert_companies` tools (2026-07-13): don't assume near-miss company-name pairs will dedup — verify empirically before writing tests/fixtures around this matcher.
 - **People DB title property is `"Name"`, not `"Nom"`** (2026-07-16 fix, PR #19) — `NotionPeopleSyncer` and `shared/workspace.py`'s People DB template both use `"Name"`; there is no `"In my network"` property. Company dedup in `upsert_companies` is now a strict 4-signal chain (domain match → `token_sort_ratio>=85` → `token_set_ratio>=90` acronym/subset containment → create), enforced identically in preview and on write. SIREN lookup returns top-3 candidates gated by a `token_sort_ratio>=85` name-divergence check against the candidate's matched name; `force=True` bypasses only the Notion-dedup review, never this SIREN gate. See DECISIONS.md 2026-07-16 entries.
 - **`NotionCompanySyncer.preview()` and `.upsert()` must stay contract-identical on every gate** — a gate added to one and not the other is a live bug, not a cosmetic gap (2026-07-17: `upsert()`'s SIREN-divergence check only skipped the SIREN write, not the whole creation, and created 2 real unreviewed pages before being caught in a live test). When adding a new dedup/confidence gate to either method, add it to both in the same change. See DECISIONS.md 2026-07-17 entry.
+
+- **The frontend has one design-token layer: `web/frontend/src/styles/tokens.css`** (2026-09-10). It holds the achromatic ramp, near-black action colour, status trio and Notion select palette at `:root`, and *both* `landing.css` (marketing, Persuade) and `globals.css` (cockpit, Operate) consume it. Before this, `globals.css` defined no custom properties at all and the cockpit was on a purple palette the landing page had already abandoned — the two surfaces could not converge because there was nothing to converge on. Do not reintroduce a hardcoded colour in `src/`: there are currently zero.
+- **Notion will not let you name the reverse side of a dual relation** (2026-09-10). `synced_property_name` is read-only on create, so a relation created with `dual_property: {}` gets an auto-generated reverse name like `Related to Activities (Deal)`. Anything that keys on that name (rollups do) must **read it back** from `GET /databases/{id}` and match on `relation.database_id`, never assume a literal string. `shared/workspace.py::_resolve_back_relation` is the helper. The old one-shot scripts got away with hardcoding `"Activities"` only because those back-relations had been created by hand in the Notion UI.
 
 ## Agent skills (project)
 
