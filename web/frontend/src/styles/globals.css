@@ -10,7 +10,8 @@ body { font-family: var(--font); caret-color: var(--ink); background: var(--surf
 
 /* ── Header ── */
 .hdr { display: flex; align-items: center; gap: 1rem; padding: 0 2rem; height: 54px; background: var(--bg); border-bottom: 1px solid var(--rule); position: sticky; top: 0; z-index: 100; }
-.hdr-logo { font-weight: 900; font-size: 1rem; color: var(--primary); text-decoration: none; letter-spacing: -0.3px; }
+.hdr-logo { display: flex; align-items: center; gap: 0.5rem; font-weight: 900; font-size: 1rem; color: var(--primary); text-decoration: none; letter-spacing: -0.3px; }
+.hdr-logo svg { width: 22px; height: 22px; flex-shrink: 0; }
 .hdr-badge { background: var(--primary); color: var(--bg); font-size: 0.6rem; font-weight: 800; letter-spacing: 2px; padding: 0.2rem 0.5rem; border-radius: 4px; }
 .hdr-ws { flex: 1; text-align: center; font-size: 0.82rem; color: var(--muted); }
 .hdr-user { font-size: 0.82rem; color: var(--ink-soft); font-weight: 500; }
@@ -18,6 +19,11 @@ body { font-family: var(--font); caret-color: var(--ink); background: var(--surf
 .hdr-notion-link:hover { background: var(--primary-deep); }
 .hdr-logout { font-size: 0.78rem; color: var(--rule-strong); text-decoration: none; padding: 0.3rem 0.7rem; border: 1px solid var(--rule); border-radius: 5px; }
 .hdr-logout:hover { color: var(--muted); border-color: var(--rule-strong); }
+@media (max-width: 640px) {
+  .hdr { height: auto; min-height: 54px; flex-wrap: wrap; padding: 0.6rem 1rem; gap: 0.5rem 0.75rem; }
+  .hdr-badge { display: none; }
+  .hdr-ws { order: 3; flex: 1 1 100%; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 
 /* ── Layout ── */
 .main { max-width: 1080px; margin: 0 auto; padding: 1.75rem 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
@@ -27,6 +33,22 @@ body { font-family: var(--font); caret-color: var(--ink); background: var(--surf
 .panel { background: var(--bg); border: 1px solid var(--rule); border-radius: 12px; padding: 1.4rem 1.5rem; }
 .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; gap: 0.75rem; }
 .panel-title { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); }
+
+/* ── Assistant setup ── */
+.setup-lede { font-size: 0.82rem; line-height: 1.5; color: var(--muted); margin: -0.35rem 0 1.15rem; }
+.setup-steps, .setup-skills { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.setup-skills { margin-top: 0.75rem; }
+@media (max-width: 720px) { .setup-steps, .setup-skills { grid-template-columns: 1fr; } }
+.setup-step, .setup-skill { border: 1px solid var(--rule); border-radius: 9px; padding: 1rem; background: var(--surface); display: flex; flex-direction: column; gap: 0.55rem; min-width: 0; }
+.setup-step h3 { margin: 0; font-size: 0.84rem; font-weight: 700; letter-spacing: -0.02em; }
+.setup-step p, .setup-skill p { margin: 0; font-size: 0.76rem; color: var(--muted); line-height: 1.45; }
+.setup-step .log-body { border-radius: 9px; max-height: none; padding: 0.7rem 0.85rem; overflow-x: auto; }
+.setup-step .log-line { margin: 0; white-space: pre; word-break: normal; }
+.setup-docs { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; }
+.setup-step .mcp-section { margin-top: 0.15rem; }
+.setup-step .mcp-section .log-body { margin-top: 0.55rem; }
+.setup-step .mcp-section .setup-docs { margin-top: 0.5rem; }
+.setup-skill b { font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; color: var(--ink); }
 
 /* ── Buttons ── */
 .btn-ghost { background: none; border: 1px solid var(--rule); color: var(--muted); font-size: 0.78rem; padding: 0.3rem 0.7rem; border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; }
@@ -45,8 +67,12 @@ body { font-family: var(--font); caret-color: var(--ink); background: var(--surf
 @media (max-width: 720px) { .docs-grid { grid-template-columns: 1fr; } }
 .docs-group h3 { margin: 0 0 0.65rem; font-size: 0.84rem; font-weight: 700; letter-spacing: -0.02em; }
 .docs-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; }
-.panel .docs-group a { font-size: 0.78rem; font-weight: 600; color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--rule); transition: border-color 120ms ease; }
-.panel .docs-group a:hover, .panel .docs-group a:focus-visible { border-bottom-color: var(--ink); }
+.panel .docs-group a,
+.panel .setup-docs a,
+.panel .setup-skill a { font-size: 0.78rem; font-weight: 600; color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--rule); transition: border-color 120ms ease; }
+.panel .docs-group a:hover, .panel .docs-group a:focus-visible,
+.panel .setup-docs a:hover, .panel .setup-docs a:focus-visible,
+.panel .setup-skill a:hover, .panel .setup-skill a:focus-visible { border-bottom-color: var(--ink); }
 .docs-group p { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.74rem; line-height: 1.45; }
 
 /* ── DB Grid ── */
@@ -88,6 +114,14 @@ body { font-family: var(--font); caret-color: var(--ink); background: var(--surf
 .tg-bot-meta { display: flex; gap: 1rem; font-size: 0.75rem; color: var(--dark-muted); margin-bottom: 0.5rem; }
 .tg-bot-actions { display: flex; align-items: center; gap: 0.75rem; }
 .tg-bot-ping-result { font-size: 0.75rem; color: var(--dark-muted); }
+.tg-info-btn { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; border: none; border-radius: 50%; background: none; color: var(--rule-strong); cursor: pointer; flex-shrink: 0; }
+.tg-info-btn:hover, .tg-info-btn[aria-expanded="true"] { color: var(--primary); background: var(--primary-wash); }
+.tg-bot-info { margin: 0 0 0.75rem; padding: 0.75rem 0.9rem; border: 1px solid var(--rule); border-radius: 8px; background: var(--bg); font-size: 0.78rem; line-height: 1.5; color: var(--muted); }
+.tg-bot-info b { display: block; margin-bottom: 0.3rem; font-size: 0.82rem; color: var(--ink); }
+.tg-bot-info p { margin: 0; }
+.tg-bot-cmds { display: flex; flex-wrap: wrap; gap: 0.4rem; list-style: none; margin: 0.5rem 0; padding: 0; }
+.tg-bot-cmds code { font-family: var(--font-mono); font-size: 0.72rem; background: var(--surface-2); border: 1px solid var(--rule); border-radius: 4px; padding: 0.15rem 0.4rem; color: var(--ink); }
+.tg-bot-info-note { margin: 0.5rem 0 0; font-size: 0.72rem; color: var(--rule-strong); }
 
 /* ── MCP panel ── */
 .mcp-tool-name { font-family: var(--font-mono); }

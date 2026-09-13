@@ -214,6 +214,7 @@
   font-weight: 700;
   letter-spacing: -0.03em;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .lp-logo {
@@ -237,10 +238,17 @@
   font-weight: 550;
   letter-spacing: -0.01em;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .lp-nav-signin:hover {
   color: var(--ink);
+}
+
+@media (max-width: 420px) {
+  .lp-nav { gap: 0.6rem; padding-inline: 0.9rem; }
+  .lp-nav-actions { gap: 0.35rem; }
+  .lp-nav-signin { padding-inline: 0.4rem; }
 }
 
 /* ── buttons ─────────────────────────────────────────────────────────────── */
@@ -1506,7 +1514,6 @@
 .lp-foot-tag {
   margin: 0;
   line-height: 1.45;
-  white-space: nowrap;
 }
 
 .lp-foot-links {

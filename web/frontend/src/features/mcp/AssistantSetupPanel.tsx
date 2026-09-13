@@ -1,6 +1,9 @@
+import type { ReactNode } from "react";
+
 const NOTION_MCP = "https://mcp.notion.com/mcp";
 const NOTION_MCP_DOCS = "https://developers.notion.com/guides/mcp/get-started-with-mcp";
 const NOTION_MCP_HELP = "https://www.notion.com/help/notion-mcp";
+const CLAUDE_CONNECTOR = "https://claude.com/connectors/notion";
 const REPO = "https://github.com/ldom1/notion-pilot";
 
 const MCP_SNIPPET = `# Claude Code
@@ -8,7 +11,11 @@ claude mcp add --transport http notion ${NOTION_MCP}
 # then run /mcp and complete the OAuth flow
 
 # Cursor — .cursor/mcp.json
-{ "mcpServers": { "notion": { "url": "${NOTION_MCP}" } } }`;
+{
+  "mcpServers": {
+    "notion": { "url": "${NOTION_MCP}" }
+  }
+}`;
 
 const INSTALL_SNIPPET = `/plugin marketplace add ldom1/notion-pilot
 /plugin install notion-crm@notion-pilot`;
@@ -26,51 +33,83 @@ const SKILLS = [
   },
 ] as const;
 
+function ForTheDev({ children }: { children: ReactNode }) {
+  return (
+    <details className="mcp-section">
+      <summary className="mcp-section-label">
+        <span className="mcp-chevron">▸</span> For the dev
+      </summary>
+      {children}
+    </details>
+  );
+}
+
 export function AssistantSetupPanel() {
   return (
-    <section className="panel">
+    <section className="panel" aria-labelledby="assistant-setup-title">
       <div className="panel-header">
-        <span className="panel-title">Your AI assistant</span>
+        <span className="panel-title" id="assistant-setup-title">Your AI assistant</span>
       </div>
 
       <p className="setup-lede">
-        The CRM lives in Notion. Claude or Cursor does the typing — connect
-        Notion&apos;s hosted MCP, then install the Pilot skills so every write is a
-        preview until you approve.
+        The CRM lives in Notion. Connect your assistant from Notion&apos;s own
+        settings, then give it the Pilot skills so every write is a preview until
+        you approve.
       </p>
 
       <div className="setup-steps">
         <div className="setup-step">
-          <h3>1. Connect Notion MCP</h3>
+          <h3>1. Connect Notion</h3>
           <p>
-            Notion&apos;s hosted server, not this app&apos;s integration. Complete OAuth once
-            — it sees the pages you can see, including the CRM you deployed. Restart
-            the assistant afterwards.
+            In Notion, open Settings → Connections → Notion MCP. Pick Claude,
+            Mistral, ChatGPT or Cursor, sign in once, then restart the assistant.
+            It sees the pages you can see, including this CRM.
           </p>
-          <pre>{MCP_SNIPPET}</pre>
           <div className="setup-docs">
-            <a href={NOTION_MCP_DOCS} target="_blank" rel="noopener noreferrer">
-              Developer setup →
-            </a>
             <a href={NOTION_MCP_HELP} target="_blank" rel="noopener noreferrer">
               Notion Help →
             </a>
+            <a href={CLAUDE_CONNECTOR} target="_blank" rel="noopener noreferrer">
+              Claude connector →
+            </a>
           </div>
+          <ForTheDev>
+            <div className="log-body">
+              <pre className="log-line">{MCP_SNIPPET}</pre>
+            </div>
+            <div className="setup-docs">
+              <a href={NOTION_MCP_DOCS} target="_blank" rel="noopener noreferrer">
+                Developer setup →
+              </a>
+            </div>
+          </ForTheDev>
         </div>
 
         <div className="setup-step">
           <h3>2. Install the skills</h3>
           <p>
-            Two lines in Claude Code. Both skills arrive together and update with
-            the repo. An MCP connection alone only gives hands — the skills are the
-            instructions.
+            An MCP connection only gives hands — the skills are the instructions.
+            Open the two guides and add them to your assistant (Claude project,
+            Mistral agent, ChatGPT custom instructions, or Cursor rules) so every
+            write is a preview until you approve.
           </p>
-          <pre>{INSTALL_SNIPPET}</pre>
           <div className="setup-docs">
-            <a href={`${REPO}#agent-skills-artelys-crm`} target="_blank" rel="noopener noreferrer">
-              Skills in the repo →
-            </a>
+            {SKILLS.map((s) => (
+              <a key={s.name} href={s.href} target="_blank" rel="noopener noreferrer">
+                {s.name} →
+              </a>
+            ))}
           </div>
+          <ForTheDev>
+            <div className="log-body">
+              <pre className="log-line">{INSTALL_SNIPPET}</pre>
+            </div>
+            <div className="setup-docs">
+              <a href={`${REPO}#agent-skills-artelys-crm`} target="_blank" rel="noopener noreferrer">
+                Skills in the repo →
+              </a>
+            </div>
+          </ForTheDev>
         </div>
       </div>
 
