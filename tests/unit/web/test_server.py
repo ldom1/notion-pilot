@@ -107,7 +107,7 @@ def test_setup_under_existing_page():
                 "scope": "crm",
                 "workspace_name": "My CRM",
                 "notion_token": "secret_manual",
-                "parent_page": "https://www.notion.so/Host-550e8400e29b41d4a716446655440000",
+                "parent_page_id": "https://www.notion.so/Host-550e8400e29b41d4a716446655440000",
             },
         )
     assert r.status_code == 200
