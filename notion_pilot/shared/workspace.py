@@ -1617,6 +1617,66 @@ async def create_crm_workspace(
     )
 
 
+@dataclass
+class CRMHomeResult:
+    views: dict[str, dict[str, str]]
+    warnings: list[str]
+
+
+async def upgrade_crm_home(
+    client: httpx.AsyncClient,
+    crm_page_id: str,
+    *,
+    previous_views: dict[str, dict[str, str]] | None = None,
+) -> CRMHomeResult:
+    """Refresh the CRM home template and its views in place.
+
+    Removes only what Notion Pilot wrote — blocks whose text is a known template
+    string, and views whose ids were persisted — and keeps the databases, their
+    rows, and anything the user added. No re-seed, no schema change.
+    """
+    warnings: list[str] = []
+    for view in (previous_views or {}).values():
+        r = await client.delete(f"{NOTION_API}/blocks/{view['block_id']}")
+        if r.status_code not in (200, 404):
+            warnings.append(
+                f"An old view could not be removed ({r.status_code}); delete the duplicate by hand."
+            )
+
+    children = await _list_children(client, crm_page_id)
+    databases = {
+        b["child_database"]["title"]: str(b["id"]) for b in children if b["type"] == "child_database"
+    }
+    leads_id = databases.get("Leads") or databases.get("Deals")
+    activities_id = databases.get("Activities")
+    for title, found in (("Leads", leads_id), ("Activities", activities_id)):
+        if found is None:
+            warnings.append(f"The {title} database was not found on this page; its views were skipped.")
+
+    owned_texts = owned_template_texts()
+    owned = [
+        b for b in children if b["type"] != "child_database" and _plain_text(b) in owned_texts
+    ]
+    anchor = str(owned[0]["id"]) if owned and owned[0]["id"] == children[0]["id"] else None
+    if anchor is None:
+        warnings.append("The template was added at the bottom of the page. Drag it above the databases.")
+
+    leads_props: set[str] = set()
+    if leads_id:
+        r = await client.get(f"{NOTION_API}/databases/{leads_id}")
+        r.raise_for_status()
+        leads_props = set(r.json()["properties"])
+
+    home = await _append_blocks(client, crm_page_id, crm_home_blocks(leads_props), after=anchor)
+    for block in owned:
+        await client.delete(f"{NOTION_API}/blocks/{block['id']}")
+
+    outcome = await _add_home_views(
+        client, crm_page_id, home, leads_id=leads_id, activities_id=activities_id
+    )
+    return CRMHomeResult(views=outcome.views, warnings=warnings + outcome.warnings)
+
+
 async def create_inbox_workspace(
     client: httpx.AsyncClient,
     parent_page_id: str,
