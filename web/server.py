@@ -1461,6 +1461,13 @@ def create_app(settings: Settings) -> FastAPI:
         if _assets_dir.exists():
             app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="assets")
 
+        # Landing page homepage films (Landing.tsx's <Film> references /film/<slug>.mp4
+        # and .jpg directly, not /static/film/... — mount to match, or they 404 through
+        # to the SPA catch-all below and the <video> silently shows nothing).
+        _film_dir = _static / "film"
+        if _film_dir.exists():
+            app.mount("/film", StaticFiles(directory=str(_film_dir)), name="film")
+
         app.mount("/static", StaticFiles(directory=str(_static)), name="static")
 
         def _serve_spa() -> HTMLResponse:
