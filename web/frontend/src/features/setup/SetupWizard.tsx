@@ -75,7 +75,7 @@ function SetupLog({
 }
 
 export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.ReactElement {
-  const [pageName, setPageName] = useState("");
+  const [pageName, setPageName] = useState("My awesome CRM");
   const [canTopLevel, setCanTopLevel] = useState<boolean | null>(null);
   const [parentKind, setParentKind] = useState<ParentKind>("root");
   const [parentPage, setParentPage] = useState("");
@@ -88,6 +88,16 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
   const [warnings, setWarnings] = useState<string[]>([]);
   const [notionUrl, setNotionUrl] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
+
+  const needsParent = parentKind === "page";
+  const parentMissing = needsParent && !parentPage.trim();
+  const nameMissing = !pageName.trim();
+  const deployBlocked = deployState === "deploying" || nameMissing || parentMissing;
+  const deployBlockReason = nameMissing
+    ? "Enter a CRM page name first"
+    : parentMissing
+      ? "Pick a parent page, or switch to workspace root"
+      : undefined;
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -185,7 +195,6 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
             ))}
           </ul>
         )}
-        {logs.length > 0 && <SetupLog logs={logs} deploying={false} logRef={logRef} />}
         <div className="lp-setup-actions">
           {notionUrl && (
             <a
@@ -193,7 +202,6 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
               href={notionUrl}
               target="_blank"
               rel="noreferrer"
-              style={{ textDecoration: "none" }}
             >
               Open in Notion ↗
             </a>
@@ -364,11 +372,8 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
           type="button"
           className="btn-primary"
           onClick={() => void handleDeploy()}
-          disabled={
-            deployState === "deploying"
-            || !pageName.trim()
-            || (parentKind === "page" && !parentPage.trim())
-          }
+          disabled={deployBlocked}
+          title={deployBlockReason}
         >
           {deployState === "deploying"
             ? "Creating…"
@@ -376,6 +381,9 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
               ? "Retry"
               : "Deploy the CRM"}
         </button>
+        {deployBlockReason && deployState === "idle" && (
+          <p className="lp-setup-hint">{deployBlockReason}</p>
+        )}
       </div>
     </div>
   );

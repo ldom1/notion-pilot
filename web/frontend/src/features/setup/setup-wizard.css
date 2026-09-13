@@ -2,6 +2,7 @@
   position: relative;
   isolation: isolate;
   min-height: 100dvh;
+  background: var(--bg);
 }
 
 .lp-setup-scene > .lp-nav,
@@ -11,9 +12,9 @@
 }
 
 .lp-setup-bg {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: -1;
   overflow: hidden;
   pointer-events: none;
 }
@@ -398,7 +399,7 @@
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.45rem 0.7rem;
   border-bottom: 1px solid var(--dark-rule);
   color: var(--dark-muted);
   font-family: var(--font-mono);
@@ -411,25 +412,24 @@
 .lp-setup-log-body {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  max-height: min(36vh, 180px);
-  padding: 0.65rem 0.75rem 0.75rem;
-  overflow-y: auto;
+  gap: 0.05rem;
+  padding: 0.55rem 0.7rem 0.65rem;
 }
 
 .lp-setup-log-line {
   display: grid;
-  grid-template-columns: 0.9rem 1fr;
-  gap: 0.5rem;
-  align-items: start;
+  grid-template-columns: 0.85rem 1fr;
+  gap: 0.4rem;
+  align-items: baseline;
   color: var(--dark-ink);
   font-family: var(--font-mono);
-  font-size: 0.75rem;
-  line-height: 1.45;
+  font-size: 0.72rem;
+  line-height: 1.35;
 }
 
 .lp-setup-log-line.is-sub {
   color: var(--dark-muted);
+  opacity: 0.85;
 }
 
 .lp-setup-log-line.is-ok {
@@ -444,7 +444,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 1.45em;
+  min-height: 1.35em;
 }
 
 .lp-setup-log .lp-setup-tree-spin {
@@ -457,7 +457,30 @@
   flex-wrap: wrap;
   gap: 0.75rem;
   justify-content: flex-end;
+  align-items: center;
   margin-top: 0.25rem;
+}
+
+/* Outrank `.lp a { color: inherit }` — Open in Notion is an <a class="btn-primary">. */
+.lp .lp-setup-actions a.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  color: var(--bg);
+  text-decoration: none;
+}
+
+.lp-setup-actions .btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.lp-setup-hint {
+  flex: 1 1 100%;
+  margin: 0;
+  text-align: right;
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
 .lp-setup-ok {

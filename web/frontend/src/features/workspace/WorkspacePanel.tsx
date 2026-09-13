@@ -57,6 +57,7 @@ export function WorkspacePanel({
   const [telegramPingResult, setTelegramPingResult] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [tgInfoOpen, setTgInfoOpen] = useState(false);
   const [refreshingCrm, setRefreshingCrm] = useState(false);
   const [crmRefreshError, setCrmRefreshError] = useState<string | null>(null);
   const [crmWarnings, setCrmWarnings] = useState<string[] | null>(null);
@@ -163,7 +164,9 @@ export function WorkspacePanel({
       </div>
 
       <div className="db-grid">
-        {Object.entries(databases).map(([key, db]) => {
+        {Object.entries(databases)
+          .filter(([, db]) => db.category !== "inbox")
+          .map(([key, db]) => {
           const isEditing = editingDbId === key;
           const isSaving = savingDbId === key || isRefreshing;
           const countIsNull = db.count === null;
@@ -235,12 +238,43 @@ export function WorkspacePanel({
         <div className="tg-bot-header">
           <span className="db-icon">🤖</span>
           <span className="tg-bot-label">Telegram Bot</span>
+          <button
+            type="button"
+            className="tg-info-btn"
+            aria-label="About the Telegram bot"
+            aria-expanded={tgInfoOpen}
+            aria-controls="tg-bot-info"
+            onClick={() => setTgInfoOpen((open) => !open)}
+          >
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+              <circle cx="12" cy="6.1" r="2.2" fill="currentColor" />
+              <rect x="9.95" y="10.15" width="4.1" height="9.55" rx="2.05" fill="currentColor" />
+            </svg>
+          </button>
           <span
             className="tg-bot-dot"
             style={{ color: telegramStatus?.connected ? "var(--ok)" : "var(--bad)" }}
             title={telegramStatus?.connected ? "Connected" : "Disconnected"}
           >●</span>
         </div>
+        {tgInfoOpen && (
+          <div id="tg-bot-info" className="tg-bot-info" role="region" aria-label="About the Telegram bot">
+            <b>CRM from Telegram</b>
+            <p>
+              Create and update People, Companies, and Leads without opening Notion.
+              The bot asks for any field you skip.
+            </p>
+            <ul className="tg-bot-cmds">
+              <li><code>/lead</code></li>
+              <li><code>/people</code></li>
+              <li><code>/company</code></li>
+              <li><code>/deal</code></li>
+            </ul>
+            <p className="tg-bot-info-note">
+              The dot is whether the bot process is polling. Test connection pings it.
+            </p>
+          </div>
+        )}
         {telegramStatus && (
           <div className="tg-bot-meta">
             {telegramStatus.bot_name && <span>@{telegramStatus.bot_name}</span>}

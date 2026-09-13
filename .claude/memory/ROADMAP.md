@@ -141,7 +141,8 @@ Target: 4 custom knowledge DBs — Notions, Ideas, Tools, Data & Technology.
 
 - MCP server (`notion_pilot/mcp/`) merged to `develop` 2026-07-15 (PR #18, squash commit `8e705b7`) — exposes CRM upsert/dedup/enrich/rank/read as 11 MCP tools. Registered in this repo's own `.claude/settings.json` as `notion-crm` (needs a Claude Code restart to connect). Still needs: verify the *sibling* `artelys-crystal-hpc-lead-generation` project's `.claude/settings.json` registration (added earlier, points at this repo's main checkout — the worktree it may have referenced is gone now that the branch merged) actually resolves.
 - No MCP tool creates a Lead/Deal yet — only `upsert_people`/`upsert_companies` write, `get_open_leads` is read-only. Add if Deal creation via MCP is wanted. *(Superseded: `upsert_deal`, `log_activity` and `get_activities` shipped later — see CHANGELOG.)*
-- CRM v1 (2026-09-10, PR #28): the deploy wizard now creates five databases with rollups and formulas. Still out of scope from that spec: the Meetings→Activities poller (needs a persisted token and a running job), Notion views/dashboard/automation (the API cannot create them — see `scripts/crm/NOTION_UI_STEPS.md`), and OAuth token persistence for multi-tenant automation.
+- CRM v1 (2026-09-10, PR #28): the deploy wizard now creates five databases with rollups and formulas. Still out of scope from that spec: the Meetings→Activities poller (needs a persisted token and a running job), database automations / native charts, and OAuth token persistence for multi-tenant automation.
+- **CRM home dashboard (2026-09-13, PR #30 → `develop`, CI green):** linked views under **This week**, Sources panel, safer refresh CLI. Follow-ups: cockpit Refresh button; persist `crm_views` from CLI setup so deploy→upgrade does not orphan linked views; French page copy (v1 English).
 - Landing + cockpit (2026-09-10, PR #27): three appendix screenshots and the CTA booking link in the executive deck are still placeholders. The `.claude-plugin` marketplace manifests are schema-correct but unverified — run `/plugin marketplace add ldom1/notion-pilot` once before advertising it on the site.
 
 ## Next up (2026-09-11) — ordered
@@ -164,7 +165,13 @@ Target: 4 custom knowledge DBs — Notions, Ideas, Tools, Data & Technology.
 - **Legacy `data_sources` vs `databases`.** The reference Artelys workspace has People and Companies as data sources; `_add_activity_rollups` PATCHes `/databases/{id}`. Wizard-deployed workspaces are unaffected, but any tooling pointed at Artelys needs the data-sources path.
 
 ### From the CRM v1 spec, deliberately out of scope
-Meetings→Activities poller (needs a persisted token and a running job), Notion views / dashboard / database automations (the API cannot create them — `scripts/crm/NOTION_UI_STEPS.md` explains why), `Projet`/Projects relations (would need a sixth database the product does not own).
+Meetings→Activities poller (needs a persisted token and a running job), Notion **database automations** and **native charts** (linked *views* on the CRM home shipped in PR #30 — `NOTION_UI_STEPS.md` still covers extra manual Leads/Activities/People views), `Projet`/Projects relations (would need a sixth database the product does not own).
+
+## Next up (2026-09-13) — after CRM home
+
+1. **Merge PR #30** (`feat/crm-home-dashboard` → `develop`) when ready.
+2. **Cockpit Refresh button** — reuse persisted `crm_views` / `crm_page_id`; fix first CLI upgrade after wizard/CLI deploy orphaning linked views (setup must persist view block ids).
+3. Still open from 2026-09-11 list: OAuth `bot.owner.type == "user"` probe, plugin marketplace smoke, cockpit visual pass, deck placeholders.
 
 ### Marketing, not yet started
 The `launch` and `directory-submissions` skills were never run. Both are channel strategy and are better done *after* the audit gaps above close — a Product Hunt push against a wizard that cannot persist a token would burn the launch. `.agents/product-marketing.md` is the positioning doc they read from; it records **no invented metrics**, and proof points are marked "collect from the first three pilot users".

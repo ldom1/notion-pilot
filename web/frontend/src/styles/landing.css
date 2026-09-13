@@ -187,7 +187,7 @@
 }
 
 .lp-tint {
-  background: var(--surface);
+  background: color-mix(in oklab, var(--surface) 78%, transparent);
 }
 
 /* ── nav ─────────────────────────────────────────────────────────────────── */
@@ -219,14 +219,28 @@
 .lp-logo {
   display: block;
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
 }
 
 .lp-nav-actions {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.lp-nav-signin {
+  padding: 0.5rem 0.7rem;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.lp-nav-signin:hover {
+  color: var(--ink);
 }
 
 /* ── buttons ─────────────────────────────────────────────────────────────── */
@@ -309,9 +323,11 @@
 }
 
 .lp-btn-lg {
-  padding: 0.82rem 1.4rem;
+  padding: 0.82rem clamp(1.55rem, 4.5vw, 2.4rem);
   font-size: 0.98rem;
   border-radius: 9px;
+  min-width: min(100%, 17rem);
+  justify-content: center;
 }
 
 .lp-btn-row {
@@ -552,54 +568,11 @@
   background: var(--bg);
 }
 
-.lp-film-copy {
-  margin-top: 1.15rem;
-  padding-top: 1.15rem;
-  border-top: 1px solid var(--rule);
-}
-
-.lp-film-copy .lp-h3 {
-  margin: 0;
-}
-
-.lp-film-copy > p {
-  max-width: 62ch;
-  margin: 0;
-  color: var(--muted);
-}
-
-.lp-film-stage {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-  margin-bottom: 0.5rem;
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.lp-film-dur {
-  padding-left: 0.55rem;
-  border-left: 1px solid var(--rule-strong);
-  letter-spacing: 0.1em;
-}
-
 /* Every film runs the full measure. Halving the width halves the type inside
  * them too, and these frames are tables and tool logs — at 540px nobody can
  * read the thing the film exists to show. */
 .lp-film + .lp-film {
   margin-top: clamp(2.25rem, 4.5vw, 3.5rem);
-}
-
-@media (max-width: 860px) {
-  .lp-film-copy {
-    margin-top: 1rem;
-    padding-top: 1rem;
-  }
 }
 
 /* ── feature blocks ─────────────────────────────────────────────────────── */
@@ -1504,25 +1477,72 @@
   justify-content: center;
 }
 
-.lp-foot {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.8rem 1.5rem;
-  align-items: center;
-  justify-content: space-between;
-  padding-block: 1.8rem;
+.lp-footer {
   border-top: 1px solid var(--rule);
+  background: color-mix(in oklab, var(--surface) 78%, transparent);
+}
+
+.lp-foot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.1rem 2rem;
+  align-items: start;
+  padding-block: 2.2rem 2.4rem;
   color: var(--muted);
   font-size: 0.83rem;
 }
 
-.lp-foot a {
-  color: var(--accent);
+.lp-foot-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.lp-foot-brand .lp-brand {
+  font-size: 0.98rem;
+}
+
+.lp-foot-tag {
+  margin: 0;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.lp-foot-links {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.lp-foot-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.48rem 0.75rem;
+  border-radius: var(--r);
+  color: var(--ink);
+  font-size: 0.83rem;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.lp-foot-links a:hover {
+  background: var(--surface-2);
+}
+
+.lp-foot-links svg {
+  display: block;
+  flex: none;
 }
 
 .lp-foot .lp-scope {
-  flex: 1 1 100%;
-  margin: 0.4rem 0 0;
+  grid-column: 1 / -1;
+  margin: 0.15rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rule);
+  max-width: none;
 }
 
 /* ── responsive ──────────────────────────────────────────────────────────── */
@@ -1543,6 +1563,10 @@
 }
 
 @media (max-width: 720px) {
+  .lp-foot {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .lp-arg,
   .lp-relation {
     grid-template-columns: minmax(0, 1fr);
@@ -1574,6 +1598,11 @@
 
   .lp-lane {
     flex-basis: 158px;
+  }
+
+  .lp-btn-row .lp-btn-lg {
+    flex: 1 1 100%;
+    white-space: normal;
   }
 }
 
