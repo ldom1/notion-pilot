@@ -65,6 +65,12 @@ uv sync --group web
 
 Open `http://localhost:8080`, click **Deploy the CRM to Notion**, authorize with your Notion account, name the CRM page, and choose workspace root or a page from the workspace. Done.
 
+The CRM page opens on your pipeline: four views under **This week**, a prompt to paste into your assistant, and **Sources & documentation**. To refresh an older CRM page in place:
+
+```bash
+uv run python scripts/crm/crm_upgrade_home.py --crm-page-id <page id or URL>
+```
+
 **Advanced / self-hosted without OAuth:** Click "Have an integration token?" in the wizard and paste a `secret_...` token from [notion.so/my-integrations](https://www.notion.so/profile/integrations). The integration must have workspace-level create permissions.
 
 ### Generated `.env` variables

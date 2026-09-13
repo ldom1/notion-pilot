@@ -7,6 +7,11 @@ updated:
 
 <!-- Append-only ADR log. Never delete entries. -->
 
+### 2026-09-13 — CRM home *is* the dashboard (spec rev 6); linked views via Views API
+**Decision:** One CRM page opens on **This week** with four linked views created through `POST /v1/views` (`notion_pilot/shared/notion_views.py`, version allowlist `2025-09-03` / `2026-03-11`). No separate Dashboard page; no native charts. Sources live in one list (`doc_links.py`) for the Notion toggle and the cockpit panel. Refresh deletes only blocks whose plain text matches known templates (current + legacy Telegram), never databases/rows/user blocks.
+**Rejected:** Separate Dashboard child page; Notion native dashboards/charts; wiping the whole page on upgrade; inventing a `"this_month"` close-date filter (Notion has none — use `next_month`).
+**Rationale:** Spec rev 6 after dogfood: the home page *is* the operating surface. Live gate proved board/`formula.checkbox`/`next_month`/`past_month` and that linked blocks list as `child_database` titled `Untitled` on `2022-06-28` (title-based DB discovery stays safe). Spec: [[2026-09-13-crm-home-dashboard-design]], plan: [[2026-09-13-crm-home-dashboard-plan]], PR #30.
+
 ### 2026-07-24 — Companies Finance section writes via Notion MCP directly, not `upsert_companies`/`enrich_companies`
 **Decision:** `company-open-data-enrichment` writes the 4 new Finance properties (`CA`, `Résultat net`, `Marge nette %`, `Année financière`) directly via Notion MCP page-update, always overwriting with the freshest RNE year (guarded against stale years and mismatched existing property types)
 **Rejected:** Extending `enrich_companies`' fill-empty-only semantics to cover financials

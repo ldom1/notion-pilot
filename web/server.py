@@ -31,6 +31,7 @@ from notion_pilot.shared.workspace import (
     create_crm_workspace,
     create_inbox_workspace,
     create_workspace_root_page,
+    upgrade_crm_home,
 )
 from web.config import (
     DB_DEFS,
@@ -435,6 +436,8 @@ def create_app(settings: Settings) -> FastAPI:
 
                     db_ids: dict[str, str] = {}
                     done_id = host_id
+                    crm_page_id = ""
+                    crm_views: dict[str, dict[str, str]] = {}
 
                     if req.scope in ("crm", "both"):
                         yield sse("log", message="Creating CRM page…")
@@ -444,6 +447,7 @@ def create_app(settings: Settings) -> FastAPI:
                         yield sse("log", message="  → Meetings database")
                         yield sse("log", message="  → Activities database")
                         yield sse("log", message="  → Rollups and pipeline formulas")
+                        yield sse("log", message="  → Pipeline views on the CRM home")
                         crm = await create_crm_workspace(client, host_id, page_title=crm_title)
                         done_id = crm.crm_page_id
                         db_ids["notion_companies_data_source_id"] = crm.companies_id
@@ -451,6 +455,10 @@ def create_app(settings: Settings) -> FastAPI:
                         db_ids["notion_deals_database_id"] = crm.deals_id
                         db_ids["notion_meetings_database_id"] = crm.meetings_id
                         db_ids["notion_activities_database_id"] = crm.activities_id
+                        crm_page_id = crm.crm_page_id
+                        crm_views = crm.views
+                        for warning in crm.warnings:
+                            yield sse("warning", message=warning)
                         yield sse("log", message="✓ CRM ready (with demo data)")
 
                     if req.scope in ("inbox", "both"):
@@ -467,7 +475,15 @@ def create_app(settings: Settings) -> FastAPI:
                         yield sse("log", message="✓ Knowledge ready (with demo data)")
 
                     done_url = notion_page_url(done_id)
-                    save_cockpit_cfg(wid, {"databases": db_ids, "workspace_url": done_url})
+                    save_cockpit_cfg(
+                        wid,
+                        {
+                            "databases": db_ids,
+                            "workspace_url": done_url,
+                            "crm_page_id": crm_page_id,
+                            "crm_views": crm_views,
+                        },
+                    )
                     yield sse("log", message="✓ Cockpit configured")
                     yield sse("done", url=done_url)
             except httpx.HTTPStatusError as exc:
@@ -529,6 +545,39 @@ def create_app(settings: Settings) -> FastAPI:
             "workspace_name": request.session.get("workspace_name", ""),
             "user_name": request.session.get("user_name", ""),
             "workspace_url": load_cockpit_cfg(wid).get("workspace_url", ""),
+            "crm_page_id": load_cockpit_cfg(wid).get("crm_page_id") or None,
+        }
+
+    @app.post("/api/crm/refresh")
+    async def refresh_crm(request: Request) -> dict:
+        """Refresh the CRM home template + views on an already-deployed CRM.
+
+        Unlike /api/setup/stream, this never creates a new CRM — it only
+        rewrites Notion Pilot's own blocks and views on the page already
+        linked in cockpit config (see upgrade_crm_home).
+        """
+        token = _require_token(request)
+        wid = _workspace_id(request)
+        cfg = load_cockpit_cfg(wid)
+        crm_page_id = cfg.get("crm_page_id")
+        if not crm_page_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No deployed CRM is linked to this workspace yet — deploy one first.",
+            )
+        try:
+            async with httpx.AsyncClient(headers=notion_headers(token), timeout=120) as client:
+                result = await upgrade_crm_home(
+                    client, crm_page_id, previous_views=cfg.get("crm_views")
+                )
+        except httpx.HTTPStatusError as exc:
+            raise HTTPException(status_code=400, detail=format_notion_error(exc))
+        cfg["crm_views"] = result.views
+        save_cockpit_cfg(wid, cfg)
+        return {
+            "notion_page_url": notion_page_url(crm_page_id),
+            "warnings": result.warnings,
+            "views": result.views,
         }
 
     @app.get("/api/cockpit/status/{key}")

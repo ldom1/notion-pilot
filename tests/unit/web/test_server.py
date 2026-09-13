@@ -66,7 +66,14 @@ def test_auth_notion_redirect_missing_oauth_config():
 def test_setup_with_manual_token():
     from web.server import create_app
 
-    mock_crm = MagicMock(companies_id="c1", people_id="p1", deals_id="d1", crm_page_id="pg1")
+    mock_crm = MagicMock(
+        companies_id="c1",
+        people_id="p1",
+        deals_id="d1",
+        crm_page_id="pg1",
+        views={},
+        warnings=[],
+    )
     mock_page_id = "root_page_id"
     client = TestClient(create_app(_make_settings()))
     with (
@@ -88,7 +95,14 @@ def test_setup_with_manual_token():
 def test_setup_under_existing_page():
     from web.server import create_app
 
-    mock_crm = MagicMock(companies_id="c1", people_id="p1", deals_id="d1", crm_page_id="pg1")
+    mock_crm = MagicMock(
+        companies_id="c1",
+        people_id="p1",
+        deals_id="d1",
+        crm_page_id="pg1",
+        views={},
+        warnings=[],
+    )
     client = TestClient(create_app(_make_settings()))
     with (
         patch(
@@ -116,6 +130,42 @@ def test_setup_under_existing_page():
     crm_mock.assert_awaited_once()
     assert crm_mock.await_args.args[1] == "550e8400-e29b-41d4-a716-446655440000"
     assert crm_mock.await_args.kwargs["page_title"] == "My CRM"
+
+
+def test_setup_stream_forwards_view_warnings_and_saves_views():
+    from web.server import create_app
+
+    warning = "🕘 Recent activity was not created: the Activities database was not found."
+    mock_crm = MagicMock(
+        companies_id="c1",
+        people_id="p1",
+        deals_id="d1",
+        meetings_id="m1",
+        activities_id="a1",
+        crm_page_id="pg1",
+        views={"pipeline": {"view_id": "v1", "block_id": "b1"}},
+        warnings=[warning],
+    )
+    client = TestClient(create_app(_make_settings()))
+    with (
+        patch("web.server.create_workspace_root_page", new_callable=AsyncMock, return_value="root"),
+        patch("web.server.create_crm_workspace", new_callable=AsyncMock, return_value=mock_crm),
+        patch("web.server.save_cockpit_cfg") as save,
+    ):
+        r = client.post(
+            "/api/setup/stream",
+            json={"scope": "crm", "workspace_name": "My CRM", "notion_token": "secret_manual"},
+        )
+    events = [
+        json.loads(line[len("data: ") :])
+        for line in r.text.splitlines()
+        if line.startswith("data: ")
+    ]
+    assert {"type": "warning", "message": warning} in events
+    assert events[-1]["type"] == "done"
+    cfg = save.call_args.args[1]
+    assert cfg["crm_page_id"] == "pg1"
+    assert cfg["crm_views"] == {"pipeline": {"view_id": "v1", "block_id": "b1"}}
 
 
 @respx.mock

@@ -193,6 +193,75 @@ def test_cockpit_status_with_configured_db():
     assert people_db["notion_name"] == "People"
 
 
+def test_cockpit_status_reports_the_linked_crm_page():
+    with patch(
+        "web.server.load_cockpit_cfg",
+        return_value={"databases": {}, "crm_page_id": "crm-page-1"},
+    ):
+        client = _authed_client()
+        r = client.get("/api/cockpit/status")
+
+    assert r.status_code == 200
+    assert r.json()["crm_page_id"] == "crm-page-1"
+
+
+def test_cockpit_status_has_no_crm_page_before_a_crm_is_deployed():
+    with patch("web.server.load_cockpit_cfg", return_value={"databases": {}}):
+        client = _authed_client()
+        r = client.get("/api/cockpit/status")
+
+    assert r.json()["crm_page_id"] is None
+
+
+# ── /api/crm/refresh ──────────────────────────────────────────────────────────
+
+
+def test_refresh_crm_without_a_deployed_crm_returns_400():
+    with patch("web.server.load_cockpit_cfg", return_value={"databases": {}}):
+        client = _authed_client()
+        r = client.post("/api/crm/refresh")
+
+    assert r.status_code == 400
+    assert "deploy one first" in r.json()["detail"]
+
+
+def test_refresh_crm_refreshes_the_linked_page_and_persists_its_views():
+    mock_result = MagicMock(
+        views={"pipeline": {"view_id": "v2", "block_id": "b2"}},
+        warnings=["🕘 Recent activity was not created: the Activities database was not found."],
+    )
+    with (
+        patch(
+            "web.server.load_cockpit_cfg",
+            return_value={
+                "databases": {},
+                "crm_page_id": "crm-page-1",
+                "crm_views": {"pipeline": {"view_id": "v1", "block_id": "b1"}},
+            },
+        ),
+        patch(
+            "web.server.upgrade_crm_home", new_callable=AsyncMock, return_value=mock_result
+        ) as upgrade,
+        patch("web.server.save_cockpit_cfg") as save,
+    ):
+        client = _authed_client()
+        r = client.post("/api/crm/refresh")
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["notion_page_url"] == "https://notion.so/crmpage1"
+    assert body["warnings"] == mock_result.warnings
+    assert body["views"] == mock_result.views
+
+    assert upgrade.call_args.args[1] == "crm-page-1"
+    assert upgrade.call_args.kwargs["previous_views"] == {
+        "pipeline": {"view_id": "v1", "block_id": "b1"}
+    }
+    saved_cfg = save.call_args.args[1]
+    assert saved_cfg["crm_views"] == mock_result.views
+    assert saved_cfg["crm_page_id"] == "crm-page-1"  # unrelated cfg fields survive the merge
+
+
 # ── /api/cockpit/config ───────────────────────────────────────────────────────
 
 

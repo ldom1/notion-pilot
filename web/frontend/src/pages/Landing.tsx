@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { fetchStatus } from "../api/client";
 import { SetupWizard } from "../features/setup/SetupWizard";
 import { Spinner } from "../components/Spinner";
+import { Logo } from "../components/Logo";
+import { SceneBg } from "../components/SceneBg";
 import "../styles/landing.css";
 
 type CheckState = "idle" | "checking" | "authenticated" | "unauthenticated" | "setup";
@@ -229,43 +231,14 @@ function Film({ film }: { film: Film }) {
           onPlay={applyRate}
         />
       </div>
-      <figcaption className="lp-film-copy">
-        <span className="lp-film-stage">
-          {film.stage}
-          <span className="lp-film-dur">{film.seconds}s · no sound</span>
-        </span>
-        <h3 className="lp-h3">{film.title}</h3>
-      </figcaption>
     </figure>
   );
 }
 
-function Logo() {
-  // A page of records, with the approval mark sweeping out past its edge.
+function GithubMark({ size = 18 }: { size?: number }) {
   return (
-    <svg className="lp-logo" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <rect
-        x="3.3"
-        y="3.3"
-        width="20.4"
-        height="25.4"
-        rx="4"
-        stroke="currentColor"
-        strokeWidth="1.7"
-      />
-      <path
-        d="M8.4 11h8.2M8.4 15.6h5.2M8.4 20.2h3"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-      />
-      <path
-        d="m12.6 21.4 5.2 5.4L30.2 9.6"
-        stroke="var(--primary)"
-        strokeWidth="3.3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
     </svg>
   );
 }
@@ -307,10 +280,8 @@ const TAKEAWAYS: [string, string][] = [
 
 type Film = {
   slug: string;
-  stage: string;
   title: string;
   poster: string;
-  seconds: number;
   rate?: number;
 };
 
@@ -318,10 +289,8 @@ type Film = {
 // are told in the surfaces and EU sections — a second autoplay would retell them.
 const PIPELINE_FILM: Film = {
   slug: "notion-pilot-pipeline",
-  stage: "The job",
   title: "One email in. Four records out. Numbers already right.",
   poster: "/film/notion-pilot-pipeline.jpg",
-  seconds: 21,
   rate: 0.85,
 };
 
@@ -483,29 +452,10 @@ export default function Landing() {
   if (checkState === "setup") {
     return (
       <div className="lp lp-setup-scene">
-        <div className="lp-setup-bg" aria-hidden="true">
-          <svg className="lp-setup-bg-graph" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
-            <g className="lp-setup-bg-edges">
-              <path d="M120 180H380L560 90H820" />
-              <path d="M380 180V420H640L860 520" />
-              <path d="M640 420V700H1100" />
-              <path d="M820 90V300H1280" />
-            </g>
-            <g className="lp-setup-bg-dots">
-              <circle cx="120" cy="180" r="3.5" />
-              <circle cx="380" cy="180" r="3.5" />
-              <circle cx="560" cy="90" r="3.5" />
-              <circle cx="820" cy="90" r="3.5" />
-              <circle cx="640" cy="420" r="3.5" />
-              <circle cx="860" cy="520" r="3.5" />
-              <circle className="lp-setup-bg-pulse" cx="1100" cy="700" r="3.5" />
-              <circle className="lp-setup-bg-pulse" cx="1280" cy="300" r="3.5" />
-            </g>
-          </svg>
-        </div>
+        <SceneBg />
         <nav className="lp-nav">
           <span className="lp-brand">
-            <Logo /> Notion Pilot
+            <Logo className="lp-logo" /> Notion Pilot
           </span>
           <a className="lp-small" href="/auth/logout">
             Sign out
@@ -525,10 +475,11 @@ export default function Landing() {
   }
 
   return (
-    <div className="lp">
+    <div className="lp lp-setup-scene">
+      <SceneBg />
       <nav className="lp-nav">
         <a className="lp-brand" href="/">
-          <Logo /> Notion Pilot
+            <Logo className="lp-logo" /> Notion Pilot
         </a>
         <div className="lp-nav-actions">
           <a className="lp-btn lp-btn-quiet" href="#model">
@@ -536,6 +487,9 @@ export default function Landing() {
           </a>
           <a className="lp-btn lp-btn-primary" href="/auth/notion">
             Deploy to Notion
+          </a>
+          <a className="lp-nav-signin" href="/auth/notion?next=/cockpit">
+            Sign in
           </a>
         </div>
       </nav>
@@ -1035,7 +989,7 @@ export default function Landing() {
       <section className="lp-section" id="film">
         <div className="lp-wrap">
           <div className="lp-intro">
-            <h2 className="lp-h2">Nobody opened Notion. The pipeline still moved.</h2>
+            <h2 className="lp-h2">Open Notion to see the pipeline. It already moved.</h2>
           </div>
           <Film film={PIPELINE_FILM} />
         </div>
@@ -1061,9 +1015,6 @@ export default function Landing() {
                 <h3 className="lp-h3">Your AI assistant</h3>
                 <span className="lp-surface-when">paste · preview · go</span>
               </div>
-              <p>
-                The film above is this path. Paste a thread; get a preview; you only approve.
-              </p>
               <div className="lp-chat">
                 <div className="lp-bubble lp-bubble-me">
                   <span className="lp-who">Pasted from your inbox</span>
@@ -1248,13 +1199,23 @@ export default function Landing() {
         </div>
       </section>
 
-      <footer className="lp-wrap">
-        <div className="lp-foot">
-          <span className="lp-brand" style={{ fontSize: "0.92rem" }}>
-            <Logo /> Notion Pilot
-          </span>
-          <span>Self-hosted CRM automation for Notion · human-in-the-loop by default</span>
-          <a href="/auth/notion?next=/cockpit">Sign in</a>
+      <footer className="lp-footer">
+        <div className="lp-wrap lp-foot">
+          <div className="lp-foot-brand">
+            <a className="lp-brand" href="/">
+              <Logo className="lp-logo" /> Notion Pilot
+            </a>
+            <p className="lp-foot-tag">
+              Self-hosted CRM automation for Notion · human-in-the-loop by default
+            </p>
+          </div>
+          <nav className="lp-foot-links" aria-label="Footer">
+            <a href="https://github.com/ldom1/notion-pilot">
+              <GithubMark />
+              GitHub
+            </a>
+            <a href="/auth/notion?next=/cockpit">Sign in</a>
+          </nav>
           <p className="lp-scope">
             <Icon name="shield" size={16} />
             <span>

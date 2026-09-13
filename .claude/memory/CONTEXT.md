@@ -36,9 +36,16 @@ updated:
 - MS4All People enriched (LinkedIn/Position/Seniority/Role Type): Edouard Lété, Coralie Feillault, Zoheir Laguel — Phone still `needs_review`.
 - **Blocker:** `NOTION_DEALS_DATABASE_ID` / `NOTION_ACTIVITIES_DATABASE_ID` often unset in local Settings — Leads/Activities writes went through Notion MCP OAuth, not stdio. Companies DS may 404 for the Lgiron API **dev** integration token.
 
+## What's New (2026-09-13)
+
+- **CRM home dashboard (spec rev 6)** implemented via SDD (Tasks 1–9 + review harden). Branch `feat/crm-home-dashboard`, [PR #30](https://github.com/ldom1/notion-pilot/pull/30) → `develop`, CI green. See [[2026-09-13-crm-home-dashboard]].
+- Stack #28 → #29 → #27 already on `develop` earlier the same day.
+- Live gate: linked views list as `child_database` / `Untitled` on Notion-Version `2022-06-28`. Scratch parent remains `3d76c451-9465-80f3-9ee8-dd9f840f31bf`.
+- **Uncommitted WIP (do not mix into #30):** landing/cockpit dogfood (Logo, SceneBg, Header, AssistantSetupPanel, SetupWizard deploy UX, static assets). Stash may include `dogfood-cockpit-globals`.
+
 ## Current Branch
 
-`develop` (2026-07-17) — PR #16, #18, and #19 all merged (#19: `mcp-crm-fixes`, squash `af2d718` — People DB schema mismatch, "Rte France"/"RTE" duplicate creation, wrong-SIREN attachment, no fallback enrichment). See [[2026-07-14-crm-rationalization-execution]], `[[2026-07-15-mcp-server-test]]`, [[2026-07-16-mcp-crm-fixes]].
+`feat/crm-home-dashboard` (2026-09-13) — PR #30 open against `develop`. Local `develop` pointer may still sit on the same tip until merge; prefer the feature branch for the CRM home work.
 
 **3 PRs open, none yet merged** (all from `origin/develop`, split out of the [[2026-07-16-mcp-people-knowledge-fixes-plan]] implementation):
 - PR #20 (`workstream-a-mcp-thin-wrapper`) — `upsert_companies` MCP thin-wrapper refactor + a live-test-discovered fix: `upsert()` now enforces the same SIREN-divergence `needs_review` gate `preview()` already had.
@@ -168,6 +175,7 @@ Conflict resolution note: develop keeps #29 `parent_page_id` + capabilities + bo
 
 ## Verified against the live Notion API (do not re-litigate)
 
+- **Views (2026-09-13):** board on select Stage without nested `group_by.group_by`; `formula.checkbox`, `next_month`, `past_month` accepted; reverse insertion after **This week** yields §1 order; `parent.database_id` is the linked block id; `DELETE /v1/blocks/{id}` on `2022-06-28` removes a linked view; append returns only new blocks in order. Linked views list as `child_database` titled `Untitled` (×4) — not Leads/Activities.
 - A dual relation's reverse property is auto-named `Related to <db> (<prop>)`; `synced_property_name` is read-only on create. Renaming it afterwards works, and a rollup on the resolved name is accepted.
 - `parent: {"workspace": true}` is **rejected for internal integrations**: *"Internal integrations aren't owned by a single user, so creating workspace-level private pages is not supported."* Only a public-integration OAuth token can create top-level pages.
 - `GET /v1/users/me` → `bot.owner.type == "workspace"` for an internal integration. (The `"user"` value for an OAuth token is **still unverified** — only an internal token was available.)

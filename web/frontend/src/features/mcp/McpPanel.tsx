@@ -41,19 +41,15 @@ export function McpPanel() {
       </div>
 
       <p className="script-desc" style={{ marginBottom: "1rem" }}>
-        <code>notion_pilot/mcp/</code> exposes the CRM vertical (dedup&apos;d upsert,
-        enrichment, duplicate scan, pitch-based ranking, read queries) as MCP tools.
-        By default any MCP-aware client launches it over stdio as a local subprocess —
-        there is no persistent server to report live status here. When the deployment
-        sets <code>MCP_BEARER_TOKEN</code>, the same tools are also reachable remotely
-        over HTTP at <code>/mcp</code>, gated by that bearer token.
+        CRM tools over stdio — upsert, enrich, scan, rank, query. Optional HTTP
+        at <code>/mcp</code> when <code>MCP_BEARER_TOKEN</code> is set.
       </p>
 
       <div className="log-body" style={{ borderRadius: "9px", marginBottom: "1rem" }}>
         <pre className="log-line" style={{ margin: 0 }}>{CONFIG_SNIPPET}</pre>
       </div>
 
-      <details className="mcp-section" open>
+      <details className="mcp-section">
         <summary className="mcp-section-label">
           <span className="mcp-chevron">▸</span> Write · confirm required ({WRITE_TOOLS.length})
         </summary>
@@ -64,7 +60,7 @@ export function McpPanel() {
         </div>
       </details>
 
-      <details className="mcp-section" open>
+      <details className="mcp-section">
         <summary className="mcp-section-label">
           <span className="mcp-chevron">▸</span> Read-only ({READ_TOOLS.length})
         </summary>

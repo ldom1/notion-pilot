@@ -5,17 +5,28 @@ import httpx
 import pytest
 import respx
 
+from notion_pilot.shared.notion_views import VIEW_SPECS
 from notion_pilot.shared.workspace import (
     NOTION_API,
     CRMWorkspaceResult,
     InboxWorkspaceResult,
+    SOURCES_TITLE,
+    THIS_WEEK,
+    _DEMO_DEALS,
+    _plain_text,
     create_crm_workspace,
     create_inbox_workspace,
     create_workspace_root_page,
+    crm_home_blocks,
 )
 
 
-def _make_mock_client(named_ids: list[str], *, reverse_names: dict[str, str] | None = None):
+def _make_mock_client(
+    named_ids: list[str],
+    *,
+    reverse_names: dict[str, str] | None = None,
+    views_status: int = 200,
+):
     """Mock httpx client for the workspace bootstrap.
 
     POST returns named_ids in order, then 'seeded-N' for the demo-data calls.
@@ -26,10 +37,14 @@ def _make_mock_client(named_ids: list[str], *, reverse_names: dict[str, str] | N
     """
     call_count = 0
     patched: list[tuple[str, dict]] = []
+    appended: list[dict] = []
+    posted: list[dict] = []
+    view_posts: list[dict] = []
     reverse = reverse_names or {}
 
     async def fake_post(url, **kwargs):
         nonlocal call_count
+        posted.append({"url": url, "json": kwargs.get("json", {})})
         resp = MagicMock()
         resp.raise_for_status = MagicMock()
         resp.json.return_value = {
@@ -56,18 +71,57 @@ def _make_mock_client(named_ids: list[str], *, reverse_names: dict[str, str] | N
         return resp
 
     async def fake_patch(url, **kwargs):
+        body = kwargs.get("json", {})
         resp = MagicMock()
         resp.status_code = 200
         resp.raise_for_status = MagicMock()
-        resp.json.return_value = {"id": url.split("/")[-1]}
-        patched.append((url.split("/")[-1], kwargs.get("json", {}).get("properties", {})))
+        if url.endswith("/children"):
+            appended.append(body)
+            resp.json.return_value = {
+                "results": [{**b, "id": f"block-{i}"} for i, b in enumerate(body["children"])]
+            }
+        else:
+            resp.json.return_value = {"id": url.split("/")[-1]}
+            patched.append((url.split("/")[-1], body.get("properties", {})))
         return resp
+
+    async def fake_request(method, url, json=None, headers=None):
+        path = url.removeprefix(NOTION_API)
+        req = httpx.Request(method, url)
+        if path.startswith("/databases/"):
+            return httpx.Response(200, json={"data_sources": [{"id": "ds"}]}, request=req)
+        if path.startswith("/data_sources/"):
+            names = (
+                "Stage",
+                "Stale Deal",
+                "Days Since Last Activity",
+                "Expected Close Date",
+                "Date",
+            )
+            props = {n: {"id": n, "type": "select" if n == "Stage" else "date"} for n in names}
+            return httpx.Response(200, json={"properties": props}, request=req)
+        view_posts.append(json)
+        if views_status != 200:
+            return httpx.Response(views_status, json={"message": "nope"}, request=req)
+        n = len(view_posts)
+        return httpx.Response(
+            200,
+            json={
+                "id": f"view-{n}",
+                "parent": {"type": "database_id", "database_id": f"linked-{n}"},
+            },
+            request=req,
+        )
 
     mock_client = MagicMock()
     mock_client.post = fake_post
     mock_client.get = fake_get
     mock_client.patch = fake_patch
+    mock_client.request = fake_request
     mock_client.patched = patched
+    mock_client.appended = appended
+    mock_client.posted = posted
+    mock_client.view_posts = view_posts
     return mock_client
 
 
@@ -222,3 +276,53 @@ async def test_create_workspace_root_page():
     assert body["properties"]["title"]["title"][0]["text"]["content"] == "My Workspace"
     assert body["icon"] == {"type": "emoji", "emoji": "🚀"}
     assert "children" in body
+
+
+async def test_crm_page_is_created_empty_then_gets_the_home_template():
+    mock_client = _make_mock_client(_CRM_IDS)
+    await create_crm_workspace(mock_client, "parent-page-id")
+    page_post = mock_client.posted[0]
+    assert page_post["url"].endswith("/pages")
+    assert "children" not in page_post["json"]
+    assert mock_client.appended[0]["children"] == crm_home_blocks()
+
+
+async def test_views_are_placed_under_this_week_and_returned():
+    mock_client = _make_mock_client(_CRM_IDS)
+    result = await create_crm_workspace(mock_client, "parent-page-id")
+    this_week = next(i for i, b in enumerate(crm_home_blocks()) if _plain_text(b) == THIS_WEEK)
+    positions = {p["create_database"]["position"]["block_id"] for p in mock_client.view_posts}
+    assert positions == {f"block-{this_week}"}
+    assert set(result.views) == {s.key for s in VIEW_SPECS}
+    assert result.warnings == []
+
+
+async def test_refused_views_do_not_abort_and_leave_manual_steps_after_sources():
+    mock_client = _make_mock_client(_CRM_IDS, views_status=400)
+    result = await create_crm_workspace(mock_client, "parent-page-id")
+    assert result.crm_page_id == "crm-page"
+    assert len(result.warnings) == 4
+    sources = next(i for i, b in enumerate(crm_home_blocks()) if _plain_text(b) == SOURCES_TITLE)
+    callout = mock_client.appended[1]
+    assert callout["after"] == f"block-{sources}"
+    assert _plain_text(callout["children"][0]) == "Some views need a minute in Notion"
+
+
+async def test_home_views_wiring_failure_degrades_to_warnings(monkeypatch):
+    mock_client = _make_mock_client(_CRM_IDS)
+
+    def boom(*_a, **_k):
+        raise StopIteration
+
+    monkeypatch.setattr("notion_pilot.shared.workspace.find_block", boom)
+    result = await create_crm_workspace(mock_client, "parent-page-id")
+    assert result.crm_page_id == "crm-page"
+    assert result.views == {}
+    assert any("Home views could not be wired" in w for w in result.warnings)
+
+
+def test_demo_deals_fill_every_home_view_on_day_zero():
+    closing = [d for d in _DEMO_DEALS if d.get("expected_close_in_days") is not None]
+    assert sorted(d["expected_close_in_days"] for d in closing) == [12, 26]
+    stale = [d for d in _DEMO_DEALS if d["next_action"] is None]
+    assert [d["name"] for d in stale] == ["Analytics Platform — ClearPath"]

@@ -75,7 +75,7 @@ function SetupLog({
 }
 
 export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.ReactElement {
-  const [pageName, setPageName] = useState("");
+  const [pageName, setPageName] = useState("My awesome CRM");
   const [canTopLevel, setCanTopLevel] = useState<boolean | null>(null);
   const [parentKind, setParentKind] = useState<ParentKind>("root");
   const [parentPage, setParentPage] = useState("");
@@ -85,8 +85,19 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
   const [pagesState, setPagesState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [deployState, setDeployState] = useState<DeployState>("idle");
   const [logs, setLogs] = useState<string[]>([]);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [notionUrl, setNotionUrl] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
+
+  const needsParent = parentKind === "page";
+  const parentMissing = needsParent && !parentPage.trim();
+  const nameMissing = !pageName.trim();
+  const deployBlocked = deployState === "deploying" || nameMissing || parentMissing;
+  const deployBlockReason = nameMissing
+    ? "Enter a CRM page name first"
+    : parentMissing
+      ? "Pick a parent page, or switch to workspace root"
+      : undefined;
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -136,6 +147,7 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
     if (parentKind === "page" && !parent) return;
     setDeployState("deploying");
     setLogs([]);
+    setWarnings([]);
     try {
       const stream = runSetup({
         scope: "crm",
@@ -145,6 +157,10 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
       for await (const event of stream as AsyncIterable<SSEEvent>) {
         if (event.type === "log") {
           setLogs((prev) => [...prev, String(event.message ?? "")]);
+        } else if (event.type === "warning") {
+          const message = String(event.message ?? "");
+          setWarnings((prev) => [...prev, message]);
+          setLogs((prev) => [...prev, `⚠ ${message}`]);
         } else if (event.type === "done") {
           const url = (event.url as string | null) ?? null;
           setNotionUrl(url);
@@ -167,7 +183,18 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
       <div className="lp-setup">
         <div className="lp-setup-ok">✓</div>
         <h2 className="lp-setup-title">Your CRM is ready</h2>
-        {logs.length > 0 && <SetupLog logs={logs} deploying={false} logRef={logRef} />}
+        <p className="lp-setup-done-sum">
+          {warnings.length === 0
+            ? "Your pipeline is on the CRM home, with Companies, People, Leads, Activities and Meetings below it."
+            : "Your CRM works. A few views need a minute in Notion — the steps are on the CRM home."}
+        </p>
+        {warnings.length > 0 && (
+          <ul className="lp-setup-warnings">
+            {warnings.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+        )}
         <div className="lp-setup-actions">
           {notionUrl && (
             <a
@@ -175,7 +202,6 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
               href={notionUrl}
               target="_blank"
               rel="noreferrer"
-              style={{ textDecoration: "none" }}
             >
               Open in Notion ↗
             </a>
@@ -346,11 +372,8 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
           type="button"
           className="btn-primary"
           onClick={() => void handleDeploy()}
-          disabled={
-            deployState === "deploying"
-            || !pageName.trim()
-            || (parentKind === "page" && !parentPage.trim())
-          }
+          disabled={deployBlocked}
+          title={deployBlockReason}
         >
           {deployState === "deploying"
             ? "Creating…"
@@ -358,6 +381,9 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
               ? "Retry"
               : "Deploy the CRM"}
         </button>
+        {deployBlockReason && deployState === "idle" && (
+          <p className="lp-setup-hint">{deployBlockReason}</p>
+        )}
       </div>
     </div>
   );
