@@ -440,8 +440,34 @@ export async function deleteWorkspace(): Promise<void> {
 export interface SetupRequest {
   scope: "crm" | "inbox" | "both";
   workspace_name: string;
+  /** Omit to create at the top level of the workspace (OAuth tokens only). */
+  parent_page_id?: string | null;
 }
 
 export function runSetup(req: SetupRequest): AsyncGenerator<SSEEvent> {
   return _sse("POST", "/api/setup/stream", req);
+}
+
+export interface SetupCapabilities {
+  can_create_top_level: boolean;
+  owner_type: string | null;
+  workspace_name: string;
+}
+
+/** GET /api/setup/capabilities — which placements this token allows */
+export async function fetchSetupCapabilities(): Promise<SetupCapabilities> {
+  return _get<SetupCapabilities>("/api/setup/capabilities");
+}
+
+export interface NotionPage {
+  id: string;
+  name: string;
+}
+
+/** GET /api/cockpit/notion-pages — pages usable as a deploy parent */
+export async function fetchNotionPages(
+  q = "",
+): Promise<{ pages: NotionPage[]; truncated: boolean }> {
+  const path = q ? `/api/cockpit/notion-pages?q=${encodeURIComponent(q)}` : "/api/cockpit/notion-pages";
+  return _get<{ pages: NotionPage[]; truncated: boolean }>(path);
 }

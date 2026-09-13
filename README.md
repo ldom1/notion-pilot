@@ -39,6 +39,14 @@ The wizard walks you through token validation, scope selection, and parent page 
 
 ### Option C — Web UI (deploy wizard)
 
+The wizard asks where to put the workspace: the top level of your Notion, or
+inside a page you pick. **With an internal integration token, a parent page is
+required** — Notion rejects workspace-level page creation for integrations that
+aren't owned by a single user ("Internal integrations aren't owned by a single
+user, so creating workspace-level private pages is not supported"). The wizard
+detects this and only offers placements your token can actually use. Share the
+page with your integration first: open it in Notion → `···` → **Connections**.
+
 Register a public Notion integration at [notion.so/my-integrations](https://www.notion.so/profile/integrations), then add to your `.env`:
 
 ```env
