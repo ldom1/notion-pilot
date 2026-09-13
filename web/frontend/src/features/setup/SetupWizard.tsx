@@ -85,6 +85,7 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
   const [pagesState, setPagesState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [deployState, setDeployState] = useState<DeployState>("idle");
   const [logs, setLogs] = useState<string[]>([]);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [notionUrl, setNotionUrl] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -136,6 +137,7 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
     if (parentKind === "page" && !parent) return;
     setDeployState("deploying");
     setLogs([]);
+    setWarnings([]);
     try {
       const stream = runSetup({
         scope: "crm",
@@ -145,6 +147,10 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
       for await (const event of stream as AsyncIterable<SSEEvent>) {
         if (event.type === "log") {
           setLogs((prev) => [...prev, String(event.message ?? "")]);
+        } else if (event.type === "warning") {
+          const message = String(event.message ?? "");
+          setWarnings((prev) => [...prev, message]);
+          setLogs((prev) => [...prev, `⚠ ${message}`]);
         } else if (event.type === "done") {
           const url = (event.url as string | null) ?? null;
           setNotionUrl(url);
@@ -167,6 +173,18 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps): React.Rea
       <div className="lp-setup">
         <div className="lp-setup-ok">✓</div>
         <h2 className="lp-setup-title">Your CRM is ready</h2>
+        <p className="lp-setup-done-sum">
+          {warnings.length === 0
+            ? "Your pipeline is on the CRM home, with Companies, People, Leads, Activities and Meetings below it."
+            : "Your CRM works. A few views need a minute in Notion — the steps are on the CRM home."}
+        </p>
+        {warnings.length > 0 && (
+          <ul className="lp-setup-warnings">
+            {warnings.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+        )}
         {logs.length > 0 && <SetupLog logs={logs} deploying={false} logRef={logRef} />}
         <div className="lp-setup-actions">
           {notionUrl && (

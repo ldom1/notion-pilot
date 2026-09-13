@@ -487,3 +487,15 @@
     animation: none;
   }
 }
+
+/* Views Notion refused during deploy — informational, not an error state. */
+.lp-setup-warnings {
+  margin: 0 0 1.25rem;
+  padding: 0.75rem 1rem 0.75rem 2rem;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  text-align: left;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--muted);
+}

@@ -170,6 +170,7 @@ export type SSEEventType =
   | "status"
   | "done"
   | "error"
+  | "warning"
   | "result"
   | "token"
   | "step_start"

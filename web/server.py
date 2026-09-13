@@ -435,6 +435,8 @@ def create_app(settings: Settings) -> FastAPI:
 
                     db_ids: dict[str, str] = {}
                     done_id = host_id
+                    crm_page_id = ""
+                    crm_views: dict[str, dict[str, str]] = {}
 
                     if req.scope in ("crm", "both"):
                         yield sse("log", message="Creating CRM page…")
@@ -444,6 +446,7 @@ def create_app(settings: Settings) -> FastAPI:
                         yield sse("log", message="  → Meetings database")
                         yield sse("log", message="  → Activities database")
                         yield sse("log", message="  → Rollups and pipeline formulas")
+                        yield sse("log", message="  → Pipeline views on the CRM home")
                         crm = await create_crm_workspace(client, host_id, page_title=crm_title)
                         done_id = crm.crm_page_id
                         db_ids["notion_companies_data_source_id"] = crm.companies_id
@@ -451,6 +454,10 @@ def create_app(settings: Settings) -> FastAPI:
                         db_ids["notion_deals_database_id"] = crm.deals_id
                         db_ids["notion_meetings_database_id"] = crm.meetings_id
                         db_ids["notion_activities_database_id"] = crm.activities_id
+                        crm_page_id = crm.crm_page_id
+                        crm_views = crm.views
+                        for warning in crm.warnings:
+                            yield sse("warning", message=warning)
                         yield sse("log", message="✓ CRM ready (with demo data)")
 
                     if req.scope in ("inbox", "both"):
@@ -467,7 +474,15 @@ def create_app(settings: Settings) -> FastAPI:
                         yield sse("log", message="✓ Knowledge ready (with demo data)")
 
                     done_url = notion_page_url(done_id)
-                    save_cockpit_cfg(wid, {"databases": db_ids, "workspace_url": done_url})
+                    save_cockpit_cfg(
+                        wid,
+                        {
+                            "databases": db_ids,
+                            "workspace_url": done_url,
+                            "crm_page_id": crm_page_id,
+                            "crm_views": crm_views,
+                        },
+                    )
                     yield sse("log", message="✓ Cockpit configured")
                     yield sse("done", url=done_url)
             except httpx.HTTPStatusError as exc:
