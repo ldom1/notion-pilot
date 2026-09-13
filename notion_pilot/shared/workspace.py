@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Collection, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
@@ -11,7 +11,7 @@ import httpx
 from loguru import logger
 
 from notion_pilot.shared.doc_links import DOC_GROUPS, SOURCES_LEDE
-from notion_pilot.shared.notion_views import ViewSpec
+from notion_pilot.shared.notion_views import ViewSpec, ViewsOutcome, create_home_views
 
 NOTION_VERSION = "2022-06-28"
 NOTION_API = "https://api.notion.com/v1"
@@ -256,13 +256,39 @@ def manual_views_callout(skipped: Sequence[ViewSpec]) -> JsonDict:
     return _callout(MANUAL_VIEWS_TITLE, "⚠️", children)
 
 
+async def _add_home_views(
+    client: httpx.AsyncClient,
+    page_id: str,
+    home: list[JsonDict],
+    *,
+    leads_id: str | None,
+    activities_id: str | None,
+) -> ViewsOutcome:
+    """Views under "This week"; manual steps after Sources for any view Notion refused."""
+    outcome = await create_home_views(
+        client,
+        page_id=page_id,
+        after_block_id=find_block(home, "heading_2", THIS_WEEK),
+        databases={"Leads": leads_id, "Activities": activities_id},
+    )
+    if outcome.skipped:
+        try:
+            await _append_blocks(
+                client,
+                page_id,
+                [manual_views_callout(outcome.skipped)],
+                after=find_block(home, "toggle", SOURCES_TITLE),
+            )
+        except httpx.HTTPError as exc:
+            outcome.warnings.append(f"The manual steps could not be added to the page ({exc}).")
+    return outcome
+
+
 def owned_template_texts() -> frozenset[str]:
     """Top-level block texts Notion Pilot wrote — the only ones an upgrade removes."""
     current = {_plain_text(block) for block in crm_home_blocks()}
     return frozenset(current | {MANUAL_VIEWS_TITLE}) | LEGACY_TEMPLATE_TEXTS
 
-
-_CRM_CHILDREN: list[JsonDict] = crm_home_blocks()
 
 _KNOWLEDGE_CHILDREN: list[JsonDict] = [
     _callout(
@@ -486,6 +512,7 @@ _DEMO_DEALS: list[JsonDict] = [
         "type": "Lead qualifié",
         "next_action": "Follow up on proposal — awaiting board approval",
         "next_action_date": "2026-06-05",
+        "expected_close_in_days": 26,
         "contacted": True,
         "notes": "Proposal sent 2026-05-20. Strong technical fit. Competing with one other vendor.",
     },
@@ -500,6 +527,7 @@ _DEMO_DEALS: list[JsonDict] = [
         "type": "Lead qualifié",
         "next_action": "Final contract review — legal sign-off pending",
         "next_action_date": "2026-05-28",
+        "expected_close_in_days": 12,
         "contacted": True,
         "notes": "Partnership deal. Recurring revenue potential after year 1.",
     },
@@ -512,8 +540,8 @@ _DEMO_DEALS: list[JsonDict] = [
         "probability": 0.20,
         "product": ["Consulting"],
         "type": "Prospection tiède",
-        "next_action": "Send case study on analytics migration",
-        "next_action_date": "2026-06-15",
+        "next_action": None,
+        "next_action_date": None,
         "contacted": False,
         "notes": "Inbound. Early stage — needs nurturing. Decision expected Q3.",
     },
@@ -729,9 +757,11 @@ class CRMWorkspaceResult:
     crm_page_id: str
     companies_id: str
     people_id: str
-    deals_id: str
+    deals_id: str  # the Leads database (historical name)
     meetings_id: str
     activities_id: str
+    views: dict[str, dict[str, str]] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -982,10 +1012,15 @@ async def _seed_deals(
             "Probability (%)": {"number": d["probability"]},
             "Product": {"multi_select": [{"name": p} for p in d["product"]]},
             "Lead Source": {"select": {"name": d["type"]}},
-            "Next Step": {"rich_text": _rt(d["next_action"])},
-            "Next Step Date": {"date": {"start": d["next_action_date"]}},
             "Notes": {"rich_text": _rt(d["notes"])},
         }
+        # ClearPath has no next step on purpose: it is the demo "Needs attention" lead.
+        if d["next_action"]:
+            props["Next Step"] = {"rich_text": _rt(d["next_action"])}
+            props["Next Step Date"] = {"date": {"start": d["next_action_date"]}}
+        if d.get("expected_close_in_days") is not None:
+            close = date.today() + timedelta(days=d["expected_close_in_days"])
+            props["Expected Close Date"] = {"date": {"start": close.isoformat()}}
         if contacts:
             props["Contacts"] = {"relation": contacts}
         deal_ids[d["name"]] = await _create_db_page(client, deals_id, props)
@@ -1336,7 +1371,8 @@ async def create_crm_workspace(
 ) -> CRMWorkspaceResult:
     """Create CRM container page + Companies, People, Deals databases with demo data."""
     logger.info("workspace: creating CRM '{}'", page_title)
-    crm_page_id = await _create_page(client, parent_page_id, page_title, "🏢", _CRM_CHILDREN)
+    crm_page_id = await _create_page(client, parent_page_id, page_title, "🏢")
+    home = await _append_blocks(client, crm_page_id, crm_home_blocks())
 
     companies_id = await _create_db(
         client,
@@ -1564,7 +1600,10 @@ async def create_crm_workspace(
             person_id=next(iter(people_ids.values())),
             deal_id=next(iter(deal_ids.values())),
         )
-    logger.info("workspace: CRM ready — page_id={}", crm_page_id)
+    views = await _add_home_views(
+        client, crm_page_id, home, leads_id=deals_id, activities_id=activities_id
+    )
+    logger.info("workspace: CRM ready — page_id={} views={}", crm_page_id, sorted(views.views))
 
     return CRMWorkspaceResult(
         crm_page_id=crm_page_id,
@@ -1573,6 +1612,8 @@ async def create_crm_workspace(
         deals_id=deals_id,
         meetings_id=meetings_id,
         activities_id=activities_id,
+        views=views.views,
+        warnings=views.warnings,
     )
 
 
