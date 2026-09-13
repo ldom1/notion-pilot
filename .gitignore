@@ -84,3 +84,9 @@ web/workspaces/
 # Frontend build
 web/dist/
 web/frontend/node_modules/
+
+# Playwright: minted session state holds a real Notion token
+web/frontend/e2e/.auth/
+web/frontend/test-results/
+web/frontend/playwright-report/
+web/frontend/blob-report/

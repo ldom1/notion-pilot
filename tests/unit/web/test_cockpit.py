@@ -405,6 +405,68 @@ def test_deals_properties_no_db_configured():
 
 
 @respx.mock
+def test_log_activity_uses_session_token_and_persisted_activities_id():
+    """The first-time-user path for logging an activity.
+
+    MCP log_activity binds the operator's static NOTION_TOKEN at import, so it
+    cannot serve a workspace someone connected through the wizard. This endpoint
+    is the OAuth-session equivalent.
+    """
+    settings = _make_settings()
+    new_page_id = str(uuid.uuid4())
+    respx.post("https://api.notion.com/v1/pages").mock(
+        return_value=Response(201, json={"id": new_page_id})
+    )
+
+    with patch(
+        "web.config.load_cockpit_cfg",
+        return_value={"databases": {"notion_activities_database_id": "db-activities"}},
+    ):
+        client = _authed_client(settings=settings)
+        r = client.post(
+            "/api/cockpit/log-activity",
+            json={
+                "title": "Discovery call",
+                "type": "📞 Call",
+                "outcome": "➡️ Follow-up Needed",
+                "deal_page_id": "deal-1",
+                "person_page_id": "person-1",
+                "company_page_id": "company-1",
+                "next_step": "Send recap",
+            },
+        )
+
+    assert r.status_code == 200, r.text
+    assert r.json()["page_id"] == new_page_id
+
+    calls = [c for c in respx.calls if "api.notion.com" in str(c.request.url)]
+    assert len(calls) == 1
+    body = json.loads(calls[0].request.content)
+    assert body["parent"]["database_id"] == "db-activities"
+    props = body["properties"]
+    assert props["Name"]["title"][0]["text"]["content"] == "Discovery call"
+    assert props["Type"]["select"]["name"] == "📞 Call"
+    assert props["Outcome"]["select"]["name"] == "➡️ Follow-up Needed"
+    # the People relation is "Person", per ActivityRecord._to_properties
+    assert props["Person"]["relation"][0]["id"] == "person-1"
+    assert props["Deal"]["relation"][0]["id"] == "deal-1"
+    assert props["Company"]["relation"][0]["id"] == "company-1"
+    assert "Contact" not in props
+    assert props["Date"]["date"]["start"]  # defaults to today
+
+
+@respx.mock
+def test_log_activity_without_activities_db_returns_400():
+    """A workspace deployed before this change has no Activities id persisted."""
+    settings = _make_settings()
+    with patch("web.config.load_cockpit_cfg", return_value={"databases": {}}):
+        client = _authed_client(settings=settings)
+        r = client.post("/api/cockpit/log-activity", json={"title": "Call"})
+    assert r.status_code == 400
+    assert "Activities" in r.json()["detail"]
+
+
+@respx.mock
 def test_create_deal_existing_contact():
     """Links deal to an existing People page — no new person created in Notion."""
     settings = _make_settings()
@@ -510,8 +572,8 @@ def test_create_deal_with_extra_fields():
                 "deal_name": "HPC Deal",
                 "notion_id": "person-id",
                 "extra_fields": {
-                    "Product": ["HPC-as-a-service"],
-                    "Lead Source": "Prospection chaude",
+                    "Product": ["Consulting"],
+                    "Lead Source": "Referral",
                     "Value (euros)": 45000,
                     "Notes": "Strategic account",
                 },
@@ -520,8 +582,8 @@ def test_create_deal_with_extra_fields():
 
     assert r.status_code == 200
     body = json.loads(respx.calls[0].request.content)
-    assert body["properties"]["Product"]["multi_select"][0]["name"] == "HPC-as-a-service"
-    assert body["properties"]["Lead Source"]["select"]["name"] == "Prospection chaude"
+    assert body["properties"]["Product"]["multi_select"][0]["name"] == "Consulting"
+    assert body["properties"]["Lead Source"]["select"]["name"] == "Referral"
     assert body["properties"]["Value (euros)"]["number"] == 45000
     assert body["properties"]["Notes"]["rich_text"][0]["text"]["content"] == "Strategic account"
 

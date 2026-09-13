@@ -52,6 +52,7 @@ from web.models import (
     ChatRequest,
     CockpitConfigRequest,
     CreateDealRequest,
+    LogActivityRequest,
     CreateLeadRequest,
     RunScriptRequest,
     RunWorkflowRequest,
@@ -357,11 +358,16 @@ def create_app(settings: Settings) -> FastAPI:
                         yield sse("log", message="Creating CRM page…")
                         yield sse("log", message="  → Companies database")
                         yield sse("log", message="  → People database")
-                        yield sse("log", message="  → Deals database")
+                        yield sse("log", message="  → Leads database")
+                        yield sse("log", message="  → Meetings database")
+                        yield sse("log", message="  → Activities database")
+                        yield sse("log", message="  → Rollups and pipeline formulas")
                         crm = await create_crm_workspace(client, root_page_id)
                         db_ids["notion_companies_data_source_id"] = crm.companies_id
                         db_ids["notion_people_data_source_id"] = crm.people_id
                         db_ids["notion_deals_database_id"] = crm.deals_id
+                        db_ids["notion_meetings_database_id"] = crm.meetings_id
+                        db_ids["notion_activities_database_id"] = crm.activities_id
                         yield sse("log", message="✓ CRM ready (with demo data)")
 
                     if req.scope in ("inbox", "both"):
@@ -816,6 +822,57 @@ def create_app(settings: Settings) -> FastAPI:
             elif ptype == "number":
                 wizard_fields.append({"key": name, "type": "number"})
         return {"fields": wizard_fields}
+
+    @app.post("/api/cockpit/log-activity")
+    async def cockpit_log_activity(req: LogActivityRequest, request: Request) -> dict:
+        """Log an activity against the session's own workspace.
+
+        Mirrors create-deal: OAuth cookie token plus the Activities id persisted
+        by the deploy wizard. The MCP log_activity tool cannot serve this path —
+        it binds the operator's static token at import (notion_pilot/mcp/server.py).
+        """
+        token = _require_token(request)
+        db_ids = _resolve_db_ids(_workspace_id(request))
+        activities_db_id = db_ids.get("notion_activities_database_id")
+        if not activities_db_id:
+            raise HTTPException(status_code=400, detail="Activities database not configured")
+
+        props: dict = {
+            "Name": {"title": [{"text": {"content": req.title}}]},
+            "Type": {"select": {"name": req.type}},
+            "Date": {"date": {"start": req.date or datetime.date.today().isoformat()}},
+        }
+        if req.outcome:
+            props["Outcome"] = {"select": {"name": req.outcome}}
+        if req.duration_min is not None:
+            props["Duration (min)"] = {"number": req.duration_min}
+        # Property names follow ActivityRecord._to_properties — the relation to
+        # People is "Person", not "Contact".
+        for key, page_id in (
+            ("Deal", req.deal_page_id),
+            ("Person", req.person_page_id),
+            ("Company", req.company_page_id),
+        ):
+            if page_id:
+                props[key] = {"relation": [{"id": page_id}]}
+        if req.next_step:
+            props["Next Step"] = {"rich_text": [{"text": {"content": req.next_step}}]}
+        if req.next_step_date:
+            props["Next Step Date"] = {"date": {"start": req.next_step_date}}
+        if req.notes:
+            props["Notes"] = {"rich_text": [{"text": {"content": req.notes}}]}
+
+        async with httpx.AsyncClient(headers=notion_headers(token), timeout=20) as client:
+            r = await client.post(
+                f"{NOTION_API}/pages",
+                json={"parent": {"database_id": activities_db_id}, "properties": props},
+            )
+            if r.status_code >= 400:
+                logger.error("log-activity failed: {} {}", r.status_code, r.text)
+                raise HTTPException(status_code=502, detail="Notion rejected the activity")
+            page = r.json()
+
+        return {"ok": True, "page_id": page["id"], "url": page.get("url", "")}
 
     @app.post("/api/cockpit/create-deal")
     async def cockpit_create_deal(req: CreateDealRequest, request: Request) -> dict:

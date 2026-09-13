@@ -15,10 +15,18 @@ from notion_pilot.shared.workspace import (
 )
 
 
-def _make_mock_client(named_ids: list[str]):
-    """Return a mock httpx client whose POST calls return named_ids in order,
-    then 'seeded-N' for any subsequent calls (demo data seeding)."""
+def _make_mock_client(named_ids: list[str], *, reverse_names: dict[str, str] | None = None):
+    """Mock httpx client for the workspace bootstrap.
+
+    POST returns named_ids in order, then 'seeded-N' for the demo-data calls.
+    GET on a database returns the reverse relation properties Notion would have
+    auto-created, so _resolve_back_relation has something to discover.
+    `reverse_names` maps target-db id -> the name Notion invented, letting a test
+    simulate the auto-generated "Related to …" name.
+    """
     call_count = 0
+    patched: list[tuple[str, dict]] = []
+    reverse = reverse_names or {}
 
     async def fake_post(url, **kwargs):
         nonlocal call_count
@@ -30,28 +38,157 @@ def _make_mock_client(named_ids: list[str]):
         call_count += 1
         return resp
 
+    async def fake_get(url, **kwargs):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.raise_for_status = MagicMock()
+        props = {
+            reverse.get(target, default_name): {
+                "type": "relation",
+                "relation": {"database_id": target},
+            }
+            for target, default_name in (
+                ("activities-db", "Activities"),
+                ("meetings-db", "Meetings"),
+            )
+        }
+        resp.json.return_value = {"id": url.split("/")[-1], "properties": props}
+        return resp
+
     async def fake_patch(url, **kwargs):
         resp = MagicMock()
+        resp.status_code = 200
         resp.raise_for_status = MagicMock()
         resp.json.return_value = {"id": url.split("/")[-1]}
+        patched.append((url.split("/")[-1], kwargs.get("json", {}).get("properties", {})))
         return resp
 
     mock_client = MagicMock()
     mock_client.post = fake_post
+    mock_client.get = fake_get
     mock_client.patch = fake_patch
+    mock_client.patched = patched
     return mock_client
 
 
+_CRM_IDS = [
+    "crm-page",
+    "companies-db",
+    "people-db",
+    "deals-db",
+    "meetings-db",
+    "activities-db",
+]
+
+
 @pytest.mark.asyncio
-async def test_create_crm_workspace_returns_ids():
-    # POST order: crm-page, companies-db, people-db, deals-db, then N seeding calls
-    mock_client = _make_mock_client(["crm-page", "companies-db", "people-db", "deals-db"])
+async def test_create_crm_workspace_returns_all_five_database_ids():
+    """The deploy must create Activities and Meetings, not just the original three.
+
+    log_activity hard-fails without an Activities id, and the landing page
+    promises five databases.
+    """
+    mock_client = _make_mock_client(_CRM_IDS)
     result = await create_crm_workspace(mock_client, "parent-page-id")
     assert isinstance(result, CRMWorkspaceResult)
     assert result.crm_page_id == "crm-page"
     assert result.companies_id == "companies-db"
     assert result.people_id == "people-db"
     assert result.deals_id == "deals-db"
+    assert result.meetings_id == "meetings-db"
+    assert result.activities_id == "activities-db"
+
+
+@pytest.mark.asyncio
+async def test_rollups_key_on_the_resolved_back_relation_name():
+    """Notion names the reverse of a dual relation itself, and the name is not
+    requestable on create. So the rollup must key on the name read back from the
+    API, never on a hardcoded guess."""
+    mock_client = _make_mock_client(
+        _CRM_IDS,
+        reverse_names={"activities-db": "Related to Activities (Deal)"},
+    )
+    await create_crm_workspace(mock_client, "parent-page-id")
+
+    rollups = [
+        (db_id, props["Last Activity Date"]["rollup"])
+        for db_id, props in mock_client.patched
+        if "Last Activity Date" in props
+    ]
+    assert {db for db, _ in rollups} == {"companies-db", "people-db", "deals-db"}
+    for _, cfg in rollups:
+        # the discovered name, and the rename to "Activities" was attempted
+        assert cfg["relation_property_name"] in {"Activities", "Related to Activities (Deal)"}
+        assert cfg["rollup_property_name"] == "Date"
+        assert cfg["function"] == "latest_date"
+
+    renames = [
+        props for _, props in mock_client.patched if any("name" in v for v in props.values())
+    ]
+    assert any(
+        v.get("name") == "Activities"
+        for props in renames
+        for v in props.values()
+        if isinstance(v, dict)
+    ), "the auto-generated reverse name should be renamed to Activities"
+
+
+@pytest.mark.asyncio
+async def test_companies_has_no_activities_multi_select():
+    """A multi_select named Activities collides with the back-relation the
+    rollups depend on (it was there, and seeded, before this change)."""
+    posted: list[dict] = []
+
+    mock_client = _make_mock_client(_CRM_IDS)
+    original_post = mock_client.post
+
+    async def capture(url, **kwargs):
+        posted.append({"url": url, "json": kwargs.get("json", {})})
+        return await original_post(url, **kwargs)
+
+    mock_client.post = capture
+    await create_crm_workspace(mock_client, "parent-page-id")
+
+    companies = next(
+        c["json"]
+        for c in posted
+        if c["url"].endswith("/databases") and "Companies" in str(c["json"].get("title"))
+    )
+    props = companies["properties"]
+    assert "Activities" not in props
+    # and the French-market firmographics the enrichment skill writes are present
+    for expected in ("SIREN", "CA", "Résultat net", "Marge nette %", "Année financière"):
+        assert expected in props, expected
+
+
+@pytest.mark.asyncio
+async def test_leads_database_is_named_leads_with_english_lead_source():
+    posted: list[dict] = []
+    mock_client = _make_mock_client(_CRM_IDS)
+    original_post = mock_client.post
+
+    async def capture(url, **kwargs):
+        posted.append({"url": url, "json": kwargs.get("json", {})})
+        return await original_post(url, **kwargs)
+
+    mock_client.post = capture
+    await create_crm_workspace(mock_client, "parent-page-id")
+
+    leads = next(
+        c["json"]
+        for c in posted
+        if c["url"].endswith("/databases") and "Leads" in str(c["json"].get("title"))
+    )
+    props = leads["properties"]
+    sources = {o["name"] for o in props["Lead Source"]["select"]["options"]}
+    assert "Cold Outreach" in sources
+    assert not any("Prospection" in s for s in sources), "French labels must not ship"
+    stages = {o["name"] for o in props["Stage"]["select"]["options"]}
+    assert {"Discovery / First Meeting", "Waiting for a Response"} <= stages
+    products = {o["name"] for o in props["Product"]["multi_select"]["options"]}
+    assert "HPC-as-a-service" not in products, "Artelys product must not ship in a generic wizard"
+    for expected in ("Expected Close Date", "Primary contact", "Created time"):
+        assert expected in props, expected
 
 
 @pytest.mark.asyncio
