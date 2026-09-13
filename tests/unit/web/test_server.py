@@ -45,6 +45,22 @@ def test_health():
     assert r.json() == {"status": "ok"}
 
 
+def test_landing_film_assets_are_served_at_the_url_the_landing_page_uses():
+    """Landing.tsx's <Film> requests /film/<slug>.mp4 and .jpg directly (not
+    /static/film/...). Without a dedicated mount those fall through to the SPA
+    catch-all and silently return index.html — the video element gets an HTML
+    document as its src and shows nothing, with no error anywhere."""
+    from web.server import create_app
+
+    client = TestClient(create_app(_make_settings()))
+    r = client.get("/film/notion-pilot-pipeline.mp4")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "video/mp4"
+    r = client.get("/film/notion-pilot-pipeline.jpg")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "image/jpeg"
+
+
 def test_auth_notion_redirect():
     from web.server import create_app
 
