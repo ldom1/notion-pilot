@@ -31,6 +31,7 @@ from notion_pilot.shared.workspace import (
     create_crm_workspace,
     create_inbox_workspace,
     create_workspace_root_page,
+    upgrade_crm_home,
 )
 from web.config import (
     DB_DEFS,
@@ -544,6 +545,39 @@ def create_app(settings: Settings) -> FastAPI:
             "workspace_name": request.session.get("workspace_name", ""),
             "user_name": request.session.get("user_name", ""),
             "workspace_url": load_cockpit_cfg(wid).get("workspace_url", ""),
+            "crm_page_id": load_cockpit_cfg(wid).get("crm_page_id") or None,
+        }
+
+    @app.post("/api/crm/refresh")
+    async def refresh_crm(request: Request) -> dict:
+        """Refresh the CRM home template + views on an already-deployed CRM.
+
+        Unlike /api/setup/stream, this never creates a new CRM — it only
+        rewrites Notion Pilot's own blocks and views on the page already
+        linked in cockpit config (see upgrade_crm_home).
+        """
+        token = _require_token(request)
+        wid = _workspace_id(request)
+        cfg = load_cockpit_cfg(wid)
+        crm_page_id = cfg.get("crm_page_id")
+        if not crm_page_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No deployed CRM is linked to this workspace yet — deploy one first.",
+            )
+        try:
+            async with httpx.AsyncClient(headers=notion_headers(token), timeout=120) as client:
+                result = await upgrade_crm_home(
+                    client, crm_page_id, previous_views=cfg.get("crm_views")
+                )
+        except httpx.HTTPStatusError as exc:
+            raise HTTPException(status_code=400, detail=format_notion_error(exc))
+        cfg["crm_views"] = result.views
+        save_cockpit_cfg(wid, cfg)
+        return {
+            "notion_page_url": notion_page_url(crm_page_id),
+            "warnings": result.warnings,
+            "views": result.views,
         }
 
     @app.get("/api/cockpit/status/{key}")

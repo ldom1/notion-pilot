@@ -145,6 +145,7 @@ const Cockpit: React.FC = () => {
           onSaveDb={handleSaveDb}
           onCancelEdit={handleCancelEdit}
           onRedeploy={() => setShowRedeploy(true)}
+          crmPageId={status?.crm_page_id ?? null}
         />
         <McpPanel />
         <SourcesPanel />

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { deleteWorkspace } from "../../api/client";
+import { deleteWorkspace, refreshCrmTemplate } from "../../api/client";
 
 export interface DatabaseEntry {
   count: number | null;
@@ -33,6 +33,8 @@ interface WorkspacePanelProps {
   onSaveDb: (key: string, newId: string) => void;
   onCancelEdit: () => void;
   onRedeploy: () => void;
+  /** Notion page id of the deployed CRM home, or null if none is linked yet. */
+  crmPageId: string | null;
 }
 
 export function WorkspacePanel({
@@ -45,6 +47,7 @@ export function WorkspacePanel({
   onSaveDb,
   onCancelEdit,
   onRedeploy,
+  crmPageId,
 }: WorkspacePanelProps) {
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [availableDbs, setAvailableDbs] = useState<NotionDb[]>([]);
@@ -54,6 +57,9 @@ export function WorkspacePanel({
   const [telegramPingResult, setTelegramPingResult] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [refreshingCrm, setRefreshingCrm] = useState(false);
+  const [crmRefreshError, setCrmRefreshError] = useState<string | null>(null);
+  const [crmWarnings, setCrmWarnings] = useState<string[] | null>(null);
 
   const fetchTelegramStatus = useCallback(async () => {
     try {
@@ -105,6 +111,21 @@ export function WorkspacePanel({
 
   function handleSave(key: string) {
     onSaveDb(key, selections[key] ?? "");
+  }
+
+  async function handleRefreshCrm(): Promise<void> {
+    setRefreshingCrm(true);
+    setCrmRefreshError(null);
+    setCrmWarnings(null);
+    try {
+      const result = await refreshCrmTemplate();
+      setCrmWarnings(result.warnings);
+      onRefresh();
+    } catch (err) {
+      setCrmRefreshError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRefreshingCrm(false);
+    }
   }
 
   async function handleDelete(): Promise<void> {
@@ -246,6 +267,16 @@ export function WorkspacePanel({
           <span className="tg-bot-label">Workspace actions</span>
         </div>
         <div className="tg-bot-actions" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
+          {crmPageId && (
+            <button
+              className="btn-ghost btn-sm"
+              onClick={() => { void handleRefreshCrm(); }}
+              disabled={refreshingCrm}
+              title="Rewrite the CRM home template and pipeline views in place — databases and rows are kept."
+            >
+              {refreshingCrm ? "Refreshing CRM…" : "⟳ Refresh CRM template"}
+            </button>
+          )}
           <button className="btn-ghost btn-sm" onClick={onRedeploy}>
             ↺ Redeploy workspace
           </button>
@@ -276,6 +307,23 @@ export function WorkspacePanel({
             </span>
           )}
         </div>
+        {crmRefreshError && (
+          <p style={{ margin: "0.6rem 0 0", fontSize: "0.78rem", color: "var(--bad)" }}>
+            {crmRefreshError}
+          </p>
+        )}
+        {crmWarnings && crmWarnings.length === 0 && (
+          <p style={{ margin: "0.6rem 0 0", fontSize: "0.78rem", color: "var(--muted)" }}>
+            CRM home refreshed — all four pipeline views are up to date.
+          </p>
+        )}
+        {crmWarnings && crmWarnings.length > 0 && (
+          <ul className="lp-setup-warnings" style={{ margin: "0.6rem 0 0" }}>
+            {crmWarnings.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+        )}
       </div>
     </section>
   );

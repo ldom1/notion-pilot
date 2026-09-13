@@ -103,6 +103,7 @@ export interface CockpitStatus {
   workspace_name: string;
   user_name: string;
   workspace_url: string;
+  crm_page_id: string | null;
 }
 
 export interface ScriptParam {
@@ -435,6 +436,17 @@ export async function saveCockpitConfig(
 /** DELETE /api/workspace — clear cockpit config (DB links) for this workspace */
 export async function deleteWorkspace(): Promise<void> {
   await _json<{ ok: boolean }>("DELETE", "/api/workspace");
+}
+
+/** POST /api/crm/refresh — rewrite the CRM home template + views in place. */
+export interface RefreshCrmResult {
+  notion_page_url: string;
+  warnings: string[];
+  views: Record<string, { view_id: string; block_id: string }>;
+}
+
+export async function refreshCrmTemplate(): Promise<RefreshCrmResult> {
+  return _json<RefreshCrmResult>("POST", "/api/crm/refresh");
 }
 
 /** GET /api/setup/pages — Notion pages the integration can parent a CRM under */
