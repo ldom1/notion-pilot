@@ -1,5 +1,7 @@
 # Manual Notion UI Steps — CRM Migration
 
+> **Wizard deploys:** the CRM home already has 📊 Pipeline, ⚠️ Needs attention, 📅 Closing in the next 30 days and 🕘 Recent activity. If Notion refused one, its steps are on the CRM page. The steps below are for the legacy workspace and the extra Leads/Activities/People views.
+
 These steps **cannot be performed via the Notion API** and must be done by hand in the Notion web or desktop app.
 Complete them after all migration scripts have run successfully.
 
