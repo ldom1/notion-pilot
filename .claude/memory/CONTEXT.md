@@ -136,6 +136,20 @@ web/
 - **New (2026-09-10):** `.env.example` still lacks `NOTION_MEETINGS_DATABASE_ID`. A permission rule blocks Bash access to that file, so it was left alone; the `Settings` field exists, so the variable already works.
 - **Resolved (2026-09-10):** the readiness audit (`docs/notion-pilot-crm-readiness-audit.md`) answered "is the public integration end-to-end ready" — no, and #28 closes the schema half of it. Still open from that audit: OAuth tokens live only in the signed cookie (`web/server.py`), so no background job can act on a workspace connected through the wizard, and the `notion-crm` MCP server binds one static workspace at import so it cannot serve per-user OAuth.
 
+## Where the work stands (2026-09-13)
+
+**PR stack merged into `develop`.** Tip `c38aea0`.
+
+| PR | Status |
+|---|---|
+| #27 landing + cockpit design system | merged |
+| #28 CRM v1 schema (Activities + Meetings) | merged |
+| #29 wizard parent page | merged (closed; base was stacked on #28) |
+
+**Next:** polish the Notion-side CRM template (views / dashboard / readiness), validate live, then prod cut for communication.
+
+Conflict resolution note: develop keeps #29 `parent_page_id` + capabilities + bounded search, with #27 monochrome tokens and tree wizard UI; `_setup_host` nests a named CRM under a chosen page.
+
 ## Where the work stands (2026-09-11)
 
 **Three PRs open, stacked. Nothing merged yet.**
