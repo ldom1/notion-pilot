@@ -175,13 +175,19 @@ class FakeViewsApi:
         if self.post_status != 200:
             return _resp(self.post_status, {"message": "Invalid filter"})
         n = len(self.posts)
-        return _resp(200, {"id": f"view-{n}", "parent": {"type": "database_id", "database_id": f"linked-{n}"}})
+        return _resp(
+            200,
+            {"id": f"view-{n}", "parent": {"type": "database_id", "database_id": f"linked-{n}"}},
+        )
 
 
 async def test_create_home_views_inserts_in_reverse_so_the_page_reads_in_order():
     api = FakeViewsApi()
     outcome = await create_home_views(
-        api, page_id="page", after_block_id="heading", databases={"Leads": "leads", "Activities": "acts"}
+        api,
+        page_id="page",
+        after_block_id="heading",
+        databases={"Leads": "leads", "Activities": "acts"},
     )
     assert [p["name"] for p in api.posts] == [s.name for s in reversed(VIEW_SPECS)]
     assert {p["create_database"]["position"]["block_id"] for p in api.posts} == {"heading"}
@@ -193,7 +199,10 @@ async def test_create_home_views_inserts_in_reverse_so_the_page_reads_in_order()
 async def test_missing_activities_skips_only_recent_activity():
     api = FakeViewsApi()
     outcome = await create_home_views(
-        api, page_id="page", after_block_id="heading", databases={"Leads": "leads", "Activities": None}
+        api,
+        page_id="page",
+        after_block_id="heading",
+        databases={"Leads": "leads", "Activities": None},
     )
     assert set(outcome.views) == {"pipeline", "needs_attention", "closing_soon"}
     assert [s.key for s in outcome.skipped] == ["recent_activity"]
@@ -218,11 +227,17 @@ async def test_missing_property_skips_the_view_with_a_specific_warning():
 async def test_refused_views_become_warnings_in_page_order():
     api = FakeViewsApi(post_status=400)
     outcome = await create_home_views(
-        api, page_id="page", after_block_id="heading", databases={"Leads": "leads", "Activities": "acts"}
+        api,
+        page_id="page",
+        after_block_id="heading",
+        databases={"Leads": "leads", "Activities": "acts"},
     )
     assert outcome.views == {}
     assert [s.key for s in outcome.skipped] == [s.key for s in VIEW_SPECS]
-    assert outcome.warnings[0] == "📊 Pipeline was not created: Notion refused it (400: Invalid filter)."
+    assert (
+        outcome.warnings[0]
+        == "📊 Pipeline was not created: Notion refused it (400: Invalid filter)."
+    )
     assert len(api.posts) == 4  # no retry on 400
 
 
@@ -243,15 +258,20 @@ class EmptyDataSourcesClient:
             return _resp(200, {"data_sources": [{"id": f"ds-{db_id}"}]})
         if method == "GET" and path.startswith("/data_sources/"):
             return _resp(200, {"properties": self.props})
-        return _resp(200, {"id": "view-1", "parent": {"type": "database_id", "database_id": "linked-1"}})
+        return _resp(
+            200, {"id": "view-1", "parent": {"type": "database_id", "database_id": "linked-1"}}
+        )
 
 
 async def test_empty_data_sources_does_not_raise_and_warns():
     client = EmptyDataSourcesClient()
     outcome = await create_home_views(
-        client, page_id="page", after_block_id="heading", databases={"Leads": "leads", "Activities": "acts"}
+        client,
+        page_id="page",
+        after_block_id="heading",
+        databases={"Leads": "leads", "Activities": "acts"},
     )
     assert set(outcome.views) == {"recent_activity"}
     assert [s.key for s in outcome.skipped] == ["pipeline", "needs_attention", "closing_soon"]
-    assert all("malformed API response (IndexError)" in w for w in outcome.warnings[:3])
+    assert all("Notion returned an unexpected response" in w for w in outcome.warnings[:3])
     assert client.database_gets.count("leads") == 1

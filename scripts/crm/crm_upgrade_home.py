@@ -34,8 +34,9 @@ async def main(crm_page_id: str) -> None:
     previous = json.loads(views_file.read_text()) if views_file.exists() else None
     async with httpx.AsyncClient(headers=headers, timeout=60) as client:
         result = await upgrade_crm_home(client, crm_page_id, previous_views=previous)
-    VIEWS_DIR.mkdir(parents=True, exist_ok=True)
-    views_file.write_text(json.dumps(result.views, indent=2))
+    if result.views:
+        VIEWS_DIR.mkdir(parents=True, exist_ok=True)
+        views_file.write_text(json.dumps(result.views, indent=2))
     logger.info("CRM home refreshed — {} of 4 views created", len(result.views))
     for warning in result.warnings:
         logger.warning(warning)
@@ -43,6 +44,8 @@ async def main(crm_page_id: str) -> None:
 
 if __name__ == "__main__":
     if len(sys.argv) != 3 or sys.argv[1] != "--crm-page-id":
-        logger.error("Usage: uv run python scripts/crm/crm_upgrade_home.py --crm-page-id <PAGE_ID_OR_URL>")
+        logger.error(
+            "Usage: uv run python scripts/crm/crm_upgrade_home.py --crm-page-id <PAGE_ID_OR_URL>"
+        )
         sys.exit(1)
     asyncio.run(main(page_id_from_url(sys.argv[2])))

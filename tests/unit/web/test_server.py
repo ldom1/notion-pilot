@@ -156,7 +156,11 @@ def test_setup_stream_forwards_view_warnings_and_saves_views():
             "/api/setup/stream",
             json={"scope": "crm", "workspace_name": "My CRM", "notion_token": "secret_manual"},
         )
-    events = [json.loads(line[len("data: "):]) for line in r.text.splitlines() if line.startswith("data: ")]
+    events = [
+        json.loads(line[len("data: ") :])
+        for line in r.text.splitlines()
+        if line.startswith("data: ")
+    ]
     assert {"type": "warning", "message": warning} in events
     assert events[-1]["type"] == "done"
     cfg = save.call_args.args[1]

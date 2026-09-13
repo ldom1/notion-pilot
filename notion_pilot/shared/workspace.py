@@ -265,12 +265,15 @@ async def _add_home_views(
     activities_id: str | None,
 ) -> ViewsOutcome:
     """Views under "This week"; manual steps after Sources for any view Notion refused."""
-    outcome = await create_home_views(
-        client,
-        page_id=page_id,
-        after_block_id=find_block(home, "heading_2", THIS_WEEK),
-        databases={"Leads": leads_id, "Activities": activities_id},
-    )
+    try:
+        outcome = await create_home_views(
+            client,
+            page_id=page_id,
+            after_block_id=find_block(home, "heading_2", THIS_WEEK),
+            databases={"Leads": leads_id, "Activities": activities_id},
+        )
+    except (KeyError, StopIteration, TypeError, httpx.HTTPError) as exc:
+        return ViewsOutcome(warnings=[f"Home views could not be wired ({exc})."])
     if outcome.skipped:
         try:
             await _append_blocks(
@@ -279,7 +282,7 @@ async def _add_home_views(
                 [manual_views_callout(outcome.skipped)],
                 after=find_block(home, "toggle", SOURCES_TITLE),
             )
-        except httpx.HTTPError as exc:
+        except (KeyError, StopIteration, TypeError, httpx.HTTPError) as exc:
             outcome.warnings.append(f"The manual steps could not be added to the page ({exc}).")
     return outcome
 
@@ -1645,21 +1648,25 @@ async def upgrade_crm_home(
 
     children = await _list_children(client, crm_page_id)
     databases = {
-        b["child_database"]["title"]: str(b["id"]) for b in children if b["type"] == "child_database"
+        b["child_database"]["title"]: str(b["id"])
+        for b in children
+        if b["type"] == "child_database"
     }
     leads_id = databases.get("Leads") or databases.get("Deals")
     activities_id = databases.get("Activities")
     for title, found in (("Leads", leads_id), ("Activities", activities_id)):
         if found is None:
-            warnings.append(f"The {title} database was not found on this page; its views were skipped.")
+            warnings.append(
+                f"The {title} database was not found on this page; its views were skipped."
+            )
 
     owned_texts = owned_template_texts()
-    owned = [
-        b for b in children if b["type"] != "child_database" and _plain_text(b) in owned_texts
-    ]
+    owned = [b for b in children if b["type"] != "child_database" and _plain_text(b) in owned_texts]
     anchor = str(owned[0]["id"]) if owned and owned[0]["id"] == children[0]["id"] else None
     if anchor is None:
-        warnings.append("The template was added at the bottom of the page. Drag it above the databases.")
+        warnings.append(
+            "The template was added at the bottom of the page. Drag it above the databases."
+        )
 
     leads_props: set[str] = set()
     if leads_id:

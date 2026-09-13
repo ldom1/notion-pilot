@@ -98,7 +98,10 @@ async def test_crm_home_views_contract():
             assert order[at + 1 : at + 5] == placed
 
             linked = [b for b in children if _bare(b["id"]) in placed]
-            print("linked view blocks as listed on 2022-06-28:", [(b["type"], b.get(b["type"])) for b in linked])
+            print(
+                "linked view blocks as listed on 2022-06-28:",
+                [(b["type"], b.get(b["type"])) for b in linked],
+            )
 
             r = await client.delete(f"{NOTION_API}/blocks/{outcome.views['pipeline']['block_id']}")
             # An upgrade can remove a linked view with the legacy client.

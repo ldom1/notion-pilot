@@ -18,7 +18,9 @@ _ALL_LEADS_PROPS = {
 
 
 def _resp(body: dict, status: int = 200) -> httpx.Response:
-    return httpx.Response(status, json=body, request=httpx.Request("GET", "https://api.notion.com/v1"))
+    return httpx.Response(
+        status, json=body, request=httpx.Request("GET", "https://api.notion.com/v1")
+    )
 
 
 def _block(block_id: str, block_type: str, text: str) -> dict:
@@ -68,10 +70,23 @@ class FakePage:
             return _resp({"data_sources": [{"id": "ds"}]})
         if path.startswith("/data_sources/"):
             names = self.leads_props | {"Date"}
-            return _resp({"properties": {n: {"id": n, "type": "select" if n == "Stage" else "date"} for n in names}})
+            return _resp(
+                {
+                    "properties": {
+                        n: {"id": n, "type": "select" if n == "Stage" else "date"} for n in names
+                    }
+                }
+            )
         linked = {**_database(self._new_id(), json["name"])}
-        self.children.insert(self._index(json["create_database"]["position"]["block_id"]) + 1, linked)
-        return _resp({"id": f"view-{linked['id']}", "parent": {"type": "database_id", "database_id": linked["id"]}})
+        self.children.insert(
+            self._index(json["create_database"]["position"]["block_id"]) + 1, linked
+        )
+        return _resp(
+            {
+                "id": f"view-{linked['id']}",
+                "parent": {"type": "database_id", "database_id": linked["id"]},
+            }
+        )
 
     def texts(self) -> list[str]:
         return [
@@ -86,7 +101,9 @@ def _telegram_era_page(*, with_activities: bool = True) -> FakePage:
         _block("v0-h2", "heading_2", "Getting started"),
         _block("v0-1", "numbered_list_item", "Add a company: /lead TechCorp"),
         _block("v0-2", "numbered_list_item", "Add contacts: /people Alice Martin, CTO @ TechCorp"),
-        _block("v0-3", "numbered_list_item", "Track a deal: /deal ERP Integration — TechCorp, €45k"),
+        _block(
+            "v0-3", "numbered_list_item", "Track a deal: /deal ERP Integration — TechCorp, €45k"
+        ),
         _block("user-note", "paragraph", "Q4 targets: 3 new logos"),
         _database("companies", "Companies"),
         _database("people", "People"),
@@ -121,7 +138,10 @@ async def test_upgrade_without_activities_skips_recent_activity_and_explains():
     page = _telegram_era_page(with_activities=False)
     result = await upgrade_crm_home(page, "crm")
     assert "recent_activity" not in result.views
-    assert "The Activities database was not found on this page; its views were skipped." in result.warnings
+    assert (
+        "The Activities database was not found on this page; its views were skipped."
+        in result.warnings
+    )
     assert "Some views need a minute in Notion" in page.texts()
 
 
@@ -146,4 +166,7 @@ async def test_upgrade_without_a_template_at_the_top_appends_and_warns():
     page = FakePage([_block("user-note", "paragraph", "Mine"), _database("leads", "Leads")])
     result = await upgrade_crm_home(page, "crm")
     assert page.children[0]["id"] == "user-note"
-    assert "The template was added at the bottom of the page. Drag it above the databases." in result.warnings
+    assert (
+        "The template was added at the bottom of the page. Drag it above the databases."
+        in result.warnings
+    )

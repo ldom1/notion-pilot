@@ -226,6 +226,60 @@ def _refusal(r: httpx.Response) -> str:
     return f"Notion refused it ({r.status_code}: {message})"
 
 
+async def _create_one_view(
+    client: httpx.AsyncClient,
+    spec: ViewSpec,
+    *,
+    page_id: str,
+    after_block_id: str,
+    databases: dict[str, str | None],
+    sources: dict[str, tuple[str, dict[str, JsonDict]]],
+    failed_sources: dict[str, str],
+    budget: Budget,
+    created: dict[str, dict[str, str]],
+) -> str | None:
+    """Create one linked view. Returns a skip reason, or None on success."""
+    if spec.source in failed_sources:
+        return failed_sources[spec.source]
+    try:
+        database_id = databases.get(spec.source)
+        if database_id is None:
+            return f"the {spec.source} database was not found"
+        if spec.source not in sources:
+            sources[spec.source] = await resolve_data_source(client, database_id, budget=budget)
+        data_source_id, props = sources[spec.source]
+        missing = [name for name in spec.requires if name not in props]
+        if missing:
+            return f"the {', '.join(missing)} property is missing"
+        r = await views_request(
+            client,
+            "POST",
+            "/views",
+            budget=budget,
+            json=view_body(
+                spec,
+                data_source_id=data_source_id,
+                page_id=page_id,
+                after_block_id=after_block_id,
+                props=props,
+            ),
+        )
+        if r.status_code != 200:
+            return _refusal(r)
+        body = r.json()
+        created[spec.key] = {
+            "view_id": str(body["id"]),
+            "block_id": str(body["parent"]["database_id"]),
+        }
+        return None
+    except BudgetExhausted:
+        return "the 20-second setup budget ran out"
+    except httpx.HTTPError as exc:
+        return f"the request failed ({exc})"
+    except (IndexError, KeyError, TypeError, json.JSONDecodeError):
+        return "Notion returned an unexpected response"
+
+
 async def create_home_views(
     client: httpx.AsyncClient,
     *,
@@ -244,57 +298,19 @@ async def create_home_views(
     sources: dict[str, tuple[str, dict[str, JsonDict]]] = {}
     failed_sources: dict[str, str] = {}
     for spec in reversed(VIEW_SPECS):
-        reason: str | None = None
-        if spec.source in failed_sources:
-            reason = failed_sources[spec.source]
-        else:
-            try:
-                database_id = databases.get(spec.source)
-                if database_id is None:
-                    reason = f"the {spec.source} database was not found"
-                else:
-                    if spec.source not in sources:
-                        sources[spec.source] = await resolve_data_source(
-                            client, database_id, budget=budget
-                        )
-                    data_source_id, props = sources[spec.source]
-                    missing = [name for name in spec.requires if name not in props]
-                    if missing:
-                        reason = f"the {', '.join(missing)} property is missing"
-                    else:
-                        r = await views_request(
-                            client,
-                            "POST",
-                            "/views",
-                            budget=budget,
-                            json=view_body(
-                                spec,
-                                data_source_id=data_source_id,
-                                page_id=page_id,
-                                after_block_id=after_block_id,
-                                props=props,
-                            ),
-                        )
-                        if r.status_code == 200:
-                            created = r.json()
-                            outcome.views[spec.key] = {
-                                "view_id": str(created["id"]),
-                                "block_id": str(created["parent"]["database_id"]),
-                            }
-                        else:
-                            reason = _refusal(r)
-            except BudgetExhausted:
-                reason = "the 20-second setup budget ran out"
-            except httpx.HTTPError as exc:
-                reason = f"the request failed ({exc})"
-            except (IndexError, KeyError, json.JSONDecodeError) as exc:
-                reason = f"malformed API response ({type(exc).__name__})"
-            if (
-                reason
-                and databases.get(spec.source) is not None
-                and spec.source not in sources
-            ):
-                failed_sources[spec.source] = reason
+        reason = await _create_one_view(
+            client,
+            spec,
+            page_id=page_id,
+            after_block_id=after_block_id,
+            databases=databases,
+            sources=sources,
+            failed_sources=failed_sources,
+            budget=budget,
+            created=outcome.views,
+        )
+        if reason and databases.get(spec.source) is not None and spec.source not in sources:
+            failed_sources[spec.source] = reason
         if reason:
             outcome.warnings.append(f"{spec.name} was not created: {reason}.")
             outcome.skipped.append(spec)

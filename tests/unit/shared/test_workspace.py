@@ -5,13 +5,19 @@ import httpx
 import pytest
 import respx
 
+from notion_pilot.shared.notion_views import VIEW_SPECS
 from notion_pilot.shared.workspace import (
     NOTION_API,
     CRMWorkspaceResult,
     InboxWorkspaceResult,
+    SOURCES_TITLE,
+    THIS_WEEK,
+    _DEMO_DEALS,
+    _plain_text,
     create_crm_workspace,
     create_inbox_workspace,
     create_workspace_root_page,
+    crm_home_blocks,
 )
 
 
@@ -85,7 +91,13 @@ def _make_mock_client(
         if path.startswith("/databases/"):
             return httpx.Response(200, json={"data_sources": [{"id": "ds"}]}, request=req)
         if path.startswith("/data_sources/"):
-            names = ("Stage", "Stale Deal", "Days Since Last Activity", "Expected Close Date", "Date")
+            names = (
+                "Stage",
+                "Stale Deal",
+                "Days Since Last Activity",
+                "Expected Close Date",
+                "Date",
+            )
             props = {n: {"id": n, "type": "select" if n == "Stage" else "date"} for n in names}
             return httpx.Response(200, json={"properties": props}, request=req)
         view_posts.append(json)
@@ -94,7 +106,10 @@ def _make_mock_client(
         n = len(view_posts)
         return httpx.Response(
             200,
-            json={"id": f"view-{n}", "parent": {"type": "database_id", "database_id": f"linked-{n}"}},
+            json={
+                "id": f"view-{n}",
+                "parent": {"type": "database_id", "database_id": f"linked-{n}"},
+            },
             request=req,
         )
 
@@ -263,16 +278,6 @@ async def test_create_workspace_root_page():
     assert "children" in body
 
 
-from notion_pilot.shared.notion_views import VIEW_SPECS
-from notion_pilot.shared.workspace import (
-    SOURCES_TITLE,
-    THIS_WEEK,
-    _DEMO_DEALS,
-    _plain_text,
-    crm_home_blocks,
-)
-
-
 async def test_crm_page_is_created_empty_then_gets_the_home_template():
     mock_client = _make_mock_client(_CRM_IDS)
     await create_crm_workspace(mock_client, "parent-page-id")
@@ -301,6 +306,19 @@ async def test_refused_views_do_not_abort_and_leave_manual_steps_after_sources()
     callout = mock_client.appended[1]
     assert callout["after"] == f"block-{sources}"
     assert _plain_text(callout["children"][0]) == "Some views need a minute in Notion"
+
+
+async def test_home_views_wiring_failure_degrades_to_warnings(monkeypatch):
+    mock_client = _make_mock_client(_CRM_IDS)
+
+    def boom(*_a, **_k):
+        raise StopIteration
+
+    monkeypatch.setattr("notion_pilot.shared.workspace.find_block", boom)
+    result = await create_crm_workspace(mock_client, "parent-page-id")
+    assert result.crm_page_id == "crm-page"
+    assert result.views == {}
+    assert any("Home views could not be wired" in w for w in result.warnings)
 
 
 def test_demo_deals_fill_every_home_view_on_day_zero():
