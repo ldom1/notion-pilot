@@ -41,6 +41,14 @@ body { font-family: var(--font); caret-color: var(--ink); background: var(--surf
 .nav-login { color: var(--ink); background: var(--bg); text-decoration: none; font-size: 0.85rem; font-weight: 600; padding: 0.5rem 1rem; border: 1px solid var(--rule-strong); border-radius: var(--r); }
 .nav-login:hover { background: var(--surface); border-color: var(--ink); }
 
+.docs-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem 1.5rem; }
+@media (max-width: 720px) { .docs-grid { grid-template-columns: 1fr; } }
+.docs-group h3 { margin: 0 0 0.65rem; font-size: 0.84rem; font-weight: 700; letter-spacing: -0.02em; }
+.docs-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; }
+.panel .docs-group a { font-size: 0.78rem; font-weight: 600; color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--rule); transition: border-color 120ms ease; }
+.panel .docs-group a:hover, .panel .docs-group a:focus-visible { border-bottom-color: var(--ink); }
+.docs-group p { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.74rem; line-height: 1.45; }
+
 /* ── DB Grid ── */
 .db-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
 @media (max-width: 880px) { .db-grid { grid-template-columns: repeat(2, 1fr); } }

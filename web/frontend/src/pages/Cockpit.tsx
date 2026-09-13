@@ -4,6 +4,7 @@ import Header from "../components/Header";
 import { Spinner } from "../components/Spinner";
 import { McpPanel } from "../features/mcp/McpPanel";
 import { ChatPanel } from "../features/chat/ChatPanel";
+import { SourcesPanel } from "../features/docs/SourcesPanel";
 import { SetupWizard } from "../features/setup/SetupWizard";
 import { WorkspacePanel, DatabaseEntry } from "../features/workspace/WorkspacePanel";
 
@@ -146,6 +147,7 @@ const Cockpit: React.FC = () => {
           onRedeploy={() => setShowRedeploy(true)}
         />
         <McpPanel />
+        <SourcesPanel />
       </div>
 
       {showRedeploy && (
