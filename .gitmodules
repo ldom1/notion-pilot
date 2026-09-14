@@ -1,0 +1,3 @@
+[submodule "vendor/notion-pilot-powers"]
+	path = vendor/notion-pilot-powers
+	url = https://github.com/ldom1/notion-pilot-powers.git

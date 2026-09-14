@@ -47,7 +47,7 @@ class TestApplyReviewSurvivesEnrichmentFailure:
     """--apply-review upserts a human-approved person even when enrichment raises.
 
     Regression guard for the resilience regression identified in the whole-branch
-    review: notion_pilot.shared.prosper_client.enrich_person no longer swallows its
+    review: notion_pilot_powers.core.prosper_client.enrich_person no longer swallows its
     own exceptions (unlike the deleted enrichment.py cascade), so process_email.py
     must catch failures at the call site instead — matching the pattern already
     used in scripts/crm/crm_import_linkedin.py.

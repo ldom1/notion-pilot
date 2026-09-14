@@ -12,8 +12,8 @@ import asyncio
 from loguru import logger
 from notion_client import AsyncClient
 
-from notion_pilot.crm.prospection import rank_contacts
-from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer
+from notion_pilot_powers.core.prospection import rank_contacts
+from notion_pilot_powers.core.syncer import NotionCompanySyncer, NotionPeopleSyncer
 from notion_pilot.shared.config import load_settings
 
 

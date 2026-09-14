@@ -1,12 +1,13 @@
 [project]
 name = "notion-pilot"
 dynamic = ["version"]
-description = "Self-hosted Notion automation platform — CRM and knowledge inbox, piloted by Telegram"
+description = "Self-hosted Notion automation — CRM + knowledge inbox (Telegram optional)"
 requires-python = ">=3.12"
 license = { file = "LICENSE" }
 authors = [{ name = "Louis Giron", email = "louis@giron-dom.eu" }]
 readme = "README.md"
 dependencies = [
+    "notion-pilot-powers",
     "python-telegram-bot>=21.0",
     "notion-client>=2.2.1",
     "pydantic-settings>=2.5.0",
@@ -27,8 +28,10 @@ dependencies = [
     "itsdangerous>=2.1",
     "pyyaml>=6.0",
     "pandas>=3.0.3",
-    "mcp>=1.28.1",
 ]
+
+[tool.uv.sources]
+notion-pilot-powers = { path = "vendor/notion-pilot-powers", editable = true }
 
 [project.optional-dependencies]
 [dependency-groups]

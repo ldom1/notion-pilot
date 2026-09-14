@@ -23,6 +23,8 @@ WORKDIR /app
 ENV SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0
 
 # Install dependencies only first (cached layer — rebuilds only when pyproject.toml / uv.lock change)
+# Path dep notion-pilot-powers lives under vendor/ — must exist before uv sync.
+COPY vendor/ vendor/
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 

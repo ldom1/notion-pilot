@@ -11,15 +11,13 @@ import re
 import secrets
 import sys
 import time as _time
-from contextlib import AsyncExitStack, asynccontextmanager
-from typing import AsyncGenerator, AsyncIterator
+from typing import AsyncGenerator
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
-from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import Response
@@ -249,31 +247,7 @@ async def _list_parent_pages(client: httpx.AsyncClient) -> list[dict[str, object
 
 
 def create_app(settings: Settings) -> FastAPI:
-    mcp_session_manager: StreamableHTTPSessionManager | None = None
-
-    @asynccontextmanager
-    async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
-        async with AsyncExitStack() as stack:
-            if mcp_session_manager is not None:
-                await stack.enter_async_context(mcp_session_manager.run())
-            yield
-
-    app = FastAPI(title="Notion Pilot", docs_url=None, redoc_url=None, lifespan=_lifespan)
-
-    if settings.notion_token and settings.mcp_bearer_token:
-        from notion_pilot.mcp.server import build_http_app, mcp as mcp_server
-
-        app.mount("/mcp", build_http_app(settings.mcp_bearer_token.get_secret_value()))
-        mcp_session_manager = mcp_server.session_manager
-        logger.info("MCP server mounted at /mcp (streamable-http, bearer-token gated)")
-
-        # Starlette's Mount only matches "/mcp/..." (trailing slash required);
-        # a bare "/mcp" would otherwise fall through to the SPA catch-all below
-        # and 404/405 instead of reaching the MCP app. Redirect it explicitly —
-        # 307 preserves the method/body so POST clients still work.
-        @app.api_route("/mcp", methods=["GET", "POST", "DELETE"], include_in_schema=False)
-        async def _mcp_trailing_slash_redirect() -> RedirectResponse:
-            return RedirectResponse(url="/mcp/", status_code=307)
+    app = FastAPI(title="Notion Pilot", docs_url=None, redoc_url=None)
 
     session_secret = (
         settings.web_session_secret.get_secret_value()
@@ -1069,8 +1043,8 @@ def create_app(settings: Settings) -> FastAPI:
         """Log an activity against the session's own workspace.
 
         Mirrors create-deal: OAuth cookie token plus the Activities id persisted
-        by the deploy wizard. The MCP log_activity tool cannot serve this path —
-        it binds the operator's static token at import (notion_pilot/mcp/server.py).
+        by the deploy wizard. Local MCP (notion-pilot-powers) binds a static
+        token and cannot serve this per-session OAuth path.
         """
         token = _require_token(request)
         db_ids = _resolve_db_ids(_workspace_id(request))

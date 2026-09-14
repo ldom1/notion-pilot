@@ -190,18 +190,17 @@ notion_pilot/
 │   ├── adapters/          # Telegram / email / Discord (optional extras)
 │   ├── llm/               # OpenRouter synthesis, prompts, CRM chat
 │   ├── media/             # Photo + voice; on-device transcription
-│   ├── config.py          # Pydantic settings from .env
+│   ├── config.py          # Settings(CRMSettings) + Infisical / Telegram / web
 │   ├── models.py          # IncomingMessage + Notion properties
 │   └── notion.py          # NotionDatabaseWriter
 ├── inbox/                 # Knowledge inbox vertical
 │   ├── pipeline.py        # interpret_message → create_page
 │   ├── knowledge.py
 │   └── people.py
-├── crm/                   # CRM vertical
-│   ├── syncer.py          # People / companies sync + dedup
-│   ├── deals.py / activities.py / queries.py / prospection.py
+├── crm/                   # Platform CRM (Telegram commands, inbox queries)
+│   ├── queries.py         # get_inbox_items (CRM reads live in powers)
 │   └── commands.py        # Optional Telegram CRM commands
-└── mcp/                   # MCP tools over the same CRM logic
+vendor/notion-pilot-powers/  # Path submodule: CRM core + stdio MCP
 ```
 
 ## Agent skills: Artelys CRM
@@ -213,55 +212,21 @@ Canonical skills under `skills/` (symlinked into `.cursor/skills/` and `.claude/
 
 ## MCP server
 
-`notion_pilot/mcp/` exposes the CRM vertical's existing capabilities (fuzzy-dedup'd upsert, enrichment, duplicate scan, pitch-based ranking, read queries) as MCP tools over stdio, so any MCP-aware client (e.g. Claude Code, from this project or another) can ingest, dedup, enrich, and query Notion CRM data directly — without reinventing any of the matching/enrichment logic already proven in `crm/` and `shared/utils/`. It's a thin wrapper: `session.py` caches a `NotionCompanySyncer`/`NotionPeopleSyncer` snapshot for the process lifetime (background pre-warm at startup), and `tools.py` calls straight into the existing syncer/dedup/enrichment/prospection/queries functions.
-
-Register it as an MCP server (e.g. in a project's `.claude/settings.json`, or Cursor's `.cursor/mcp.json` — this repo ships the latter):
+CRM tools live in the **`notion-pilot-powers`** submodule (`vendor/notion-pilot-powers`), installed as an editable path dependency. Run over stdio:
 
 ```json
 {
   "mcpServers": {
     "notion-crm": {
       "command": "uv",
-      "args": ["--directory", "/home/lgiron/lab_perso/notion-pilot", "run", "python", "-m", "notion_pilot.mcp.server"]
+      "args": ["--directory", "/path/to/notion-pilot", "run", "python", "-m", "notion_pilot_powers.mcp.server"]
     }
   }
 }
 ```
 
-Tools:
+Tools (same surface as before the split): `upsert_people`, `upsert_companies`, `find_duplicates`, `enrich_people`, `enrich_companies`, `rank_contacts_for_pitch`, `search_people`, `search_companies`, `get_recent_people`, `get_open_leads`, `get_activities`, `refresh_notion_snapshot`, `upsert_deal`, `log_activity`. Write tools default to `confirm=false`.
 
-| Tool | Description |
-|---|---|
-| `upsert_people` | Upsert people into the Notion People database, dedup-checked (exact email/LinkedIn match, then fuzzy name+company). Defaults to a dry-run preview (`confirm=false`) — pass `confirm=true` to actually write. A `needs_review` result can be created anyway with `force=true`. |
-| `upsert_companies` | Upsert companies into the Notion Companies database, dedup-checked (contact-email domain, exact name, acronym/subset name). New companies get SIREN + sector/size/country enriched — prosper first, falling back to the French government company registry — shown in the preview for approval and written on `confirm=true`. A `needs_review` result can be created anyway with `force=true`. |
-| `find_duplicates` | Find likely-duplicate People/Companies pairs already in Notion via fuzzy name matching. `target`: `people`, `companies`, or `both`. |
-| `enrich_people` | Enrich People records missing seniority/role/email via prosper's `enrich_person` MCP tool. Defaults to a dry-run preview. |
-| `enrich_companies` | Enrich Company records missing sector/size/country/LinkedIn via prosper's `enrich_company` MCP tool. Defaults to a dry-run preview. |
-| `rank_contacts_for_pitch` | Rank existing CRM contacts by relevance to a B2B sales pitch (LLM-powered). |
-| `search_people` | Fuzzy-search existing People by name/company — read-only, no write. |
-| `search_companies` | Fuzzy-search existing Companies by name — read-only, no write. |
-| `get_recent_people` | People added to Notion in the last 7 days. |
-| `get_open_leads` | Open (non-closed) deals from the Deals database ("Leads" in the cockpit UI), including `page_id` for linking Activities. |
-| `get_activities` | Recent Activities (calls, meetings, emails, ...), newest first. Pass `deal_page_id` to scope to one Deal. |
-| `refresh_notion_snapshot` | Force-reload the cached People/Companies snapshot from Notion (use if the Telegram bot or web cockpit may have written since this session started). |
-| `upsert_deal` | Upsert a Deal into the Deals database, matched against existing deals by exact title. `company_name` resolved the same way as `upsert_companies`; `contact_page_id`/`primary_contact_page_id` must be existing People page ids. Defaults to a dry-run preview. Requires `NOTION_DEALS_DATABASE_ID`. |
-| `log_activity` | Log an Activity (call, meeting, email, ...) — an append-only event, not dedup-checked like People/Companies/Deals. `deal_page_id`/`person_page_id`/`company_page_id` must be existing page ids. Defaults to a dry-run preview. Requires `NOTION_ACTIVITIES_DATABASE_ID`. |
-
-All write tools default to `confirm=false` (dry-run preview, no Notion write) and require an explicit `confirm=true` to actually write.
-
-### Remote access (HTTP)
-
-The same tools are also reachable over HTTP — mounted at `/mcp` on the deployed web service, gated by a static bearer token — for MCP clients that can't spawn a local subprocess. Set `NOTION_TOKEN` and `MCP_BEARER_TOKEN` (see `.env.example`); the mount is skipped entirely if either is unset. Note this endpoint always acts on that single `NOTION_TOKEN` workspace, not any per-session OAuth workspace connected through the cockpit UI.
-
-```json
-{
-  "mcpServers": {
-    "notion-crm": {
-      "url": "https://notion-pilot.dombot.tech/mcp",
-      "headers": { "Authorization": "Bearer <MCP_BEARER_TOKEN>" }
-    }
-  }
-}
-```
+The former HTTP `/mcp` mount on the web service was removed — use local stdio (or Notion’s official MCP) instead.
 
 Contributions welcome. Short & sharp.

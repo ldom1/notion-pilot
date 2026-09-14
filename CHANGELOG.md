@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **P3 vendor split:** CRM core + stdio MCP live in `vendor/notion-pilot-powers` (editable path dep). `Settings` subclasses `CRMSettings`. HTTP `/mcp` mount removed from the web server (use local `python -m notion_pilot_powers.mcp.server`). Docker/CI fetch the submodule. Lock resolves `notion-client` to 2.x (powers `~=2.2`).
 - Messaging aligned on CRM-you-own / AI assistant (HITL): README lead and setup no longer require Telegram; Telegram/email/Discord are optional adapters. Canonical public URL is `https://notion-pilot.com/` (`notion-pilot.dombot.tech` 301s there).
 - Landing SEO: canonical, Open Graph/Twitter, JSON-LD, self-hosted Archivo/IBM Plex (no Google Fonts), `<main>` landmark, schema heading order, `.lp-who` contrast; unused agent/collab films removed from the web build (sources stay under `promotion/video/`).
 - Web server: serves `/robots.txt`, `/sitemap.xml`, `/og-image.jpg`, `/film/*`, `/fonts/*` before the SPA catch-all; long-cache for assets/fonts/film; security headers (HSTS, nosniff, Referrer-Policy, Permissions-Policy, X-Frame-Options).

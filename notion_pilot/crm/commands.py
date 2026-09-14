@@ -46,7 +46,7 @@ def _notion_token(settings: Settings) -> str:
 async def _handle_people(collected: dict[str, str], settings: Settings) -> str:
     from notion_client import AsyncClient
 
-    from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
+    from notion_pilot_powers.core.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
 
     client = AsyncClient(auth=_notion_token(settings))
     company_syncer = NotionCompanySyncer(client, settings.notion_companies_data_source_id or "")
@@ -71,7 +71,7 @@ async def _handle_people(collected: dict[str, str], settings: Settings) -> str:
 async def _handle_company(collected: dict[str, str], settings: Settings) -> str:
     from notion_client import AsyncClient
 
-    from notion_pilot.crm.syncer import NotionCompanySyncer
+    from notion_pilot_powers.core.syncer import NotionCompanySyncer
 
     client = AsyncClient(auth=_notion_token(settings))
     syncer = NotionCompanySyncer(client, settings.notion_companies_data_source_id or "")
@@ -83,7 +83,7 @@ async def _handle_company(collected: dict[str, str], settings: Settings) -> str:
 async def _handle_deal(collected: dict[str, str], settings: Settings) -> str:
     import httpx as _httpx
 
-    from notion_pilot.crm.deals import DealRecord, NotionDealsSyncer
+    from notion_pilot_powers.core.deals import DealRecord, NotionDealsSyncer
 
     if not settings.notion_deals_database_id:
         return "⚠ NOTION_DEALS_DATABASE_ID not set — cannot create deal."

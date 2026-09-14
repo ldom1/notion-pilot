@@ -19,8 +19,8 @@ from pathlib import Path
 import httpx
 from notion_client import AsyncClient
 
-from notion_pilot.crm.deals import NotionDealsSyncer
-from notion_pilot.crm.syncer import NotionCompanySyncer
+from notion_pilot_powers.core.deals import NotionDealsSyncer
+from notion_pilot_powers.core.syncer import NotionCompanySyncer
 from notion_pilot.shared.config import load_settings
 
 _DEFAULT_OUT_DIR = Path("/home/lgiron/artelys_crystal_hpc/lead-generation")
