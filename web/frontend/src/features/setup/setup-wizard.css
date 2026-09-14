@@ -495,7 +495,6 @@
 @media (prefers-reduced-motion: reduce) {
   .lp-setup-bg::before,
   .lp-setup-bg::after,
-  .lp-setup-bg-edges,
   .lp-setup-bg-pulse,
   .lp-setup-tree-spin {
     animation: none;
