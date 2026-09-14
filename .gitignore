@@ -112,8 +112,6 @@ promotion/video/hyperframes/*/snapshots/
 .agents/*
 !.agents/product-marketing.md
 skills/*
-!skills/company-open-data-enrichment/
-!skills/notion-crm-ops/
 .claude/skills/*
-!.claude/skills/company-open-data-enrichment
-!.claude/skills/notion-crm-ops
+!.claude/skills/artelys-crm/
+!.claude/skills/artelys-crm/**

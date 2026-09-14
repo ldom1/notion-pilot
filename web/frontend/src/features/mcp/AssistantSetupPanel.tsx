@@ -4,7 +4,7 @@ const NOTION_MCP = "https://mcp.notion.com/mcp";
 const NOTION_MCP_DOCS = "https://developers.notion.com/guides/mcp/get-started-with-mcp";
 const NOTION_MCP_HELP = "https://www.notion.com/help/notion-mcp";
 const CLAUDE_CONNECTOR = "https://claude.com/connectors/notion";
-const REPO = "https://github.com/ldom1/notion-pilot";
+const REPO = "https://github.com/ldom1/notion-pilot-powers";
 
 const MCP_SNIPPET = `# Claude Code
 claude mcp add --transport http notion ${NOTION_MCP}
@@ -17,18 +17,18 @@ claude mcp add --transport http notion ${NOTION_MCP}
   }
 }`;
 
-const INSTALL_SNIPPET = `/plugin marketplace add ldom1/notion-pilot
-/plugin install notion-crm@notion-pilot`;
+const INSTALL_SNIPPET = `/plugin marketplace add ldom1/notion-pilot-powers
+/plugin install notion-pilot-powers@notion-pilot-powers`;
 
 const SKILLS = [
   {
-    name: "notion-crm-ops",
-    href: `${REPO}/tree/develop/skills/notion-crm-ops`,
+    name: "crm-ops",
+    href: `${REPO}/tree/main/skills/crm-ops`,
     body: "Operate the CRM — create and update leads, log activities, enrich people and companies. Always a validation table, then wait for your go.",
   },
   {
-    name: "company-open-data-enrichment",
-    href: `${REPO}/tree/develop/skills/company-open-data-enrichment`,
+    name: "company-enrichment",
+    href: `${REPO}/tree/main/skills/company-enrichment`,
     body: "Fill French firmographics from open data (SIREN, NAF/APE, BODACC, RNE) instead of typing them. Same preview-then-go discipline.",
   },
 ] as const;
@@ -53,7 +53,7 @@ export function AssistantSetupPanel() {
 
       <p className="setup-lede">
         The CRM lives in Notion. Connect your assistant from Notion&apos;s own
-        settings, then give it the Pilot skills so every write is a preview until
+        settings, then install the Pilot plugin so every write is a preview until
         you approve.
       </p>
 
@@ -86,27 +86,19 @@ export function AssistantSetupPanel() {
         </div>
 
         <div className="setup-step">
-          <h3>2. Install the skills</h3>
+          <h3>2. Install the plugin</h3>
           <p>
-            An MCP connection only gives hands — the skills are the instructions.
-            Open the two guides and add them to your assistant (Claude project,
-            Mistral agent, ChatGPT custom instructions, or Cursor rules) so every
-            write is a preview until you approve.
+            An MCP connection only gives hands — the plugin skills are the
+            instructions. In Claude Code, run the two commands below (marketplace
+            add, then install).
           </p>
-          <div className="setup-docs">
-            {SKILLS.map((s) => (
-              <a key={s.name} href={s.href} target="_blank" rel="noopener noreferrer">
-                {s.name} →
-              </a>
-            ))}
-          </div>
           <ForTheDev>
             <div className="log-body">
               <pre className="log-line">{INSTALL_SNIPPET}</pre>
             </div>
             <div className="setup-docs">
-              <a href={`${REPO}#agent-skills-artelys-crm`} target="_blank" rel="noopener noreferrer">
-                Skills in the repo →
+              <a href={REPO} target="_blank" rel="noopener noreferrer">
+                notion-pilot-powers →
               </a>
             </div>
           </ForTheDev>

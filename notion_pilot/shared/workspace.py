@@ -137,6 +137,10 @@ _ASSISTANT_PROMPT = (
     "<paste the email>"
 )
 _ASSISTANT_SETUP = (
+    "/plugin marketplace add ldom1/notion-pilot-powers\n"
+    "/plugin install notion-pilot-powers@notion-pilot-powers"
+)
+_LEGACY_ASSISTANT_SETUP = (
     "claude mcp add --transport http notion https://mcp.notion.com/mcp\n"
     "/plugin marketplace add ldom1/notion-pilot\n"
     "/plugin install notion-crm@notion-pilot"
@@ -168,6 +172,7 @@ LEGACY_TEMPLATE_TEXTS = frozenset(
         "Track a deal: /deal ERP Integration — TechCorp, €45k",
         "💡 Tip: switch the Deals view to Board (group by Stage) for a Kanban pipeline."
         " In Notion: ··· → Add a view → Board.",
+        _LEGACY_ASSISTANT_SETUP,
     }
 )
 

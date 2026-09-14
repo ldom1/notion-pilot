@@ -39,7 +39,14 @@ def test_prompt_uses_seeded_names_and_promises_a_preview():
     assert "Here is an email from Alice Martin at TechCorp." in text
     assert "Nothing is written until you reply go." in text
     assert "These run in your assistant, not in Notion." in text
+    assert "/plugin marketplace add ldom1/notion-pilot-powers" in text
+    assert "/plugin install notion-pilot-powers@notion-pilot-powers" in text
+    assert "notion-crm@notion-pilot" not in text
 
+
+def test_legacy_keeps_old_plugin_install_for_refresh():
+    assert any("notion-crm@notion-pilot" in t for t in LEGACY_TEMPLATE_TEXTS)
+    assert any("marketplace add ldom1/notion-pilot\n" in t for t in LEGACY_TEMPLATE_TEXTS)
 
 def test_sources_toggle_links_every_doc_link():
     blocks = crm_home_blocks()

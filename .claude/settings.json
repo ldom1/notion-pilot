@@ -5,7 +5,7 @@
       "args": [
         "code-index-mcp",
         "--project-path",
-        "/home/lgiron/lab_perso/notion-pilot"
+        "/home/lgiron/lab/notion-pilot"
       ]
     },
     "qmd": {
@@ -17,19 +17,12 @@
         "INDEX_PATH": "/home/lgiron/vault-qmd/brain.db"
       }
     },
-    "notion-crm": {
-      "command": "uv",
+    "artelys-crm": {
+      "command": "sh",
       "args": [
-        "--directory",
-        "/home/lgiron/lab_perso/notion-pilot",
-        "run",
-        "python",
-        "-m",
-        "notion_pilot_powers.mcp.server"
-      ],
-      "env": {
-        "INFISICAL_ENV": "dev"
-      }
+        "-c",
+        "cd /home/lgiron/lab/notion-pilot && infisical run --env dev --path / -- uv --directory vendor/notion-pilot-powers run notion-pilot-powers --with-external"
+      ]
     }
   },
   "worktree": {
