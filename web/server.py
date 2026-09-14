@@ -16,7 +16,7 @@ from typing import AsyncGenerator, AsyncIterator
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
@@ -287,17 +287,33 @@ def create_app(settings: Settings) -> FastAPI:
         "script-src 'self'; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data:; "
+        "media-src 'self'; "
         "connect-src 'self'; "
-        "font-src 'self'"
+        "font-src 'self'; "
+        "frame-ancestors 'none'"
     )
 
-    class _CSPMiddleware(BaseHTTPMiddleware):
+    class _SecurityHeadersMiddleware(BaseHTTPMiddleware):
         async def dispatch(self, request: Request, call_next: object) -> Response:
             response: Response = await call_next(request)  # type: ignore[operator]
             response.headers["Content-Security-Policy"] = _CSP
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+            response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+            response.headers["X-Frame-Options"] = "DENY"
+            fwd = request.headers.get("x-forwarded-proto", "")
+            if request.url.scheme == "https" or fwd == "https":
+                response.headers["Strict-Transport-Security"] = (
+                    "max-age=31536000; includeSubDomains"
+                )
+            path = request.url.path
+            if path.startswith(("/assets/", "/film/", "/fonts/")):
+                response.headers.setdefault(
+                    "Cache-Control", "public, max-age=31536000, immutable"
+                )
             return response
 
-    app.add_middleware(_CSPMiddleware)
+    app.add_middleware(_SecurityHeadersMiddleware)
 
     # ── Session helpers ───────────────────────────────────────────────────────
 
@@ -1456,6 +1472,7 @@ def create_app(settings: Settings) -> FastAPI:
 
     _static = pathlib.Path(__file__).parent / "static"
     if _static.exists():
+        _static_root = _static.resolve()
         # Vite bundles assets to /assets/ — mount before the catch-all
         _assets_dir = _static / "assets"
         if _assets_dir.exists():
@@ -1467,6 +1484,10 @@ def create_app(settings: Settings) -> FastAPI:
         _film_dir = _static / "film"
         if _film_dir.exists():
             app.mount("/film", StaticFiles(directory=str(_film_dir)), name="film")
+
+        _fonts_dir = _static / "fonts"
+        if _fonts_dir.exists():
+            app.mount("/fonts", StaticFiles(directory=str(_fonts_dir)), name="fonts")
 
         app.mount("/static", StaticFiles(directory=str(_static)), name="static")
 
@@ -1482,9 +1503,42 @@ def create_app(settings: Settings) -> FastAPI:
                 headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
             )
 
+        def _serve_static_file(rel: str) -> FileResponse | None:
+            candidate = (_static / rel).resolve()
+            try:
+                candidate.relative_to(_static_root)
+            except ValueError:
+                return None
+            if not candidate.is_file():
+                return None
+            return FileResponse(
+                candidate,
+                headers={"Cache-Control": "public, max-age=3600"},
+            )
+
         @app.get("/", response_class=HTMLResponse)
         async def index() -> HTMLResponse:
             return _serve_spa()
+
+        @app.get("/robots.txt", include_in_schema=False, response_model=None)
+        async def robots_txt() -> FileResponse | HTMLResponse:
+            return _serve_static_file("robots.txt") or HTMLResponse(
+                "User-agent: *\nDisallow:\n", media_type="text/plain"
+            )
+
+        @app.get("/sitemap.xml", include_in_schema=False, response_model=None)
+        async def sitemap_xml() -> FileResponse | HTMLResponse:
+            file = _serve_static_file("sitemap.xml")
+            if file is None:
+                raise HTTPException(status_code=404, detail="sitemap missing")
+            return file
+
+        @app.get("/og-image.jpg", include_in_schema=False, response_model=None)
+        async def og_image() -> FileResponse:
+            file = _serve_static_file("og-image.jpg")
+            if file is None:
+                raise HTTPException(status_code=404, detail="og image missing")
+            return file
 
         @app.get("/cockpit", response_class=HTMLResponse, response_model=None)
         async def cockpit_page(request: Request) -> HTMLResponse | RedirectResponse:
@@ -1493,8 +1547,12 @@ def create_app(settings: Settings) -> FastAPI:
             return _serve_spa()
 
         # SPA catch-all: any non-API, non-auth, non-asset path → index.html
-        @app.get("/{full_path:path}", response_class=HTMLResponse, include_in_schema=False)
-        async def spa_fallback(full_path: str) -> HTMLResponse:
+        @app.get("/{full_path:path}", response_class=HTMLResponse, include_in_schema=False, response_model=None)
+        async def spa_fallback(full_path: str) -> HTMLResponse | FileResponse:
+            if ".." not in full_path:
+                file = _serve_static_file(full_path)
+                if file is not None:
+                    return file
             return _serve_spa()
 
     return app
