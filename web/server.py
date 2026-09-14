@@ -308,9 +308,7 @@ def create_app(settings: Settings) -> FastAPI:
                 )
             path = request.url.path
             if path.startswith(("/assets/", "/film/", "/fonts/")):
-                response.headers.setdefault(
-                    "Cache-Control", "public, max-age=31536000, immutable"
-                )
+                response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
             return response
 
     app.add_middleware(_SecurityHeadersMiddleware)
@@ -1547,7 +1545,12 @@ def create_app(settings: Settings) -> FastAPI:
             return _serve_spa()
 
         # SPA catch-all: any non-API, non-auth, non-asset path → index.html
-        @app.get("/{full_path:path}", response_class=HTMLResponse, include_in_schema=False, response_model=None)
+        @app.get(
+            "/{full_path:path}",
+            response_class=HTMLResponse,
+            include_in_schema=False,
+            response_model=None,
+        )
         async def spa_fallback(full_path: str) -> HTMLResponse | FileResponse:
             if ".." not in full_path:
                 file = _serve_static_file(full_path)
