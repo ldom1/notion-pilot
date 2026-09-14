@@ -414,10 +414,21 @@ const AGENT_STEPS: [string, string, string][] = [
   ["check", "You approve the diff", "Exactly what changes, per database. Ambiguous matches are escalated, never guessed."],
 ];
 
-const EU_MARKS: [string, string, string][] = [
+const EU_MARKS: [string, string, ReactNode][] = [
   ["people", "The team already shares it", "Collaboration is native Notion — one workspace, live for everyone. Notion Pilot only does the typing."],
-  ["server", "Frankfurt, not Oregon", "Notion can pin that same workspace at rest to eu-central-1 on the Enterprise plan. Confirm region and terms with Notion."],
-  ["shield", "Your own machine", "The automation layer is self-hosted. No third-party SaaS sits between your team and Notion."],
+  [
+    "server",
+    "Stored where Notion hosts it",
+    <>
+      Region and terms are set by your agreement with Notion — see{" "}
+      <a href="#where-data-goes">Where your data goes</a>.
+    </>,
+  ],
+  [
+    "shield",
+    "Your own machine",
+    "Skills and the optional MCP run on your machine. Our server only deploys the structure and keeps no CRM rows.",
+  ],
   ["lock", "Your permissions", "The assistant connects as you and sees what you see. Revoke it in Notion, not in a support ticket."],
 ];
 
@@ -505,7 +516,7 @@ export default function Landing() {
             </h1>
             <p className="lp-hero-sub">
               Notion Pilot is that idea for a CRM you actually own — data kept up to date by AI
-              assistance, on a workspace you can host in Europe.
+              assistance, in your own Notion workspace.
             </p>
             <div className="lp-btn-row" style={{ marginTop: "1.9rem" }}>
               <a className="lp-btn lp-btn-primary lp-btn-lg" href="/auth/notion">
@@ -517,13 +528,10 @@ export default function Landing() {
             </div>
             <div className="lp-hero-terms">
               <span className="lp-term">
-                <Icon name="server" size={16} /> Self-hosted
+                <Icon name="server" size={16} /> Runs on your machine
               </span>
               <span className="lp-term">
                 <Icon name="check" size={16} /> Every write needs your approval
-              </span>
-              <span className="lp-term">
-                <Icon name="shield" size={16} /> EU data residency
               </span>
             </div>
           </div>
@@ -1069,25 +1077,24 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── europe ───────────────────────────────────────────────────────── */}
-      <section className="lp-section lp-tint">
+      {/* ── where data goes ──────────────────────────────────────────────── */}
+      <section className="lp-section lp-tint" id="where-data-goes">
         <div className="lp-wrap">
           <div className="lp-eu">
             <div>
-              <span className="lp-region">
-                <Icon name="shield" size={16} /> eu-central-1 · Frankfurt
-              </span>
-              <h2 className="lp-h2">European by deployment, not by promise</h2>
+              <h2 className="lp-h2">Where your data goes</h2>
               <p className="lp-body" style={{ marginTop: "1.1rem" }}>
-                The CRM lives in the Notion workspace your team share. Collaboration is
-                Notion's — that is the point. Both halves of the rest of this system are hosted
-                independently, and both can sit inside the EU. Data residency is{" "}
-                <strong>an option on the Notion Enterprise plan</strong>, free of charge; an
-                existing workspace can be migrated into the EU region on request.
-              </p>
-              <p className="lp-small" style={{ marginTop: "0.9rem" }}>
-                Confirm the current region list and contractual terms with{" "}
-                <a href={RESIDENCY_URL}>Notion</a> for your own agreement.
+                <strong>Where your data goes.</strong> Your CRM records are stored in your Notion
+                workspace. On the <strong>Notion Enterprise plan</strong>, Notion can host that
+                workspace in the EU (Frankfurt); on other plans, Notion stores it in its default
+                region (US). Region and terms are set by your agreement with Notion (
+                <a href={RESIDENCY_URL}>details</a>). EU hosting covers CRM data stored in Notion,
+                not AI processing. When your assistant reads CRM records, that content is processed
+                by your assistant&apos;s provider (e.g. Anthropic for Claude), under the
+                provider&apos;s data processing terms; Notion&apos;s residency does not cover it.
+                Notion states that some of its own AI processing can also happen outside the
+                residency region. notion-pilot.com deploys the CRM structure and keeps no CRM
+                records and no Notion access token.
               </p>
             </div>
             <div className="lp-eu-marks">
@@ -1209,7 +1216,7 @@ export default function Landing() {
               <Logo className="lp-logo" /> Notion Pilot
             </a>
             <p className="lp-foot-tag">
-              Self-hosted CRM automation for Notion · human-in-the-loop by default
+              CRM for Notion, run from your own assistant · human-in-the-loop by default
             </p>
           </div>
           <nav className="lp-foot-links" aria-label="Footer">
