@@ -6,9 +6,9 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 
-**Self-hosted Notion automation platform — CRM and knowledge inbox, piloted by Telegram.** Send a link, a photo, or a voice note — it lands in your Notion database, fully structured, in seconds.
+**Self-hosted Notion CRM you actually own** — deploy a relational CRM into your workspace, then keep it current with your AI assistant (human-in-the-loop by default). Optional capture channels: Telegram, email, Discord.
 
-No webhooks. No third-party SaaS. No data leaving your server.
+No third-party CRM SaaS. Your data stays in your Notion.
 
 ## 🚀 Quick Start
 
@@ -91,7 +91,7 @@ uv run python scripts/crm/crm_upgrade_home.py --crm-page-id <page id or URL>
 - **Voice-to-Notion, offline.** Dictate an idea, get a transcribed, titled, categorized page. All on-device via [faster-whisper](https://github.com/SYSTRAN/faster-whisper).
 - **LLM-powered enrichment (optional).** Point it at [OpenRouter](https://openrouter.ai/) and every message becomes a Notion row with a smart title, tags, summary, detected source (GitHub, YouTube, arXiv…), and interest level.
 - **Heuristics fallback.** No API key, no problem — URLs, platforms, and basic categorization still just work.
-- **One binary, zero infra.** Long polling only. Runs as a single systemd user service. Perfect for a home server.
+- **One binary, zero infra.** Optional Telegram long polling (no webhook). Runs as a single systemd user service. Perfect for a home server.
 
 ## What goes in, what comes out
 
@@ -105,23 +105,22 @@ Notion receives:
 
 Voice notes? Same thing — transcribed first, then enriched.
 
-## Setup (2 minutes)
+## Setup (inbox bot, optional Telegram)
 
 ```bash
 git clone https://github.com/ldom1/notion-pilot && cd notion-pilot
-cp .env.example .env   # fill in TELEGRAM_BOT_TOKEN, NOTION_TOKEN, NOTION_TELEGRAM_MSG_DATABASE_ID
+cp .env.example .env   # NOTION_TOKEN + database IDs; TELEGRAM_BOT_TOKEN only if using Telegram
 uv sync
 uv run python -m notion_pilot
 ```
 
-Send your bot a message on Telegram. Send `/ping` to confirm it's alive.
+Prefer the **Web UI deploy wizard** (Option C above) for the CRM. For the knowledge inbox over Telegram: create a bot with [@BotFather](https://t.me/BotFather), set `TELEGRAM_BOT_TOKEN`, then `/ping`.
 
 ### What you need
 
 - Python 3.12 + [uv](https://docs.astral.sh/uv/)
-- A Telegram bot from [@BotFather](https://t.me/BotFather)
-- A [Notion integration](https://www.notion.so/my-integrations) + a database shared with it, containing columns: `Name` (title), `Label` (multi-select), `Type` (select), `Link` (url), `Source` (select), `Description` (text), `Interest` (select), `Status` (status)
-- *(Optional)* An [OpenRouter API key](https://openrouter.ai/keys) for LLM enrichment
+- A [Notion integration](https://www.notion.so/my-integrations) + databases shared with it
+- *(Optional)* Telegram bot token, email/Discord extras, [OpenRouter](https://openrouter.ai/keys) for LLM enrichment
 
 ### Optional adapters
 
@@ -134,7 +133,7 @@ Set the relevant env vars (see `.env.example`) — adapters activate automatical
 For email senders routed to People, set `NOTION_PEOPLE_DATA_SOURCE_ID` and `NOTION_COMPANIES_DATA_SOURCE_ID`;
 the adapter uses the central CRM syncer with deduplication instead of a separate contacts table.
 
-## Try it without Telegram
+## Try the inbox pipeline without a chat adapter
 
 ```bash
 uv run python examples/example.py
@@ -186,27 +185,23 @@ Two verticals, one platform:
 
 ```
 notion_pilot/
-├── shared/            # Core shared across verticals
-│   ├── adapters/
-│   │   ├── __init__.py    # SourceAdapter + SinkAdapter protocols
-│   │   ├── telegram.py    # Telegram long-polling source
-│   │   ├── email.py       # IMAP polling source (optional: uv sync --extra email)
-│   │   └── discord.py     # Discord source + notification sink (optional: uv sync --extra discord)
+├── bot.py                 # Runner: activates adapters from env
+├── shared/                # Core shared across verticals
+│   ├── adapters/          # Telegram / email / Discord (optional extras)
+│   ├── llm/               # OpenRouter synthesis, prompts, CRM chat
+│   ├── media/             # Photo + voice; on-device transcription
 │   ├── config.py          # Pydantic settings from .env
-│   ├── models.py          # IncomingMessage + NotionDatabaseProperties
+│   ├── models.py          # IncomingMessage + Notion properties
 │   └── notion.py          # NotionDatabaseWriter
-├── inbox/             # Knowledge inbox vertical (formerly pipelines/)
-│   ├── bot.py         # Runner: activates adapters from env, asyncio.gather
-│   ├── pipeline.py    # interpret_message → create_page
-│   └── llm/
-│       ├── openrouter.py  # Structured JSON extraction via chat completions
-│       ├── prompt.py      # System prompt built from the Pydantic model
-│       └── source_hints.py
-├── crm/               # CRM vertical
-│   ├── people.py      # NotionPeopleSyncer
-│   ├── companies.py   # NotionCompanySyncer
-│   └── deals.py       # Deal tracking
-└── media/             # Photo + voice download, on-device transcription
+├── inbox/                 # Knowledge inbox vertical
+│   ├── pipeline.py        # interpret_message → create_page
+│   ├── knowledge.py
+│   └── people.py
+├── crm/                   # CRM vertical
+│   ├── syncer.py          # People / companies sync + dedup
+│   ├── deals.py / activities.py / queries.py / prospection.py
+│   └── commands.py        # Optional Telegram CRM commands
+└── mcp/                   # MCP tools over the same CRM logic
 ```
 
 ## Agent skills: Artelys CRM

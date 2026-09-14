@@ -834,6 +834,7 @@
   color: var(--muted);
 }
 
+.lp-ent-head h3,
 .lp-ent-head h4 {
   font-size: 0.98rem;
   letter-spacing: -0.02em;
@@ -1260,7 +1261,7 @@
 .lp-who {
   display: block;
   margin-bottom: 0.35rem;
-  color: var(--muted);
+  color: var(--ink-soft);
   font-family: var(--font-mono);
   font-size: 0.64rem;
   letter-spacing: 0.06em;
