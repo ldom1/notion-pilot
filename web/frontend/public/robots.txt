@@ -3,6 +3,5 @@ Allow: /
 Disallow: /cockpit
 Disallow: /api/
 Disallow: /auth/
-Disallow: /mcp
 
 Sitemap: https://notion-pilot.com/sitemap.xml

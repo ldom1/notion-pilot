@@ -41,7 +41,7 @@ export function McpPanel() {
 
       <p className="script-desc" style={{ marginBottom: "1rem" }}>
         CRM tools over stdio via <code>notion-pilot-powers</code> — upsert, enrich,
-        scan, rank, query. HTTP <code>/mcp</code> on this web service was removed.
+        scan, rank, query. Runs on your machine; this site only deploys the CRM.
       </p>
 
       <div className="log-body" style={{ borderRadius: "9px", marginBottom: "1rem" }}>

@@ -3,14 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-import datetime
 import json as _json
 import os
 import pathlib
-import re
 import secrets
-import sys
-import time as _time
 from typing import AsyncGenerator
 
 import httpx
@@ -23,7 +19,6 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import Response
 
 from notion_pilot.shared.config import Settings
-from notion_pilot.shared.llm.crm_chat import chat_crm, detect_data_source
 from notion_pilot.shared.utils.notion_urls import page_id_from_url
 from notion_pilot.shared.workspace import (
     create_crm_workspace,
@@ -34,44 +29,24 @@ from notion_pilot.shared.workspace import (
 from web.config import (
     DB_DEFS,
     NOTION_API,
-    delete_conversation,
-    list_conversations,
     load_cockpit_cfg,
-    load_conversation,
-    load_memory,
-    load_workflows,
     notion_headers,
     resolve_db_ids,
     save_cockpit_cfg,
-    save_conversation,
-    save_memory,
-    save_workflows,
 )
 from web.notion_db import (
     format_notion_error,
     page_title,
-    query_all_pages,
     query_db_status,
 )
 from web.models import (
-    ChatRequest,
     CockpitConfigRequest,
-    CreateDealRequest,
-    LogActivityRequest,
-    CreateLeadRequest,
-    RunScriptRequest,
-    RunWorkflowRequest,
-    SaveWorkflowRequest,
     SetupRequest,
     SetupResponse,
-    UpdateMemoryRequest,
 )
 from web.oauth import build_authorize_url, exchange_code_for_token_full
 from web.utils import (
-    extract_text_prop,
     extract_title_prop,
-    resolve_company_name,
-    load_scripts,
     notion_page_url,
 )
 
@@ -254,7 +229,14 @@ def create_app(settings: Settings) -> FastAPI:
         if settings.web_session_secret
         else secrets.token_hex(32)
     )
-    app.add_middleware(SessionMiddleware, secret_key=session_secret, https_only=False)
+    # Production: Secure cookie + 1h TTL (D25). Localhost redirect → http cookies for dev/tests.
+    _is_prod = "localhost" not in settings.notion_oauth_redirect_uri
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=session_secret,
+        https_only=_is_prod,
+        max_age=3600,
+    )
 
     _CSP = (
         "default-src 'self'; "
@@ -303,9 +285,6 @@ def create_app(settings: Settings) -> FastAPI:
 
     def _resolve_db_ids(wid: str) -> dict:
         return resolve_db_ids(settings, wid, cockpit_only=True)
-
-    def _merged_db_ids(wid: str) -> dict:
-        return resolve_db_ids(settings, wid, cockpit_only=False)
 
     # ── Health ────────────────────────────────────────────────────────────────
 
@@ -734,712 +713,6 @@ def create_app(settings: Settings) -> FastAPI:
         save_cockpit_cfg(wid, {"databases": {}, "workspace_url": ""})
         return {"ok": True}
 
-    @app.get("/api/cockpit/scripts")
-    async def cockpit_scripts(request: Request) -> dict:
-        _require_token(request)
-        return {"scripts": load_scripts()}
-
-    # Tracks running subprocesses by script_id; cleared on finish or stop
-    _running_procs: dict[str, asyncio.subprocess.Process] = {}
-
-    @app.post("/api/cockpit/run-script")
-    async def cockpit_run_script(req: RunScriptRequest, request: Request) -> StreamingResponse:
-        token = _require_token(request)
-        wid = _workspace_id(request)
-        scripts = load_scripts()
-        script = next((s for s in scripts if s["id"] == req.script_id), None)
-        if not script:
-            raise HTTPException(status_code=404, detail=f"Script '{req.script_id}' not found")
-        repo_root = pathlib.Path(__file__).parent.parent
-        script_path = repo_root / script["path"]
-        if not script_path.exists():
-            raise HTTPException(status_code=404, detail=f"Script file not found: {script['path']}")
-
-        env = os.environ.copy()
-        env["NOTION_TOKEN"] = token
-        for k, v in _merged_db_ids(wid).items():
-            if v:
-                env[k.upper()] = v
-
-        # Validate extra_args: only allow safe --flag or --flag=value patterns
-        _safe_arg_re = re.compile(r"^--[a-z][a-z0-9-]*(=[\w.,/-]*)?$")
-        extra = [a for a in (req.extra_args or []) if _safe_arg_re.match(a)]
-        cmd = [sys.executable, str(script_path)] + list(script.get("args") or []) + extra
-
-        async def _generate() -> AsyncGenerator[str, None]:
-            def sse(msg_type: str, **kwargs: object) -> str:
-                return f"data: {_json.dumps({'type': msg_type, **kwargs})}\n\n"
-
-            all_args = list(script.get("args") or []) + extra
-            display = f"$ python {script['path']}" + (" " + " ".join(all_args) if all_args else "")
-            yield sse("log", message=display)
-            try:
-                proc = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.STDOUT,
-                    env=env,
-                    cwd=str(repo_root),
-                )
-                _running_procs[req.script_id] = proc
-                assert proc.stdout is not None
-                while line := await proc.stdout.readline():
-                    yield sse("log", message=line.decode().rstrip())
-                await proc.wait()
-                if proc.returncode == 0:
-                    yield sse("done", message="Completed successfully")
-                else:
-                    yield sse("error", message=f"Exited with code {proc.returncode}")
-            except Exception as exc:
-                logger.error("script run failed: {}", exc)
-                yield sse("error", message=str(exc))
-            finally:
-                _running_procs.pop(req.script_id, None)
-
-        return StreamingResponse(
-            _generate(),
-            media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-        )
-
-    @app.post("/api/cockpit/stop-script")
-    async def cockpit_stop_script(req: RunScriptRequest, request: Request) -> dict:
-        _require_token(request)
-        proc = _running_procs.get(req.script_id)
-        if not proc:
-            raise HTTPException(status_code=404, detail=f"'{req.script_id}' is not running")
-        proc.kill()
-        return {"ok": True}
-
-    @app.post("/api/cockpit/chat")
-    async def cockpit_chat(req: ChatRequest, request: Request) -> StreamingResponse:
-        token = _require_token(request)
-        wid = _workspace_id(request)
-        db_ids = _resolve_db_ids(wid)
-        workspace_memory = load_memory(wid)
-
-        # Validate session_id — must be safe for use as a filename
-        sid = req.session_id
-        if sid and not re.match(r"^[a-zA-Z0-9_-]{1,64}$", sid):
-            sid = None
-
-        # Decide which Notion DB(s) to query based on query intent
-        data_source = detect_data_source(req.query)
-
-        # Load session cache — reuse fetched data for follow-ups
-        existing_session = load_conversation(wid, sid) if sid else None
-        cached_people: list[dict] | None = (
-            existing_session.get("people_cache") if existing_session else None
-        )
-        cached_companies: list[dict] | None = (
-            existing_session.get("companies_cache") if existing_session else None
-        )
-
-        need_people = data_source in ("people", "both") and cached_people is None
-        need_companies = data_source in ("companies", "both") and cached_companies is None
-        need_company_names = (
-            data_source in ("people", "both")
-            and cached_companies is None
-            and bool(db_ids.get("notion_companies_data_source_id"))
-        )
-        # On follow-ups, skip fetch if we already have the right cache
-        if req.history:
-            need_people = need_people and cached_people is None
-            need_companies = need_companies and cached_companies is None
-
-        async def _generate() -> AsyncGenerator[str, None]:
-            def sse(msg_type: str, **kwargs: object) -> str:
-                return f"data: {_json.dumps({'type': msg_type, **kwargs})}\n\n"
-
-            people: list[dict] = list(cached_people or [])
-            companies: list[dict] = list(cached_companies or [])
-
-            if need_people or need_companies or need_company_names:
-                yield sse("status", message="Searching your CRM…")
-                async with httpx.AsyncClient(headers=notion_headers(token), timeout=60) as client:
-                    co_db_id = db_ids.get("notion_companies_data_source_id")
-                    if need_companies or need_company_names:
-                        if co_db_id:
-                            try:
-                                for row in await query_all_pages(client, co_db_id):
-                                    props = row.get("properties", {})
-                                    sector = ""
-                                    if props.get("Sector", {}).get("select"):
-                                        sector = props["Sector"]["select"]["name"]
-                                    companies.append(
-                                        {
-                                            "id": row["id"],
-                                            "name": extract_title_prop(props),
-                                            "sector": sector,
-                                        }
-                                    )
-                            except Exception as exc:
-                                logger.warning("companies fetch failed: {}", exc)
-
-                    company_names = {c["id"]: c["name"] for c in companies if c.get("id")}
-
-                    if need_people:
-                        people_db_id = db_ids.get("notion_people_data_source_id")
-                        if people_db_id:
-                            try:
-                                for row in await query_all_pages(client, people_db_id):
-                                    props = row.get("properties", {})
-                                    people.append(
-                                        {
-                                            "id": row["id"],
-                                            "name": extract_title_prop(props),
-                                            "position": extract_text_prop(props, "Position"),
-                                            "company": resolve_company_name(
-                                                props, company_names, "Company"
-                                            ),
-                                        }
-                                    )
-                            except Exception as exc:
-                                logger.warning("people fetch failed: {}", exc)
-
-                parts = []
-                if people:
-                    parts.append(f"{len(people)} contacts")
-                if companies:
-                    parts.append(f"{len(companies)} companies")
-                yield sse("status", message=f"Found {', '.join(parts) or 'nothing'}, analysing…")
-
-            history = [{"role": m.role, "content": m.content} for m in req.history]
-            try:
-                result = await chat_crm(
-                    settings,
-                    req.query,
-                    history,
-                    people=people,
-                    companies=companies if companies else None,
-                    workspace_memory=workspace_memory,
-                )
-            except ValueError as exc:
-                yield sse("error", message=str(exc))
-                return
-            except httpx.HTTPStatusError as exc:
-                logger.warning("chat_crm LLM error: {}", exc.response.text[:300])
-                yield sse("error", message=f"LLM API error: {exc.response.text[:200]}")
-                return
-            except Exception as exc:
-                logger.warning("chat_crm failed: {}", exc)
-                yield sse("error", message="LLM returned an unreadable response. Try again.")
-                return
-
-            # "create" intent is handled client-side via the deal wizard (which fetches
-            # Deals DB schema and prompts the user before calling /api/cockpit/create-deal).
-            yield sse("result", data=result)
-
-            # Persist conversation server-side
-            if sid:
-                try:
-                    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-                    session = existing_session or {
-                        "id": sid,
-                        "title": req.query[:60] + ("…" if len(req.query) > 60 else ""),
-                        "created_at": now,
-                        "messages": [],
-                        "history": [],
-                    }
-                    if need_people and people:
-                        session["people_cache"] = people
-                    if (need_companies or need_company_names) and companies:
-                        session["companies_cache"] = companies
-                    session["updated_at"] = now
-                    session["messages"].append({"role": "user", "content": req.query, "ts": now})
-                    assistant_msg = result.get("message", "")
-                    session["messages"].append(
-                        {"role": "assistant", "content": assistant_msg, "data": result, "ts": now}
-                    )
-                    session["history"] = [
-                        {"role": m["role"], "content": m["content"]} for m in session["messages"]
-                    ]
-                    save_conversation(wid, session)
-                except Exception as exc:
-                    logger.warning("conversation save failed: {}", exc)
-
-        return StreamingResponse(
-            _generate(),
-            media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-        )
-
-    # ── Conversations ────────────────────────────────────────────────────────
-
-    @app.get("/api/cockpit/conversations")
-    async def cockpit_list_conversations(request: Request) -> dict:
-        _require_token(request)
-        wid = _workspace_id(request)
-        return {"conversations": list_conversations(wid)}
-
-    @app.get("/api/cockpit/conversations/{session_id}")
-    async def cockpit_get_conversation(session_id: str, request: Request) -> dict:
-        _require_token(request)
-        if not re.match(r"^[a-zA-Z0-9_-]{1,64}$", session_id):
-            raise HTTPException(status_code=400, detail="Invalid session_id")
-        wid = _workspace_id(request)
-        session = load_conversation(wid, session_id)
-        if session is None:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-        return {"session": session}
-
-    @app.delete("/api/cockpit/conversations/{session_id}")
-    async def cockpit_delete_conversation(session_id: str, request: Request) -> dict:
-        _require_token(request)
-        if not re.match(r"^[a-zA-Z0-9_-]{1,64}$", session_id):
-            raise HTTPException(status_code=400, detail="Invalid session_id")
-        wid = _workspace_id(request)
-        if not delete_conversation(wid, session_id):
-            raise HTTPException(status_code=404, detail="Conversation not found")
-        return {"ok": True}
-
-    # ── Workspace memory ─────────────────────────────────────────────────────
-
-    @app.get("/api/cockpit/memory")
-    async def cockpit_get_memory(request: Request) -> dict:
-        _require_token(request)
-        wid = _workspace_id(request)
-        return {"text": load_memory(wid)}
-
-    @app.put("/api/cockpit/memory")
-    async def cockpit_save_memory(req: UpdateMemoryRequest, request: Request) -> dict:
-        _require_token(request)
-        wid = _workspace_id(request)
-        save_memory(wid, req.text.strip())
-        return {"ok": True}
-
-    @app.get("/api/cockpit/deals-properties")
-    async def cockpit_deals_properties(request: Request) -> dict:
-        """Return wizard-relevant properties of the Deals database (select/multi_select with options)."""
-        token = _require_token(request)
-        wid = _workspace_id(request)
-        deals_db_id = _resolve_db_ids(wid).get("notion_deals_database_id")
-        if not deals_db_id:
-            raise HTTPException(status_code=400, detail="Deals database not configured")
-        async with httpx.AsyncClient(headers=notion_headers(token), timeout=15) as client:
-            r = await client.get(f"{NOTION_API}/databases/{deals_db_id}")
-            r.raise_for_status()
-        props = r.json().get("properties", {})
-        wizard_fields = []
-        skip = {"Name", "Client", "Contacts"}  # handled implicitly
-        for name, cfg in props.items():
-            if name in skip:
-                continue
-            ptype = cfg.get("type")
-            if ptype == "select":
-                options = [o["name"] for o in cfg["select"].get("options", [])]
-                wizard_fields.append({"key": name, "type": "select", "options": options})
-            elif ptype == "multi_select":
-                options = [o["name"] for o in cfg["multi_select"].get("options", [])]
-                wizard_fields.append({"key": name, "type": "multi_select", "options": options})
-            elif ptype == "rich_text":
-                wizard_fields.append({"key": name, "type": "text"})
-            elif ptype == "number":
-                wizard_fields.append({"key": name, "type": "number"})
-        return {"fields": wizard_fields}
-
-    @app.post("/api/cockpit/log-activity")
-    async def cockpit_log_activity(req: LogActivityRequest, request: Request) -> dict:
-        """Log an activity against the session's own workspace.
-
-        Mirrors create-deal: OAuth cookie token plus the Activities id persisted
-        by the deploy wizard. Local MCP (notion-pilot-powers) binds a static
-        token and cannot serve this per-session OAuth path.
-        """
-        token = _require_token(request)
-        db_ids = _resolve_db_ids(_workspace_id(request))
-        activities_db_id = db_ids.get("notion_activities_database_id")
-        if not activities_db_id:
-            raise HTTPException(status_code=400, detail="Activities database not configured")
-
-        props: dict = {
-            "Name": {"title": [{"text": {"content": req.title}}]},
-            "Type": {"select": {"name": req.type}},
-            "Date": {"date": {"start": req.date or datetime.date.today().isoformat()}},
-        }
-        if req.outcome:
-            props["Outcome"] = {"select": {"name": req.outcome}}
-        if req.duration_min is not None:
-            props["Duration (min)"] = {"number": req.duration_min}
-        # Property names follow ActivityRecord._to_properties — the relation to
-        # People is "Person", not "Contact".
-        for key, page_id in (
-            ("Deal", req.deal_page_id),
-            ("Person", req.person_page_id),
-            ("Company", req.company_page_id),
-        ):
-            if page_id:
-                props[key] = {"relation": [{"id": page_id}]}
-        if req.next_step:
-            props["Next Step"] = {"rich_text": [{"text": {"content": req.next_step}}]}
-        if req.next_step_date:
-            props["Next Step Date"] = {"date": {"start": req.next_step_date}}
-        if req.notes:
-            props["Notes"] = {"rich_text": [{"text": {"content": req.notes}}]}
-
-        async with httpx.AsyncClient(headers=notion_headers(token), timeout=20) as client:
-            r = await client.post(
-                f"{NOTION_API}/pages",
-                json={"parent": {"database_id": activities_db_id}, "properties": props},
-            )
-            if r.status_code >= 400:
-                logger.error("log-activity failed: {} {}", r.status_code, r.text)
-                raise HTTPException(status_code=502, detail="Notion rejected the activity")
-            page = r.json()
-
-        return {"ok": True, "page_id": page["id"], "url": page.get("url", "")}
-
-    @app.post("/api/cockpit/create-deal")
-    async def cockpit_create_deal(req: CreateDealRequest, request: Request) -> dict:
-        """Create a single Deal entry with wizard-collected properties."""
-        token = _require_token(request)
-        wid = _workspace_id(request)
-        db_ids = _resolve_db_ids(wid)
-        deals_db_id = db_ids.get("notion_deals_database_id")
-        if not deals_db_id:
-            raise HTTPException(status_code=400, detail="Deals database not configured")
-
-        hdrs = notion_headers(token)
-        contact_id: str | None = req.notion_id
-
-        async with httpx.AsyncClient(headers=hdrs, timeout=20) as client:
-            if not contact_id and req.new_person:
-                people_db_id = db_ids.get("notion_people_data_source_id")
-                if not people_db_id:
-                    raise HTTPException(status_code=400, detail="People database not configured")
-                person_props: dict = {
-                    "Name": {"title": [{"text": {"content": req.new_person.name}}]},
-                }
-                if req.new_person.position:
-                    person_props["Position"] = {
-                        "rich_text": [{"text": {"content": req.new_person.position}}]
-                    }
-                p_r = await client.post(
-                    f"{NOTION_API}/pages",
-                    json={
-                        "parent": {"database_id": people_db_id},
-                        "properties": person_props,
-                    },
-                )
-                p_r.raise_for_status()
-                contact_id = p_r.json()["id"]
-
-            # Resolve company page ID + the Deals DB property that points to Companies
-            company_id: str | None = None
-            company_prop_key: str | None = None
-            companies_db_id = db_ids.get("notion_companies_data_source_id")
-            if req.company_name and companies_db_id:
-                # Find the company page by title
-                cq = await client.post(
-                    f"{NOTION_API}/databases/{companies_db_id}/query",
-                    json={
-                        "filter": {
-                            "property": "title",
-                            "title": {"equals": req.company_name},
-                        },
-                        "page_size": 1,
-                    },
-                )
-                if cq.is_success and cq.json().get("results"):
-                    company_id = cq.json()["results"][0]["id"]
-                    # Find the relation property in Deals DB that targets Companies DB
-                    db_schema = await client.get(f"{NOTION_API}/databases/{deals_db_id}")
-                    if db_schema.is_success:
-                        for prop_name, prop in db_schema.json().get("properties", {}).items():
-                            if prop.get("type") == "relation" and prop.get("relation", {}).get(
-                                "database_id", ""
-                            ).replace("-", "") == companies_db_id.replace("-", ""):
-                                company_prop_key = prop_name
-                                break
-
-            deal_props: dict = {
-                "Name": {"title": [{"text": {"content": req.deal_name}}]},
-                "Stage": {"select": {"name": "Prospect"}},
-            }
-            if contact_id:
-                deal_props["Contacts"] = {"relation": [{"id": contact_id}]}
-            if company_id and company_prop_key:
-                deal_props[company_prop_key] = {"relation": [{"id": company_id}]}
-            # Merge extra fields from wizard answers
-            for key, val in (req.extra_fields or {}).items():
-                if isinstance(val, list):
-                    deal_props[key] = {"multi_select": [{"name": v} for v in val]}
-                elif isinstance(val, (int, float)):
-                    deal_props[key] = {"number": val}
-                elif val:
-                    # select or text
-                    if key in {"Stage", "Lead Source"}:
-                        deal_props[key] = {"select": {"name": val}}
-                    else:
-                        deal_props[key] = {"rich_text": [{"text": {"content": str(val)}}]}
-
-            logger.info(
-                "create-deal: posting to DB {} props={}", deals_db_id, list(deal_props.keys())
-            )
-            page_body: dict = {"parent": {"database_id": deals_db_id}, "properties": deal_props}
-            if req.summary:
-                # Split into ≤2000-char chunks (Notion rich_text limit per block)
-                chunks = [req.summary[i : i + 2000] for i in range(0, len(req.summary), 2000)]
-                page_body["children"] = [
-                    {
-                        "object": "block",
-                        "type": "callout",
-                        "callout": {
-                            "icon": {"type": "emoji", "emoji": "🤖"},
-                            "rich_text": [{"type": "text", "text": {"content": chunk}}],
-                            "color": "purple_background",
-                        },
-                    }
-                    for chunk in chunks
-                ]
-            d_r = await client.post(f"{NOTION_API}/pages", json=page_body)
-            if not d_r.is_success:
-                logger.error("create-deal Notion error {}: {}", d_r.status_code, d_r.text[:400])
-                raise HTTPException(status_code=400, detail=f"Notion API error: {d_r.text[:200]}")
-            page_id = d_r.json()["id"]
-            logger.info("create-deal: created page_id={}", page_id)
-
-        return {"page_id": page_id, "url": notion_page_url(page_id)}
-
-    @app.post("/api/cockpit/create-lead")
-    async def cockpit_create_lead(req: CreateLeadRequest, request: Request) -> dict:
-        token = _require_token(request)
-        wid = _workspace_id(request)
-        db_ids = _resolve_db_ids(wid)
-        people_db_id = db_ids.get("notion_people_data_source_id")
-        deals_db_id = db_ids.get("notion_deals_database_id")
-        companies_db_id = db_ids.get("notion_companies_data_source_id")
-        if not people_db_id:
-            raise HTTPException(status_code=400, detail="People database not configured")
-
-        person_props: dict = {"Name": {"title": [{"text": {"content": req.name}}]}}
-        if req.position:
-            person_props["Position"] = {"rich_text": [{"text": {"content": req.position}}]}
-        async with httpx.AsyncClient(headers=notion_headers(token), timeout=20) as client:
-            # 1. Create the People page
-            r = await client.post(
-                f"{NOTION_API}/pages",
-                json={"parent": {"database_id": people_db_id}, "properties": person_props},
-            )
-            r.raise_for_status()
-            person_page_id = r.json()["id"]
-
-            if not deals_db_id:
-                return {"page_id": person_page_id, "url": notion_page_url(person_page_id)}
-
-            # 2. Optionally resolve company
-            company_id: str | None = None
-            company_prop_key: str | None = None
-            if req.company and companies_db_id:
-                cq = await client.post(
-                    f"{NOTION_API}/databases/{companies_db_id}/query",
-                    json={
-                        "filter": {"property": "title", "title": {"equals": req.company}},
-                        "page_size": 1,
-                    },
-                )
-                if cq.is_success and cq.json().get("results"):
-                    company_id = cq.json()["results"][0]["id"]
-                    db_schema = await client.get(f"{NOTION_API}/databases/{deals_db_id}")
-                    if db_schema.is_success:
-                        for prop_name, prop in db_schema.json().get("properties", {}).items():
-                            if prop.get("type") == "relation" and prop.get("relation", {}).get(
-                                "database_id", ""
-                            ).replace("-", "") == companies_db_id.replace("-", ""):
-                                company_prop_key = prop_name
-                                break
-
-            # 3. Create Deal linking the new person + company
-            deal_props: dict = {
-                "Name": {"title": [{"text": {"content": f"Lead: {req.name}"}}]},
-                "Stage": {"select": {"name": "Prospect"}},
-                "Contacts": {"relation": [{"id": person_page_id}]},
-            }
-            if company_id and company_prop_key:
-                deal_props[company_prop_key] = {"relation": [{"id": company_id}]}
-
-            d_r = await client.post(
-                f"{NOTION_API}/pages",
-                json={"parent": {"database_id": deals_db_id}, "properties": deal_props},
-            )
-            if d_r.is_success:
-                deal_page_id = d_r.json()["id"]
-                return {"page_id": deal_page_id, "url": notion_page_url(deal_page_id)}
-
-        return {"page_id": person_page_id, "url": notion_page_url(person_page_id)}
-
-    # ── Workflows ─────────────────────────────────────────────────────────────
-
-    @app.get("/api/cockpit/workflows")
-    async def cockpit_get_workflows(request: Request) -> dict:
-        _require_token(request)
-        return {"workflows": load_workflows(_workspace_id(request))}
-
-    @app.post("/api/cockpit/workflows")
-    async def cockpit_save_workflow(req: SaveWorkflowRequest, request: Request) -> dict:
-        _require_token(request)
-        wid = _workspace_id(request)
-        wfs = load_workflows(wid)
-        # Upsert by id
-        wfs = [w for w in wfs if w.get("id") != req.workflow.id]
-        wfs.append(req.workflow.model_dump())
-        save_workflows(wid, wfs)
-        return {"ok": True, "workflow_id": req.workflow.id}
-
-    @app.delete("/api/cockpit/workflows/{workflow_id}")
-    async def cockpit_delete_workflow(workflow_id: str, request: Request) -> dict:
-        _require_token(request)
-        wid = _workspace_id(request)
-        wfs = [w for w in load_workflows(wid) if w.get("id") != workflow_id]
-        save_workflows(wid, wfs)
-        return {"ok": True}
-
-    @app.post("/api/cockpit/run-workflow")
-    async def cockpit_run_workflow(req: RunWorkflowRequest, request: Request) -> StreamingResponse:
-        """Run a saved workflow: execute nodes in topological order (respecting edges)."""
-        token = _require_token(request)
-        wid = _workspace_id(request)
-        wfs = load_workflows(wid)
-        wf = next((w for w in wfs if w.get("id") == req.workflow_id), None)
-        if not wf:
-            raise HTTPException(status_code=404, detail=f"Workflow '{req.workflow_id}' not found")
-
-        all_scripts = load_scripts()
-        scripts_by_id = {s["id"]: s for s in all_scripts}
-
-        # Topological sort of workflow nodes respecting edges
-        nodes = [n["id"] for n in wf.get("nodes", [])]
-        edges = wf.get("edges", [])
-        deps: dict[str, set[str]] = {n: set() for n in nodes}
-        for e in edges:
-            if e["target"] in deps:
-                deps[e["target"]].add(e["source"])
-
-        ordered: list[str] = []
-        visited: set[str] = set()
-
-        def _topo(node_id: str) -> None:
-            if node_id in visited:
-                return
-            visited.add(node_id)
-            for dep in deps.get(node_id, set()):
-                _topo(dep)
-            ordered.append(node_id)
-
-        for n in nodes:
-            _topo(n)
-
-        env = os.environ.copy()
-        env["NOTION_TOKEN"] = token
-        for k, v in _merged_db_ids(wid).items():
-            if v:
-                env[k.upper()] = v
-
-        repo_root = pathlib.Path(__file__).parent.parent
-
-        async def _generate() -> AsyncGenerator[str, None]:
-            def sse(msg_type: str, **kwargs: object) -> str:
-                return f"data: {_json.dumps({'type': msg_type, **kwargs})}\n\n"
-
-            for script_id in ordered:
-                script = scripts_by_id.get(script_id)
-                if not script:
-                    yield sse(
-                        "log",
-                        message=f"⚠ Script '{script_id}' not found, skipping",
-                        script_id=script_id,
-                    )
-                    continue
-                script_path = repo_root / script["path"]
-                if not script_path.exists():
-                    yield sse(
-                        "log", message=f"⚠ File not found: {script['path']}", script_id=script_id
-                    )
-                    continue
-
-                cmd = [sys.executable, str(script_path)] + list(script.get("args") or [])
-                display = f"$ python {script['path']}" + (
-                    " " + " ".join(script.get("args") or []) if script.get("args") else ""
-                )
-                yield sse("step_start", script_id=script_id, label=script["label"])
-                yield sse("log", message=display, script_id=script_id)
-                try:
-                    proc = await asyncio.create_subprocess_exec(
-                        *cmd,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.STDOUT,
-                        env=env,
-                        cwd=str(repo_root),
-                    )
-                    _running_procs[script_id] = proc
-                    assert proc.stdout is not None
-                    while line := await proc.stdout.readline():
-                        yield sse("log", message=line.decode().rstrip(), script_id=script_id)
-                    await proc.wait()
-                    if proc.returncode == 0:
-                        yield sse("step_done", script_id=script_id, message="✓ Done")
-                    else:
-                        yield sse(
-                            "step_error",
-                            script_id=script_id,
-                            message=f"Exited with code {proc.returncode}",
-                        )
-                        break  # stop workflow on first failure
-                except Exception as exc:
-                    logger.error("workflow step {} failed: {}", script_id, exc)
-                    yield sse("step_error", script_id=script_id, message=str(exc))
-                    break
-                finally:
-                    _running_procs.pop(script_id, None)
-
-            yield sse("done", message="Workflow complete")
-
-        return StreamingResponse(
-            _generate(),
-            media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-        )
-
-    # ── Telegram ─────────────────────────────────────────────────────────────
-
-    @app.get("/api/telegram/status")
-    async def telegram_status(request: Request) -> dict:  # type: ignore[type-arg]
-        _require_token(request)
-        if not settings.telegram_bot_token:
-            return {"connected": False, "bot_name": None, "last_seen": None}
-        token = settings.telegram_bot_token.get_secret_value()
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.get(f"https://api.telegram.org/bot{token}/getMe")
-            data = resp.json()
-            connected = data.get("ok", False)
-            bot_name = data.get("result", {}).get("username") if connected else None
-        except Exception:  # noqa: BLE001
-            connected = False
-            bot_name = None
-        from notion_pilot.shared.adapters.telegram import get_last_seen
-
-        last_seen_dt = get_last_seen()
-        last_seen = last_seen_dt.isoformat() if last_seen_dt else None
-        return {"connected": connected, "bot_name": bot_name, "last_seen": last_seen}
-
-    @app.post("/api/telegram/ping")
-    async def telegram_ping(request: Request) -> dict:  # type: ignore[type-arg]
-        _require_token(request)
-        if not settings.telegram_bot_token:
-            raise HTTPException(status_code=400, detail="Telegram bot token not configured")
-        token = settings.telegram_bot_token.get_secret_value()
-        t0 = _time.monotonic()
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(f"https://api.telegram.org/bot{token}/getMe")
-            latency_ms = int((_time.monotonic() - t0) * 1000)
-            ok = resp.json().get("ok", False)
-        except Exception:  # noqa: BLE001
-            latency_ms = int((_time.monotonic() - t0) * 1000)
-            ok = False
-        return {"ok": ok, "latency_ms": latency_ms}
-
     # ── Static files + SPA ───────────────────────────────────────────────────
 
     _static = pathlib.Path(__file__).parent / "static"
@@ -1526,6 +799,9 @@ def create_app(settings: Settings) -> FastAPI:
             response_model=None,
         )
         async def spa_fallback(full_path: str) -> HTMLResponse | FileResponse:
+            root = full_path.split("/", 1)[0]
+            if root in {"api", "auth", "mcp"}:
+                raise HTTPException(status_code=404, detail="Not found")
             if ".." not in full_path:
                 file = _serve_static_file(full_path)
                 if file is not None:

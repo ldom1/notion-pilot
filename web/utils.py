@@ -2,21 +2,9 @@
 
 from __future__ import annotations
 
-import yaml
-
-from web.config import SCRIPTS_YAML_PATH
-
 
 def notion_page_url(page_id: str) -> str:
     return f"https://notion.so/{page_id.replace('-', '')}"
-
-
-def load_scripts() -> list:
-    if not SCRIPTS_YAML_PATH.exists():
-        return []
-    with SCRIPTS_YAML_PATH.open() as f:
-        data = yaml.safe_load(f)
-    return data.get("scripts", []) if data else []
 
 
 def extract_title_prop(props: dict) -> str:
