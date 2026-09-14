@@ -494,6 +494,7 @@ export default function Landing() {
         </div>
       </nav>
 
+      <main>
       {/* ── hero ─────────────────────────────────────────────────────────── */}
       <header className="lp-hero lp-wrap">
         <div className="lp-hero-grid">
@@ -863,7 +864,7 @@ export default function Landing() {
             <div className="lp-ent">
               <div className="lp-ent-head">
                 <Icon name="company" size={18} />
-                <h4>Companies</h4>
+                <h3 className="lp-h3">Companies</h3>
                 <span className="lp-ent-flag lp-flag-auto">auto</span>
               </div>
               <div className="lp-ent-props">
@@ -879,7 +880,7 @@ export default function Landing() {
               <div className="lp-ent lp-ent-hub">
                 <div className="lp-ent-head">
                   <Icon name="deal" size={18} />
-                  <h4>Leads</h4>
+                  <h3 className="lp-h3">Leads</h3>
                   <span className="lp-ent-flag lp-flag-auto">auto</span>
                 </div>
                 <div className="lp-ent-props">
@@ -901,7 +902,7 @@ export default function Landing() {
               <div className={`lp-ent ${e.auto ? "" : "lp-ent-manual"}`} key={e.name}>
                 <div className="lp-ent-head">
                   <Icon name={e.icon} size={18} />
-                  <h4>{e.name}</h4>
+                  <h3 className="lp-h3">{e.name}</h3>
                   <span className={`lp-ent-flag ${e.auto ? "lp-flag-auto" : "lp-flag-manual"}`}>
                     {e.auto ? "auto" : "manual"}
                   </span>
@@ -1198,6 +1199,8 @@ export default function Landing() {
           </a>
         </div>
       </section>
+
+      </main>
 
       <footer className="lp-footer">
         <div className="lp-wrap lp-foot">
