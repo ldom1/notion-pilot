@@ -12,6 +12,14 @@ export interface DatabaseEntry {
   error?: string;
 }
 
+/** Exact plugin userConfig titles, dialog order (D26). Token is never shown here. */
+const USER_CONFIG_ID_FIELDS: { key: string; title: string }[] = [
+  { key: "notion_people_data_source_id", title: "People data source ID" },
+  { key: "notion_companies_data_source_id", title: "Companies data source ID" },
+  { key: "notion_deals_database_id", title: "Deals / Leads database ID" },
+  { key: "notion_activities_database_id", title: "Activities database ID" },
+];
+
 interface NotionDb {
   id: string;
   name: string;
@@ -51,6 +59,17 @@ export function WorkspacePanel({
   const [refreshingCrm, setRefreshingCrm] = useState(false);
   const [crmRefreshError, setCrmRefreshError] = useState<string | null>(null);
   const [crmWarnings, setCrmWarnings] = useState<string[] | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  async function copyId(key: string, value: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedKey(key);
+      window.setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1500);
+    } catch {
+      // ignore — user can select manually
+    }
+  }
 
   const fetchDbs = useCallback(async () => {
     setLoadingDbs(true);
@@ -189,6 +208,62 @@ export function WorkspacePanel({
         })}
       </div>
 
+      <div className="tg-bot-card" style={{ marginTop: "0.75rem" }}>
+        <div className="tg-bot-header">
+          <span className="db-icon">🔌</span>
+          <span className="tg-bot-label">Optional local MCP · plugin settings</span>
+        </div>
+        <p style={{ margin: "0.4rem 0 0.75rem", fontSize: "0.78rem", color: "var(--muted)", lineHeight: 1.45 }}>
+          The default path needs none of this — Notion&apos;s hosted MCP is enough.
+          For the optional local MCP, paste these into the plugin&apos;s{" "}
+          <code>userConfig</code> (token stays in Claude&apos;s sensitive storage,
+          not here). Create an internal integration with{" "}
+          <strong>Read content, Update content, Insert content</strong> and{" "}
+          <strong>No user information</strong>, and share{" "}
+          <strong>only the CRM parent page</strong> with it. The wizard&apos;s
+          OAuth token is never exported.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          {USER_CONFIG_ID_FIELDS.map(({ key, title }) => {
+            const id = databases[key]?.db_id ?? "";
+            return (
+              <div
+                key={key}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  flexWrap: "wrap",
+                  fontSize: "0.78rem",
+                }}
+              >
+                <span style={{ minWidth: "12rem", fontWeight: 600 }}>{title}</span>
+                <code
+                  style={{
+                    flex: 1,
+                    minWidth: "8rem",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    color: id ? "var(--ink)" : "var(--muted)",
+                  }}
+                  title={id || undefined}
+                >
+                  {id || "— not linked —"}
+                </code>
+                <button
+                  className="btn-ghost btn-sm"
+                  disabled={!id}
+                  onClick={() => { void copyId(key, id); }}
+                >
+                  {copiedKey === key ? "Copied" : "Copy"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="tg-bot-card" style={{ marginTop: "0.5rem" }}>
         <div className="tg-bot-header">
           <span className="db-icon">⚙️</span>
@@ -252,6 +327,28 @@ export function WorkspacePanel({
             ))}
           </ul>
         )}
+      </div>
+
+      <div className="tg-bot-card" style={{ marginTop: "0.5rem" }}>
+        <div className="tg-bot-header">
+          <span className="db-icon">🔓</span>
+          <span className="tg-bot-label">Disconnect</span>
+        </div>
+        <ul style={{ margin: "0.4rem 0 0", paddingLeft: "1.1rem", fontSize: "0.78rem", color: "var(--muted)", lineHeight: 1.55 }}>
+          <li>
+            <strong>Notion Pilot (this site):</strong> Notion → Settings →
+            Connections → Notion Pilot; Sign out clears the session cookie.
+            Delete workspace config (above) clears server-side DB links only.
+          </li>
+          <li>
+            <strong>Notion hosted MCP:</strong> Claude connector settings, and
+            Notion → Settings → Connections.
+          </li>
+          <li>
+            <strong>Local integration (optional MCP):</strong> Notion → Settings
+            → Integrations → delete the integration or unshare the CRM page.
+          </li>
+        </ul>
       </div>
     </section>
   );

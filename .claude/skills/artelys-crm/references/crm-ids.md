@@ -1,6 +1,6 @@
-# Artelys CRM identifiers (notion-pilot)
+# Artelys CRM identifiers (notion-pilot overlay)
 
-Update this file if databases are recreated. Prefer resolving via Notion MCP search (`Leads`, `Activities`) when unsure.
+Update this file if databases are recreated. Prefer resolving via Notion MCP search (`Leads`, `Activities`) when unsure. Used by `.claude/skills/artelys-crm/`.
 
 ## Databases / data sources
 
@@ -13,12 +13,10 @@ Update this file if databases are recreated. Prefer resolving via Notion MCP sea
 
 Pipeline hub page: `36d6c451-9465-80b7-af00-d80250f0974c` (Leads pipeline).
 
-## Env (local stdio / scripts)
+## Env (local `artelys-crm` stdio)
 
-When using `notion_pilot` code path:
+Prefer `infisical run --env dev --path /` (see skill / MCP config). Needed:
 
-- `NOTION_TOKEN` (or Infisical)
+- `NOTION_TOKEN`
 - `NOTION_PEOPLE_DATA_SOURCE_ID` / `NOTION_COMPANIES_DATA_SOURCE_ID`
-- `NOTION_DEALS_DATABASE_ID` / `NOTION_ACTIVITIES_DATABASE_ID` (often unset in `.env` — then use Notion MCP for Leads/Activities)
-
-`INFISICAL_ENV=dev` when loading Settings from a localhost OAuth redirect URI.
+- `NOTION_DEALS_DATABASE_ID` / `NOTION_ACTIVITIES_DATABASE_ID` (often unset — then use Notion MCP for Leads/Activities)

@@ -260,8 +260,8 @@ claude mcp add --transport http notion ${NOTION_MCP}
 # Cursor — .cursor/mcp.json
 { "mcpServers": { "notion": { "url": "${NOTION_MCP}" } } }`;
 
-const INSTALL_SNIPPET = `/plugin marketplace add ldom1/notion-pilot
-/plugin install notion-crm@notion-pilot`;
+const INSTALL_SNIPPET = `/plugin marketplace add ldom1/notion-pilot-powers
+/plugin install notion-pilot-powers@notion-pilot-powers`;
 
 const TAKEAWAYS: [string, string][] = [
   [

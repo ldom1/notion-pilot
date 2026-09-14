@@ -1,33 +1,23 @@
 type ToolKind = "write" | "read";
 
+/** Always-on tools (token + 4 IDs). Conditional Prosper/OpenRouter tools are footnote-only. */
 const TOOLS: { name: string; desc: string; kind: ToolKind }[] = [
   { name: "upsert_people", desc: "Upsert people into the Notion People database, dedup-checked (exact email/LinkedIn match, then fuzzy name+company). Dry-run by default.", kind: "write" },
   { name: "upsert_companies", desc: "Upsert companies into the Notion Companies database, dedup-checked; new companies get SIREN + sector/size/country enriched. Dry-run by default.", kind: "write" },
-  { name: "enrich_people", desc: "Enrich People records missing seniority/role/email via prosper's enrich_person MCP tool. Dry-run by default.", kind: "write" },
-  { name: "enrich_companies", desc: "Enrich Company records missing sector/size/country/LinkedIn via prosper's enrich_company MCP tool. Dry-run by default.", kind: "write" },
   { name: "find_duplicates", desc: "Find likely-duplicate People/Companies pairs already in Notion via fuzzy name matching.", kind: "read" },
-  { name: "rank_contacts_for_pitch", desc: "Rank existing CRM contacts by relevance to a B2B sales pitch (LLM-powered).", kind: "read" },
   { name: "search_people", desc: "Fuzzy-search existing People by name/company.", kind: "read" },
   { name: "search_companies", desc: "Fuzzy-search existing Companies by name.", kind: "read" },
   { name: "get_recent_people", desc: "People added to Notion in the last 7 days.", kind: "read" },
   { name: "get_open_leads", desc: "Open (non-closed) deals from the Deals database.", kind: "read" },
+  { name: "upsert_deal", desc: "Upsert a Deal (\"Leads\" in this cockpit) into the Deals database, matched by exact title. Dry-run by default.", kind: "write" },
+  { name: "log_activity", desc: "Log an Activity (call, meeting, email...) — an append-only event. Dry-run by default.", kind: "write" },
   { name: "get_activities", desc: "Recent Activities (calls, meetings, emails...), newest first; optionally scoped to one Deal.", kind: "read" },
   { name: "refresh_notion_snapshot", desc: "Force-reload the cached People/Companies snapshot from Notion.", kind: "read" },
-  { name: "upsert_deal", desc: "Upsert a Deal (\"Leads\" in this cockpit) into the Deals database, matched by exact title. Dry-run by default.", kind: "write" },
-  { name: "log_activity", desc: "Log an Activity (call, meeting, email...) — an append-only event, not dedup-checked. Dry-run by default.", kind: "write" },
+  { name: "lookup_siren", desc: "Look up a French company SIREN via recherche-entreprises.api.gouv.fr (name → open data).", kind: "read" },
 ];
 
 const WRITE_TOOLS = TOOLS.filter((t) => t.kind === "write");
 const READ_TOOLS = TOOLS.filter((t) => t.kind === "read");
-
-const CONFIG_SNIPPET = `{
-  "mcpServers": {
-    "notion-crm": {
-      "command": "uv",
-      "args": ["--directory", "/path/to/notion-pilot", "run", "python", "-m", "notion_pilot_powers.mcp.server"]
-    }
-  }
-}`;
 
 export function McpPanel() {
   return (
@@ -40,13 +30,11 @@ export function McpPanel() {
       </div>
 
       <p className="script-desc" style={{ marginBottom: "1rem" }}>
-        CRM tools over stdio via <code>notion-pilot-powers</code> — upsert, enrich,
-        scan, rank, query. Runs on your machine; this site only deploys the CRM.
+        Optional local MCP from the <code>notion-pilot-powers</code> plugin —
+        upsert, scan, rank, query. Fill the plugin settings (integration token +
+        the four IDs below) when you want it; the default path needs none of that.
+        Runs on your machine; this site only deploys the CRM.
       </p>
-
-      <div className="log-body" style={{ borderRadius: "9px", marginBottom: "1rem" }}>
-        <pre className="log-line" style={{ margin: 0 }}>{CONFIG_SNIPPET}</pre>
-      </div>
 
       <details className="mcp-section">
         <summary className="mcp-section-label">
@@ -69,6 +57,13 @@ export function McpPanel() {
           ))}
         </div>
       </details>
+
+      <p className="script-desc" style={{ marginTop: "0.85rem", fontSize: "0.75rem" }}>
+        Conditional (not registered for customers): <code>enrich_people</code> /{" "}
+        <code>enrich_companies</code> need Prosper; <code>rank_contacts_for_pitch</code>{" "}
+        needs OpenRouter — only when the server is launched with{" "}
+        <code>--with-external</code> and those env vars.
+      </p>
     </section>
   );
 }

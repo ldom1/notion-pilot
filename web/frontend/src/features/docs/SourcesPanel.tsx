@@ -54,14 +54,19 @@ const GROUPS = [
     title: "Go further",
     links: [
       {
-        title: "notion-crm-ops skill",
-        url: "https://github.com/ldom1/notion-pilot/tree/develop/skills/notion-crm-ops",
+        title: "crm-ops skill",
+        url: "https://github.com/ldom1/notion-pilot-powers/tree/main/skills/crm-ops",
         blurb: "How the assistant creates leads and logs activities, preview first.",
       },
       {
-        title: "company-open-data-enrichment skill",
-        url: "https://github.com/ldom1/notion-pilot/tree/develop/skills/company-open-data-enrichment",
+        title: "company-enrichment skill",
+        url: "https://github.com/ldom1/notion-pilot-powers/tree/main/skills/company-enrichment",
         blurb: "How French companies get enriched, and when it refuses.",
+      },
+      {
+        title: "notion-pilot-powers",
+        url: "https://github.com/ldom1/notion-pilot-powers",
+        blurb: "Plugin marketplace, skills and optional local MCP.",
       },
       {
         title: "Views, filters & sorts",

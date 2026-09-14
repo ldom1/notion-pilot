@@ -77,14 +77,19 @@ DOC_GROUPS: tuple[DocGroup, ...] = (
         "Go further",
         (
             DocLink(
-                "notion-crm-ops skill",
-                f"{REPO}/tree/develop/skills/notion-crm-ops",
+                "crm-ops skill",
+                "https://github.com/ldom1/notion-pilot-powers/tree/main/skills/crm-ops",
                 "How the assistant creates leads and logs activities, preview first.",
             ),
             DocLink(
-                "company-open-data-enrichment skill",
-                f"{REPO}/tree/develop/skills/company-open-data-enrichment",
+                "company-enrichment skill",
+                "https://github.com/ldom1/notion-pilot-powers/tree/main/skills/company-enrichment",
                 "How French companies get enriched, and when it refuses.",
+            ),
+            DocLink(
+                "notion-pilot-powers",
+                "https://github.com/ldom1/notion-pilot-powers",
+                "Plugin marketplace, skills and optional local MCP.",
             ),
             DocLink(
                 "Views, filters & sorts",

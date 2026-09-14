@@ -203,29 +203,20 @@ notion_pilot/
 vendor/notion-pilot-powers/  # Path submodule: CRM core + stdio MCP
 ```
 
-## Agent skills: Artelys CRM
+## Run it from your assistant
 
-Canonical skills under `skills/` (symlinked into `.cursor/skills/` and `.claude/skills/`):
+Install the **[notion-pilot-powers](https://github.com/ldom1/notion-pilot-powers)** plugin (Claude Code):
 
-- **`notion-crm-ops`** — add/update Leads, Activities, People, or Companies via Notion MCP; always French preview table before writes. See `references/` for DB IDs and field enums.
-- **`company-open-data-enrichment`** — enrich or create a Companies row from French open data (SIREN, NAF/APE, BODACC, RNE financials, dirigeants); Prosper MCP preferred, registry fallback; same preview + `go` write discipline as `notion-crm-ops`.
+```
+/plugin marketplace add ldom1/notion-pilot-powers
+/plugin install notion-pilot-powers@notion-pilot-powers
+```
+
+Skills + optional local MCP ship from that repo. This project's Artelys-only overlay is `.claude/skills/artelys-crm/` (IDs, French preview, Infisical launch) — not for customers.
 
 ## MCP server
 
-CRM tools live in the **`notion-pilot-powers`** submodule (`vendor/notion-pilot-powers`), installed as an editable path dependency. Run over stdio:
-
-```json
-{
-  "mcpServers": {
-    "notion-crm": {
-      "command": "uv",
-      "args": ["--directory", "/path/to/notion-pilot", "run", "python", "-m", "notion_pilot_powers.mcp.server"]
-    }
-  }
-}
-```
-
-Tools (same surface as before the split): `upsert_people`, `upsert_companies`, `find_duplicates`, `enrich_people`, `enrich_companies`, `rank_contacts_for_pitch`, `search_people`, `search_companies`, `get_recent_people`, `get_open_leads`, `get_activities`, `refresh_notion_snapshot`, `upsert_deal`, `log_activity`. Write tools default to `confirm=false`.
+CRM tools live in **notion-pilot-powers**. Customers fill the plugin `userConfig` (token + 4 IDs) when they want the optional local MCP; the default path uses Notion's hosted MCP only. Louis's Artelys launch is `artelys-crm` in `.claude/settings.json` / `.cursor/mcp.json` (`infisical run` + `--with-external`).
 
 The former HTTP `/mcp` mount on the web service was removed — use local stdio (or Notion’s official MCP) instead.
 

@@ -134,6 +134,14 @@ const Cockpit: React.FC = () => {
         notionUrl={notionUrl}
       />
       <div className="main">
+        <header style={{ marginBottom: "1.25rem" }}>
+          <h1 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 800, letterSpacing: "-0.02em" }}>
+            Deploy and configure your Notion CRM
+          </h1>
+          <p className="setup-lede" style={{ marginBottom: 0 }}>
+            You use the CRM from Claude Code on your machine; this page only sets it up.
+          </p>
+        </header>
         <AssistantSetupPanel />
         <WorkspacePanel
           databases={databases}
