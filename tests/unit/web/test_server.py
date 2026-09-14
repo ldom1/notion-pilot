@@ -374,3 +374,18 @@ def test_robots_txt_is_plain_text_not_spa():
     assert "text/plain" in r.headers.get("content-type", "")
     assert "Sitemap:" in r.text
     assert "<!doctype html>" not in r.text.lower()
+
+
+def test_sitemap_xml_is_xml_not_spa():
+    """SPA catch-all must not swallow /sitemap.xml."""
+    from web.server import create_app
+
+    client = TestClient(create_app(_make_settings()))
+    r = client.get("/sitemap.xml")
+    assert r.status_code == 200
+    ctype = r.headers.get("content-type", "")
+    assert "xml" in ctype
+    assert "<urlset" in r.text
+    assert "<lastmod>" in r.text
+    assert "https://notion-pilot.com/" in r.text
+    assert "<!doctype html>" not in r.text.lower()

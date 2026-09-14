@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `web/frontend/public/robots.txt`, `sitemap.xml`, `og-image.jpg`, and self-hosted `fonts/`.
 - GitHub Wiki: Home, Setup, Capture-channels, FAQ (Telegram optional).
+- Sitemap `<lastmod>`, `og:site_name` / `og:locale`, and a CI guard that `/sitemap.xml` is XML (not the SPA).
 
 ### Added
 - CRM home page shows this week's pipeline first: 📊 Pipeline, ⚠️ Needs attention, 📅 Closing in the next 30 days and 🕘 Recent activity, created as linked views during deploy.
