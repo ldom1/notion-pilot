@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { deleteWorkspace, refreshCrmTemplate } from "../../api/client";
 
 export interface DatabaseEntry {
@@ -15,12 +15,6 @@ export interface DatabaseEntry {
 interface NotionDb {
   id: string;
   name: string;
-}
-
-interface TelegramStatus {
-  connected: boolean;
-  bot_name: string | null;
-  last_seen: string | null;
 }
 
 interface WorkspacePanelProps {
@@ -52,36 +46,11 @@ export function WorkspacePanel({
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [availableDbs, setAvailableDbs] = useState<NotionDb[]>([]);
   const [loadingDbs, setLoadingDbs] = useState(false);
-  const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null);
-  const [telegramPinging, setTelegramPinging] = useState(false);
-  const [telegramPingResult, setTelegramPingResult] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [tgInfoOpen, setTgInfoOpen] = useState(false);
   const [refreshingCrm, setRefreshingCrm] = useState(false);
   const [crmRefreshError, setCrmRefreshError] = useState<string | null>(null);
   const [crmWarnings, setCrmWarnings] = useState<string[] | null>(null);
-
-  const fetchTelegramStatus = useCallback(async () => {
-    try {
-      const r = await fetch("/api/telegram/status", { credentials: "include" });
-      if (r.ok) setTelegramStatus(await r.json() as TelegramStatus);
-    } catch { /* silent */ }
-  }, []);
-
-  const pingTelegram = useCallback(async () => {
-    setTelegramPinging(true);
-    setTelegramPingResult(null);
-    try {
-      const r = await fetch("/api/telegram/ping", { method: "POST", credentials: "include" });
-      const data = await r.json() as { ok: boolean; latency_ms: number };
-      setTelegramPingResult(data.ok ? `OK — ${data.latency_ms}ms` : "Failed");
-    } catch {
-      setTelegramPingResult("Error");
-    } finally {
-      setTelegramPinging(false);
-    }
-  }, []);
 
   const fetchDbs = useCallback(async () => {
     setLoadingDbs(true);
@@ -97,12 +66,6 @@ export function WorkspacePanel({
       setLoadingDbs(false);
     }
   }, []);
-
-  useEffect(() => {
-    void fetchTelegramStatus();
-    const id = setInterval(() => { void fetchTelegramStatus(); }, 60_000);
-    return () => clearInterval(id);
-  }, [fetchTelegramStatus]);
 
   function handleEditClick(key: string, currentId: string | null | undefined) {
     setSelections((prev) => ({ ...prev, [key]: currentId ?? "" }));
@@ -140,14 +103,6 @@ export function WorkspacePanel({
     } finally {
       setDeleting(false);
     }
-  }
-
-  function relativeTime(iso: string | null): string {
-    if (!iso) return "never";
-    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-    if (diff < 60) return `${diff}s ago`;
-    if (diff < 3600) return `${Math.floor(diff / 60)}min ago`;
-    return `${Math.floor(diff / 3600)}h ago`;
   }
 
   return (
@@ -232,67 +187,6 @@ export function WorkspacePanel({
             </div>
           );
         })}
-      </div>
-
-      <div className="tg-bot-card">
-        <div className="tg-bot-header">
-          <span className="db-icon">🤖</span>
-          <span className="tg-bot-label">Telegram Bot</span>
-          <button
-            type="button"
-            className="tg-info-btn"
-            aria-label="About the Telegram bot"
-            aria-expanded={tgInfoOpen}
-            aria-controls="tg-bot-info"
-            onClick={() => setTgInfoOpen((open) => !open)}
-          >
-            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-              <circle cx="12" cy="6.1" r="2.2" fill="currentColor" />
-              <rect x="9.95" y="10.15" width="4.1" height="9.55" rx="2.05" fill="currentColor" />
-            </svg>
-          </button>
-          <span
-            className="tg-bot-dot"
-            style={{ color: telegramStatus?.connected ? "var(--ok)" : "var(--bad)" }}
-            title={telegramStatus?.connected ? "Connected" : "Disconnected"}
-          >●</span>
-        </div>
-        {tgInfoOpen && (
-          <div id="tg-bot-info" className="tg-bot-info" role="region" aria-label="About the Telegram bot">
-            <b>CRM from Telegram</b>
-            <p>
-              Create and update People, Companies, and Leads without opening Notion.
-              The bot asks for any field you skip.
-            </p>
-            <ul className="tg-bot-cmds">
-              <li><code>/lead</code></li>
-              <li><code>/people</code></li>
-              <li><code>/company</code></li>
-              <li><code>/deal</code></li>
-            </ul>
-            <p className="tg-bot-info-note">
-              The dot is whether the bot process is polling. Test connection pings it.
-            </p>
-          </div>
-        )}
-        {telegramStatus && (
-          <div className="tg-bot-meta">
-            {telegramStatus.bot_name && <span>@{telegramStatus.bot_name}</span>}
-            <span>last seen {relativeTime(telegramStatus.last_seen)}</span>
-          </div>
-        )}
-        <div className="tg-bot-actions">
-          <button
-            className="btn-ghost btn-sm"
-            onClick={() => { void pingTelegram(); }}
-            disabled={telegramPinging}
-          >
-            {telegramPinging ? "Testing…" : "Test connection"}
-          </button>
-          {telegramPingResult && (
-            <span className="tg-bot-ping-result">{telegramPingResult}</span>
-          )}
-        </div>
       </div>
 
       <div className="tg-bot-card" style={{ marginTop: "0.5rem" }}>

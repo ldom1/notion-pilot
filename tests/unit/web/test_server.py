@@ -336,6 +336,19 @@ def test_robots_txt_is_plain_text_not_spa():
     assert "text/plain" in r.headers.get("content-type", "")
     assert "Sitemap:" in r.text
     assert "<!doctype html>" not in r.text.lower()
+    assert "Disallow: /mcp" not in r.text
+
+
+def test_spa_fallback_404_for_api_auth_mcp_prefixes():
+    """Unknown api/auth/mcp paths must be JSON 404, not SPA HTML (P4)."""
+    from web.server import create_app
+
+    client = TestClient(create_app(_make_settings()))
+    for path in ("/api/does-not-exist", "/auth/nope", "/mcp"):
+        r = client.get(path)
+        assert r.status_code == 404, path
+        assert "text/html" not in r.headers.get("content-type", "")
+        assert "<!doctype html>" not in r.text.lower()
 
 
 def test_sitemap_xml_is_xml_not_spa():

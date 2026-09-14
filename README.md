@@ -188,7 +188,7 @@ notion_pilot/
 ├── bot.py                 # Runner: activates adapters from env
 ├── shared/                # Core shared across verticals
 │   ├── adapters/          # Telegram / email / Discord (optional extras)
-│   ├── llm/               # OpenRouter synthesis, prompts, CRM chat
+│   ├── llm/               # OpenRouter synthesis, prompts
 │   ├── media/             # Photo + voice; on-device transcription
 │   ├── config.py          # Settings(CRMSettings) + Infisical / Telegram / web
 │   ├── models.py          # IncomingMessage + Notion properties
