@@ -1,6 +1,6 @@
 # Companies
 
-Ground truth: `CompanyRecord` in `notion_pilot/mcp/models.py`; SIREN helpers in `notion_pilot/shared/siren_lookup.py`.
+Ground truth: `CompanyRecord` in `notion_pilot_powers/mcp/models.py`; SIREN helpers in `notion_pilot_powers/core/siren_lookup.py`.
 
 ## Strongly expected fields (always attempt)
 
@@ -15,7 +15,7 @@ Ground truth: `CompanyRecord` in `notion_pilot/mcp/models.py`; SIREN helpers in 
 
 ## SIREN is not a passable field on `upsert_companies`
 
-`CompanyRecord` (`notion_pilot/mcp/models.py`) has **no `siren` input** — the tool resolves SIREN server-side via `siren_lookup.py` and surfaces it on the result (`RecordResult.siren` / `siren_candidate_name`). So:
+`CompanyRecord` (`notion_pilot_powers/mcp/models.py`) has **no `siren` input** — the tool resolves SIREN server-side via `siren_lookup.py` and surfaces it on the result (`RecordResult.siren` / `siren_candidate_name`). So:
 
 - **`notion-crm` path:** do not pass SIREN. Run the `upsert_companies` dry-run, then validate the auto-resolved candidate (mark `needs_review` if the name score is low — never force).
 - **Notion MCP fallback path only:** set the `SIREN` property manually (registry / pappers), tagged `source=siren`.

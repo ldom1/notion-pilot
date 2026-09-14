@@ -4,7 +4,7 @@ from loguru import logger
 from notion_client import APIResponseError
 from notion_client import AsyncClient as NotionClient
 
-from notion_pilot.crm.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
+from notion_pilot_powers.core.syncer import NotionCompanySyncer, NotionPeopleSyncer, PersonRecord
 from notion_pilot.shared.adapters import MessageHandler
 from notion_pilot.shared.config import Settings
 from notion_pilot.shared.models import IncomingMessage

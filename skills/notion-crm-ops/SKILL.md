@@ -17,8 +17,8 @@ Project-only skill for **Artelys CRM** in this repo. Do not use against other No
 ## Prerequisites
 
 1. **Notion MCP** (`plugin-notion-workspace-notion` or equivalent) must be ready and authenticated to the Artelys CRM workspace. If missing/unauthenticated → stop and tell the user to connect it.
-2. Optionally **`notion-crm`** stdio MCP (`python -m notion_pilot.mcp.server`) for People/Companies upsert dry-runs (`confirm=false`).
-3. Ground field shapes in repo models: `notion_pilot/mcp/models.py` (`PersonRecord`, `CompanyRecord`, `DealInput`, `ActivityInput`) and CRM property setup under `scripts/crm/` / `notion_pilot/shared/workspace.py`.
+2. Optionally **`notion-crm`** stdio MCP (`python -m notion_pilot_powers.mcp.server`) for People/Companies upsert dry-runs (`confirm=false`).
+3. Ground field shapes in repo models: `notion_pilot_powers/mcp/models.py` (`PersonRecord`, `CompanyRecord`, `DealInput`, `ActivityInput`) and CRM property setup under `scripts/crm/` / `notion_pilot/shared/workspace.py`.
 
 Read `references/crm-ids.md` for database / data-source IDs. Read the entity reference only for the entities you touch:
 - `references/people.md`

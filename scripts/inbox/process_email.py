@@ -19,12 +19,12 @@ from pathlib import Path
 from loguru import logger
 from notion_client import AsyncClient
 
-from notion_pilot.crm.syncer import NotionPeopleSyncer, PersonRecord
+from notion_pilot_powers.core.syncer import NotionPeopleSyncer, PersonRecord
 from notion_pilot.inbox import build_knowledge_pipeline
 from notion_pilot.shared.adapters.email import EmailAdapter, _sender_allowed
 from notion_pilot.shared.config import Settings, load_settings
 from notion_pilot.shared.models import _first_url
-from notion_pilot.shared.prosper_client import PersonEnrichment, enrich_person
+from notion_pilot_powers.core.prosper_client import PersonEnrichment, enrich_person
 
 _SENDER_CONFIG = Path("config/email-senders.yaml")
 _REVIEW_CSV = Path("data/inbox/email-import-review.csv")

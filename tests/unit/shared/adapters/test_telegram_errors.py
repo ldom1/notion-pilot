@@ -1,7 +1,7 @@
 """Unit tests for telegram.py's sanitized CRM error-message formatting."""
 
 import httpx
-from notion_client.errors import APIResponseError
+from notion_client.errors import APIErrorCode, APIResponseError
 
 
 def test_format_handler_error_shows_class_name_for_plain_exception():
@@ -24,15 +24,12 @@ def test_format_handler_error_caps_plain_exception_message_length():
 def test_format_handler_error_hides_raw_notion_sdk_message():
     from notion_pilot.shared.adapters.telegram import _format_handler_error
 
-    # Real APIResponseError signature (verified against the installed notion_client
-    # package): __init__(self, code, status, message, headers, raw_body_text,
-    # additional_data=None, request_id=None) — NOT (response, message, code=...).
+    # notion-client 2.x: APIResponseError(response, message, code, ...)
+    response = httpx.Response(400, request=httpx.Request("POST", "https://api.notion.com/v1/pages"))
     exc = APIResponseError(
-        code="validation_error",
-        status=400,
+        response=response,
         message="page_id abc-123-def in database xyz-789 is not shared",
-        headers=httpx.Headers({}),
-        raw_body_text="{}",
+        code=APIErrorCode.ValidationError,
     )
     msg = _format_handler_error(exc)
     assert "abc-123-def" not in msg
@@ -42,10 +39,6 @@ def test_format_handler_error_hides_raw_notion_sdk_message():
 
 
 def test_format_handler_error_hides_other_notion_client_exception_types_too():
-    # Regression guard: NotionClientErrorBase, not just APIResponseError, is
-    # the real base class — a timeout from the SDK must get the same generic
-    # treatment, not fall through to the "plain exception" branch and leak
-    # its raw message.
     from notion_client.errors import RequestTimeoutError
 
     from notion_pilot.shared.adapters.telegram import _format_handler_error

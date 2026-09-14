@@ -8,6 +8,8 @@ from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
+from notion_pilot_powers.config import CRMSettings
+
 _log = logging.getLogger(__name__)
 
 try:
@@ -82,8 +84,12 @@ class InfisicalSettingsSource(PydanticBaseSettingsSource):
         return secrets
 
 
-class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
-    """Application secrets and ids from the environment (and optional ``.env`` file)."""
+class Settings(CRMSettings):  # pylint: disable=too-many-instance-attributes
+    """Application secrets and ids from the environment (and optional ``.env`` file).
+
+    CRM fields (Notion token, People/Companies/Deals/Activities ids, Prosper,
+    OpenRouter) come from ``CRMSettings`` in ``notion-pilot-powers``.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -109,11 +115,7 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
             init_settings,
         )
 
-    # ── Notion (optional when using OAuth) ──────────────────────────────────
-    notion_token: SecretStr | None = Field(
-        default=None,
-        description="Notion integration token. Not required when using the OAuth deploy wizard.",
-    )
+    # ── Notion inbox (platform) ──────────────────────────────────────────────
     notion_telegram_msg_database_id: str = Field(
         validation_alias=AliasChoices(
             "notion_telegram_msg_database_id",
@@ -127,40 +129,10 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         description="Notion title column name (use Name if your DB uses the default title)",
     )
 
-    # ── MCP server (optional) ────────────────────────────────────────────────
-    mcp_bearer_token: SecretStr | None = Field(
-        default=None,
-        description="Shared bearer token required to call the MCP server's HTTP transport "
-        "(mounted at /mcp). The web server only mounts /mcp when both this and "
-        "notion_token are set — leave unset to keep MCP stdio-only.",
-    )
-
     # ── Telegram (optional) ──────────────────────────────────────────────────
     telegram_bot_token: SecretStr | None = Field(
         default=None,
         description="Telegram bot token from @BotFather; enables the Telegram adapter",
-    )
-
-    # ── OpenRouter (optional) ────────────────────────────────────────────────
-    openrouter_api_key: SecretStr | None = Field(
-        default=None,
-        description="OpenRouter API key; when set, rows are enriched via chat completions",
-    )
-    openrouter_model: str = Field(
-        default="google/gemini-2.5-flash-lite",
-        description="OpenRouter model id",
-    )
-    openrouter_url: str = Field(
-        default="https://openrouter.ai/api/v1",
-        description="OpenRouter API URL",
-    )
-    openrouter_http_referer: str = Field(
-        default="",
-        description="HTTP-Referer header sent to OpenRouter for cost attribution",
-    )
-    openrouter_app_title: str = Field(
-        default="notion-pilot",
-        description="X-Title header sent to OpenRouter for dashboard display",
     )
 
     # ── Whisper (optional) ───────────────────────────────────────────────────
@@ -205,34 +177,14 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
         ),
     )
 
-    # ── CRM / People import (optional) ──────────────────────────────────────
-    notion_people_data_source_id: str | None = Field(
-        default=None,
-        description="Notion data source ID for the People database (inline DS API).",
-    )
-    notion_companies_data_source_id: str | None = Field(
-        default=None,
-        description="Notion data source ID for the Companies & departments database.",
-    )
+    # ── CRM extras (not on CRMSettings) ──────────────────────────────────────
     brave_api_key: SecretStr | None = Field(
         default=None,
         description="Brave Search API key for email enrichment during people import.",
     )
-
-    # ── CRM Enrichment (optional) ────────────────────────────────────────────
     apollo_api_key: SecretStr | None = Field(
         default=None,
         description="Apollo.io API key for person/company enrichment (Tier 1).",
-    )
-
-    # ── Deals DB (optional) ──────────────────────────────────────────────────
-    notion_deals_database_id: str | None = Field(
-        default=None,
-        description="Notion database ID for the Deals database (standard databases API, not data_sources).",
-    )
-    notion_activities_database_id: str | None = Field(
-        default=None,
-        description="Notion database ID for the Activities database (standard databases API, not data_sources).",
     )
     notion_meetings_database_id: str | None = Field(
         default=None,
@@ -240,10 +192,6 @@ class Settings(BaseSettings):  # pylint: disable=too-many-instance-attributes
             "Notion database ID for the Meetings database. Created by the deploy wizard and "
             "related to Leads/People/Companies, but human-written: no tool writes to it."
         ),
-    )
-    prosper_mcp_url: str = Field(
-        default="http://localhost:8090/sse",
-        description="SSE endpoint for prosper's MCP server (company resolution + enrichment).",
     )
 
     # ── Knowledge Inbox DBs (optional) ──────────────────────────────────────

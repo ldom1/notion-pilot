@@ -1,6 +1,6 @@
 # People
 
-Ground truth shapes: `notion_pilot/mcp/models.py` → `PersonRecord`; writes via `NotionPeopleSyncer` / Notion MCP.
+Ground truth shapes: `notion_pilot_powers/mcp/models.py` → `PersonRecord`; writes via `NotionPeopleSyncer` / Notion MCP.
 
 ## Required vs strongly expected
 

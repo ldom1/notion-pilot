@@ -24,9 +24,10 @@ from telegram.ext import (
 from notion_pilot.crm.commands import COMMANDS, extract_fields_from_text, get_next_prompt
 from notion_pilot.crm.contact_parse import parse_linkedin_deterministic, sanitize_extracted
 from notion_pilot.crm.conv_state import ConvState, ConvStateStore
-from notion_pilot.crm.queries import get_inbox_items, get_open_leads, get_recent_people
+from notion_pilot.crm.queries import get_inbox_items
 from notion_pilot.crm.recap import format_inbox, format_leads, format_recap
 from notion_pilot.crm.setup_wizard import advance_setup, start_setup
+from notion_pilot_powers.core.queries import get_open_leads, get_recent_people
 from notion_pilot.shared.adapters import MessageHandler as PipelineHandler
 from notion_pilot.shared.config import Settings
 from notion_pilot.shared.media import extract_photo, extract_voice
@@ -279,15 +280,13 @@ def _format_handler_error(exc: Exception) -> str:
     never surface a raw notion_client SDK message (may contain page/database IDs
     or schema internals); cap any other exception's message length.
 
-    Checked against NotionClientErrorBase — the true root of every notion_client
-    exception (verified: RequestTimeoutError, InvalidPathParameterError,
-    HTTPResponseError, UnknownHTTPResponseError, and APIResponseError all inherit
-    from it) — not just APIResponseError, so a timeout or an internal-path error
-    from the SDK gets the same generic treatment instead of leaking its message."""
-    from notion_client.errors import NotionClientErrorBase
+    notion-client 2.x has no NotionClientErrorBase — catch HTTPResponseError
+    (covers APIResponseError) and RequestTimeoutError instead.
+    """
+    from notion_client.errors import HTTPResponseError, RequestTimeoutError
 
     cls_name = type(exc).__name__
-    if isinstance(exc, NotionClientErrorBase):
+    if isinstance(exc, (HTTPResponseError, RequestTimeoutError)):
         return f"⚠ Failed to save to Notion: {cls_name} — Notion API error, see server logs."
     detail = str(exc)
     if len(detail) > _ERROR_MESSAGE_CAP:

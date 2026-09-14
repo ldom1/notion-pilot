@@ -24,7 +24,7 @@ const CONFIG_SNIPPET = `{
   "mcpServers": {
     "notion-crm": {
       "command": "uv",
-      "args": ["--directory", "/path/to/notion-pilot", "run", "python", "-m", "notion_pilot.mcp.server"]
+      "args": ["--directory", "/path/to/notion-pilot", "run", "python", "-m", "notion_pilot_powers.mcp.server"]
     }
   }
 }`;
@@ -36,13 +36,12 @@ export function McpPanel() {
         <span className="panel-title">MCP Server</span>
         <span style={{ display: "flex", gap: "0.35rem" }}>
           <span className="script-cat-badge crm">stdio</span>
-          <span className="script-cat-badge inbox">http (optional)</span>
         </span>
       </div>
 
       <p className="script-desc" style={{ marginBottom: "1rem" }}>
-        CRM tools over stdio — upsert, enrich, scan, rank, query. Optional HTTP
-        at <code>/mcp</code> when <code>MCP_BEARER_TOKEN</code> is set.
+        CRM tools over stdio via <code>notion-pilot-powers</code> — upsert, enrich,
+        scan, rank, query. HTTP <code>/mcp</code> on this web service was removed.
       </p>
 
       <div className="log-body" style={{ borderRadius: "9px", marginBottom: "1rem" }}>

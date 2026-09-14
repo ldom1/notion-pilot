@@ -1,12 +1,12 @@
-"""CRM utilities — people/company syncing, dedup, enrichment."""
+"""CRM vertical — Telegram commands + re-exports from notion-pilot-powers."""
 
-from notion_pilot.crm.syncer import (
+from notion_pilot_powers.core.dedup import CandidateRecord, DedupStatus, MatchResult, find_match
+from notion_pilot_powers.core.syncer import (
     NotionCompanySyncer,
     NotionPeopleSyncer,
     PersonRecord,
     UpsertResult,
 )
-from notion_pilot.shared.utils.dedup import CandidateRecord, DedupStatus, MatchResult, find_match
 
 __all__ = [
     "CandidateRecord",

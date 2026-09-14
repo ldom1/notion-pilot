@@ -6,6 +6,7 @@ WORKDIR /app
 
 ENV SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0
 
+COPY vendor/ vendor/
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
